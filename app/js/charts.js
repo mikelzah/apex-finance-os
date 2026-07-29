@@ -112,8 +112,8 @@ export function line(points, options = {}) {
   svg.appendChild(
     el('defs', {}, [
       el('linearGradient', { id: gradId, x1: '0', y1: '0', x2: '0', y2: '1' }, [
-        el('stop', { offset: '0%', 'stop-color': 'var(--quantum-mark)', 'stop-opacity': '0.22' }),
-        el('stop', { offset: '100%', 'stop-color': 'var(--quantum-mark)', 'stop-opacity': '0' }),
+        el('stop', { offset: '0%', 'stop-color': 'var(--accent-mark)', 'stop-opacity': '0.22' }),
+        el('stop', { offset: '100%', 'stop-color': 'var(--accent-mark)', 'stop-opacity': '0' }),
       ]),
     ]),
   );

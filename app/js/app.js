@@ -4,6 +4,7 @@ import * as U from './ui.js';
 import * as D from './dates.js';
 import * as F from './fmt.js';
 import * as store from './store.js';
+import * as theme from './theme.js';
 import { icon } from './icons.js';
 
 import * as dashboard from './views/dashboard.js';
@@ -11,6 +12,7 @@ import * as goals from './views/goals.js';
 import * as portfolio from './views/portfolio.js';
 import * as journal from './views/journal.js';
 import * as more from './views/more.js';
+import * as intro from './views/intro.js';
 
 const { h } = U;
 
@@ -29,6 +31,7 @@ const header = document.getElementById('header');
 const tabbar = document.getElementById('tabbar');
 
 let route = { tab: 'dashboard', sub: null };
+let booted = false;
 
 // --------------------------------------------------------------------------
 
@@ -56,20 +59,33 @@ function context() {
 // --------------------------------------------------------------------------
 
 function render() {
+  // Пока данных нет вовсе, вкладки нечего показывать: приложение
+  // спрашивает, с чего начать, и не притворяется наполненным.
+  if (store.isEmpty()) return renderIntro();
+
   const ctx = context();
   const view = VIEWS[route.tab];
 
-  renderHeader();
+  renderHeader(ctx);
+  tabbar.hidden = false;
 
   U.clear(screen);
   screen.classList.toggle('is-bare', header.hidden);
-  const banner = backupBanner(ctx);
-  if (banner) screen.appendChild(banner);
+
+  const notices = [offlineNotice(), backupBanner(ctx)].filter(Boolean);
+  U.append(screen, notices);
   U.append(screen, view.render(ctx));
 
   renderTabs();
-  // Возврат в подраздел не должен оставлять экран прокрученным вниз.
   if (route.tab !== 'journal') screen.scrollTop = 0;
+}
+
+function renderIntro() {
+  header.hidden = true;
+  tabbar.hidden = true;
+  U.clear(screen);
+  screen.classList.add('is-bare');
+  U.append(screen, intro.render({ refresh: render, go }));
 }
 
 /**
@@ -77,7 +93,7 @@ function render() {
  * На основных экранах заголовок дублировал бы таб-бар и забирал полосу
  * в 110 пикселей, ничего не сообщая.
  */
-function renderHeader() {
+function renderHeader(ctx) {
   U.clear(header);
   const isSub = route.tab === 'more' && route.sub;
   header.hidden = !isSub;
@@ -88,6 +104,9 @@ function renderHeader() {
       h('span', { class: 'back-chevron', text: '‹' }),
     ]),
     h('h1', { text: more.title(route.sub) }),
+    // Действие раздела живёт в шапке: заголовок экрана под ней повторял бы
+    // название раздела, и на экране оказывалось бы два одинаковых заголовка.
+    h('div', { class: 'header-action' }, [more.action(route.sub, ctx)]),
   ]);
 }
 
@@ -113,6 +132,17 @@ function renderTabs() {
 }
 
 /**
+ * Оффлайн — не авария: данные лежат в телефоне, работает вообще всё,
+ * кроме обновления котировок. Поэтому сноска, а не тревожная плашка.
+ */
+function offlineNotice() {
+  if (navigator.onLine !== false) return null;
+  return h('div', { class: 'offline' }, [
+    h('span', { text: 'Нет сети — котировки не обновятся, остальное работает' }),
+  ]);
+}
+
+/**
  * Напоминание о копии. Данные живут только здесь, и единственное, что стоит
  * между ними и случайной очисткой Safari, — выгруженный файл.
  */
@@ -121,8 +151,6 @@ function backupBanner(ctx) {
   const every = state.settings.backupReminderDays;
   if (!every) return null;
   if (route.tab === 'more') return null;
-
-  if (!state.operations.length && !state.assets.length) return null;
 
   // Пока копии не было, отсчёт идёт от установки: напоминать в первый же день
   // бессмысленно — терять ещё нечего, а баннер уже мозолит глаза.
@@ -140,12 +168,30 @@ function backupBanner(ctx) {
 
 // --------------------------------------------------------------------------
 
+function skeleton() {
+  U.clear(screen);
+  screen.classList.add('is-bare');
+  U.append(screen, [
+    h('div', { class: 'hero' }, [
+      h('div', { class: 'skeleton skeleton-line', style: { width: '40%', margin: '0 auto' } }),
+      h('div', { class: 'skeleton skeleton-hero' }),
+    ]),
+    h('div', { class: 'act' }, [h('div', { class: 'skeleton', style: { height: '4.5rem', borderRadius: 'var(--radius-lg)' } })]),
+    h('div', { class: 'card' }, [h('div', { class: 'skeleton skeleton-block' })]),
+  ]);
+}
+
 async function boot() {
+  theme.apply();
+  // Чтение из IndexedDB обычно занимает миллисекунды, но на холодном старте
+  // после перезагрузки телефона бывает и заметно дольше. Пустой белый экран
+  // в этот момент читается как поломка, скелетон — как загрузка.
+  skeleton();
+
   try {
-    const { seeded } = await store.init();
+    await store.init();
     route = parseHash();
     render();
-    if (seeded) U.toast('Загружены стартовые данные');
   } catch (err) {
     console.error(err);
     U.clear(screen);
@@ -158,11 +204,18 @@ async function boot() {
     return;
   }
 
+  booted = true;
+
   window.addEventListener('hashchange', () => {
     route = parseHash();
     U.close();
     render();
   });
+
+  theme.watch(() => booted && render());
+
+  window.addEventListener('online', () => booted && render());
+  window.addEventListener('offline', () => booted && render());
 
   // Приложение открыто сутками — на смене даты «сегодня» должно поехать само,
   // иначе календарь дисциплины утром покажет вчерашний день.

@@ -4,7 +4,7 @@
 // Версию поднимайте при каждом изменении файлов: иначе на телефоне останется
 // старая копия, а понять это по внешнему виду невозможно.
 
-const VERSION = 'v2';
+const VERSION = 'v3';
 const CACHE = `apex-finance-os-${VERSION}`;
 
 const SHELL = [
@@ -12,6 +12,8 @@ const SHELL = [
   './index.html',
   './manifest.webmanifest',
   './css/app.css',
+  './css/tokens.css',
+  './fonts/inter-subset.woff2',
   './js/app.js',
   './js/store.js',
   './js/calc.js',
@@ -22,11 +24,15 @@ const SHELL = [
   './js/charts.js',
   './js/moex.js',
   './js/icons.js',
+  './js/theme.js',
+  './js/table.js',
   './js/views/dashboard.js',
   './js/views/goals.js',
   './js/views/portfolio.js',
   './js/views/journal.js',
   './js/views/more.js',
+  './js/views/intro.js',
+  './data/demo.json',
   './data/seed.json',
   './icons/icon.svg',
   './icons/icon-192.png',

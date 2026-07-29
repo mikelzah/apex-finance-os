@@ -8,6 +8,8 @@ import * as D from '../dates.js';
 import * as charts from '../charts.js';
 import * as store from '../store.js';
 import * as forms from '../forms.js';
+import * as theme from '../theme.js';
+import { table } from '../table.js';
 
 const { h } = U;
 
@@ -22,6 +24,20 @@ export function render(ctx) {
     case 'backup': return backup(ctx);
     default: return hub(ctx);
   }
+}
+
+/**
+ * Действие для шапки вложенного раздела. Кнопка живёт там, а не в теле
+ * экрана: иначе заголовок раздела и заголовок экрана дублируют друг друга.
+ */
+export function action(sub, ctx) {
+  if (sub === 'assets') {
+    return U.button('Добавить', () => forms.assetSheet(null, { onDone: ctx.refresh }), { kind: 'primary' });
+  }
+  if (sub === 'keyrate') {
+    return U.button('Добавить', () => keyRateSheet(ctx), { kind: 'primary' });
+  }
+  return null;
 }
 
 export function title(sub) {
@@ -83,42 +99,84 @@ function hub(ctx) {
 
 function assets(ctx) {
   const { state, today, refresh } = ctx;
-  const order = { [C.STATUS_ACTIVE]: 0, [C.STATUS_FROZEN]: 1, [C.STATUS_PLANNED]: 2, [C.STATUS_SOLD]: 3 };
-  const list = [...state.assets].sort((a, b) => {
-    const byStatus = (order[a.status] ?? 4) - (order[b.status] ?? 4);
-    if (byStatus) return byStatus;
-    return C.assetValue(b, state.operations) - C.assetValue(a, state.operations);
+  const ops = state.operations;
+  const alive = state.assets.filter((a) => a.status !== C.STATUS_SOLD);
+  const total = alive.reduce((s, a) => s + C.assetValue(a, ops), 0);
+
+  const rows = state.assets.map((a) => {
+    const value = C.assetValue(a, ops);
+    const gap = a.bankBalance != null ? a.bankBalance - value : null;
+    return { asset: a, value, gap, share: total > 0 && a.status !== C.STATUS_SOLD ? value / total : null };
   });
+
+  const accruals = C.pendingAccruals(state.assets, ops, today);
 
   return [
     U.card([
-      U.sectionTitle('Активы', U.button('Добавить', () => forms.assetSheet(null, { onDone: refresh }), { kind: 'primary' })),
-      ...list.map((a) => {
-        const value = C.assetValue(a, state.operations);
-        const gap = a.bankBalance != null ? a.bankBalance - value : null;
-        return U.row(a.name, F.money(value), {
-          sub: [a.type, a.liquidity, a.rate ? `${F.percent(a.rate, 2)} годовых` : null]
-            .filter(Boolean)
-            .join(' · '),
-          tag: a.status === C.STATUS_ACTIVE ? (gap && Math.abs(gap) >= 1 ? 'расхождение' : null) : a.status,
-          tagClass: gap && Math.abs(gap) >= 1 ? 'sell' : 'muted',
-          onClick: () => forms.assetSheet(a, { onDone: refresh }),
-        });
+      table({
+        rows,
+        sortKey: 'value',
+        dir: 'desc',
+        onRow: (r) => forms.assetSheet(r.asset, { onDone: refresh }),
+        empty: 'Активов нет. Добавьте первый — с него начнётся капитал.',
+        columns: [
+          {
+            key: 'name',
+            title: 'Название',
+            value: (r) => r.asset.name,
+            render: (r) => {
+              const box = h('div');
+              box.appendChild(h('div', { text: r.asset.name }));
+              const sub = [r.asset.type, r.asset.rate ? F.percent(r.asset.rate, 2) : null]
+                .filter(Boolean)
+                .join(' · ');
+              box.appendChild(h('div', { class: 'dt-dim', style: { fontSize: 'var(--text-micro)' }, text: sub }));
+              return box;
+            },
+            total: () => 'Итого',
+          },
+          {
+            key: 'value',
+            title: 'Стоимость',
+            align: 'right',
+            value: (r) => r.value,
+            render: (r) => F.money(r.value),
+            total: () => F.money(total),
+          },
+          {
+            key: 'share',
+            title: 'Доля',
+            align: 'right',
+            value: (r) => r.share,
+            render: (r) => (r.share == null ? '—' : F.share(r.share, 1)),
+          },
+          {
+            key: 'status',
+            title: 'Статус',
+            value: (r) => r.asset.status,
+            render: (r) => {
+              if (r.gap && Math.abs(r.gap) >= 1) {
+                return h('span', { class: 'tag tag-sell', text: 'расхождение' });
+              }
+              if (r.asset.status === C.STATUS_ACTIVE) return h('span', { class: 'dt-dim', text: 'активен' });
+              return h('span', { class: 'tag tag-muted', text: r.asset.status.toLowerCase() });
+            },
+          },
+        ],
       }),
-      list.length ? null : U.emptyState('Активов нет.'),
-    ]),
-    U.card([
-      U.sectionTitle('Накопленные проценты'),
-      ...C.pendingAccruals(state.assets, state.operations, today).map((p) =>
-        U.row(p.asset.name, F.money2(p.accrued), {
-          sub: p.asset.capDay ? `капитализация ${p.asset.capDay}-го` : 'день капитализации не задан',
-        }),
-      ),
-      C.pendingAccruals(state.assets, state.operations, today).length
-        ? null
-        : U.emptyState('Активов с процентами нет.'),
-      U.callout('Это расчётная оценка с последней капитализации, а не цифра из банка. В капитал она попадёт только после того, как вы запишете операцию «Доход».', 'info'),
-    ]),
+    ], { class: 'card-table' }),
+
+    accruals.length
+      ? U.card([
+          U.sectionTitle('Накопленные проценты'),
+          ...accruals.map((p) =>
+            U.row(p.asset.name, F.money2(p.accrued), {
+              sub: p.asset.capDay ? `капитализация ${p.asset.capDay}-го` : 'день капитализации не задан',
+            }),
+          ),
+          U.callout('Это расчётная оценка с последней капитализации, а не цифра из банка. В капитал она попадёт только после того, как вы запишете операцию «Доход».', 'info'),
+        ])
+      : null,
   ];
 }
 
@@ -246,35 +304,8 @@ function keyRate(ctx) {
   const { state, today, refresh } = ctx;
   const rows = [...state.keyRate].sort((a, b) => (a.date < b.date ? 1 : -1));
 
-  const add = () => {
-    U.sheet('Точка ключевой ставки', (api) => {
-      const date = U.input({ type: 'date', value: today });
-      const rate = U.numberInput(null, { 'data-autofocus': 'yes' });
-      api.setFooter([
-        U.button('Отмена', () => api.close()),
-        U.button('Сохранить', async () => {
-          const value = U.parseNumber(rate.value);
-          if (value == null) return U.toast('Введите ставку', 'error');
-          await store.mutate((draft) => {
-            const i = draft.keyRate.findIndex((r) => r.date === date.value);
-            if (i === -1) draft.keyRate.push({ date: date.value, rate: value });
-            else draft.keyRate[i].rate = value;
-          });
-          api.close();
-          refresh();
-        }, { kind: 'primary' }),
-      ]);
-      return [
-        U.field('Дата изменения', date),
-        U.field('Ставка, %', rate),
-        U.callout('Ставка ЦБ меняется несколько раз в год. Достаточно вносить точку в день изменения — лимит пересчитается сам.', 'info'),
-      ];
-    });
-  };
-
   return [
     U.card([
-      U.sectionTitle('Ключевая ставка ЦБ', U.button('Добавить', add, { kind: 'primary' })),
       U.stat('Действует сейчас', F.percent(C.rateOn(state.keyRate, today)), { big: true }),
       charts.line(
         rows.map((r) => ({ x: r.date, y: r.rate })).reverse(),
@@ -297,6 +328,33 @@ function keyRate(ctx) {
       rows.length ? null : U.emptyState('Ряд пуст. Без него налоговый лимит не пересчитывается.'),
     ]),
   ];
+}
+
+function keyRateSheet(ctx) {
+  const { today, refresh } = ctx;
+  U.sheet('Точка ключевой ставки', (api) => {
+    const date = U.input({ type: 'date', value: today });
+    const rate = U.numberInput(null, { 'data-autofocus': 'yes' });
+    api.setFooter([
+      U.button('Отмена', () => api.close()),
+      U.button('Сохранить', async () => {
+        const value = U.parseNumber(rate.value);
+        if (value == null) return U.toast('Введите ставку', 'error');
+        await store.mutate((draft) => {
+          const i = draft.keyRate.findIndex((r) => r.date === date.value);
+          if (i === -1) draft.keyRate.push({ date: date.value, rate: value });
+          else draft.keyRate[i].rate = value;
+        });
+        api.close();
+        refresh();
+      }, { kind: 'primary' }),
+    ]);
+    return [
+      U.field('Дата изменения', date),
+      U.field('Ставка, %', rate),
+      U.callout('Ставка ЦБ меняется несколько раз в год. Достаточно вносить точку в день изменения — лимит пересчитается сам.', 'info'),
+    ];
+  });
 }
 
 // --------------------------------------------------------------------------
@@ -412,10 +470,42 @@ function settings(ctx) {
     });
   };
 
+  const themeSheet = () => {
+    U.sheet('Тема', (api) => {
+      const options = ['system', 'light', 'dark'];
+      return options.map((mode) =>
+        U.row(theme.label(mode), theme.preference() === mode ? '✓' : '', {
+          sub: mode === 'system' ? `сейчас ${theme.label(theme.resolved()).toLowerCase()}` : null,
+          onClick: () => {
+            theme.set(mode);
+            api.close();
+            refresh();
+          },
+        }),
+      );
+    }, { focus: false });
+  };
+
+  const replaceData = (title, message, action, done) => {
+    U.confirmSheet(title, message, 'Заменить', async () => {
+      try {
+        await action();
+        U.toast(done);
+        refresh();
+      } catch (err) {
+        U.toast(`Не удалось: ${err.message}`, 'error');
+      }
+    });
+  };
+
   const asset = state.assets.find((a) => a.id === s.quickAssetId);
 
   return [
     U.card([
+      U.row('Тема', theme.label(), {
+        sub: theme.preference() === 'system' ? `сейчас ${theme.label(theme.resolved()).toLowerCase()}` : null,
+        onClick: themeSheet,
+      }),
       U.row('Быстрый взнос', s.quickAmount ? F.money(s.quickAmount) : 'выключен', {
         sub: asset ? asset.name : 'актив не выбран',
         onClick: quick,
@@ -425,31 +515,26 @@ function settings(ctx) {
       }),
     ]),
     U.card([
-      U.sectionTitle('Опасная зона'),
-      U.button('Вернуть стартовые данные', () => {
-        U.confirmSheet(
-          'Вернуть стартовые данные?',
-          'Всё, что вы завели в приложении, будет заменено слепком из Notion на 29.07.2026. Сделайте копию, если данные важны.',
-          'Вернуть',
-          async () => {
-            await store.resetToSeed();
-            U.toast('Стартовые данные восстановлены');
-            refresh();
-          },
-        );
-      }, { kind: 'danger' }),
-      U.button('Стереть всё', () => {
-        U.confirmSheet(
-          'Стереть все данные?',
-          'Активы, цели, операции и история исчезнут без возможности восстановления.',
-          'Стереть',
-          async () => {
-            await store.wipe();
-            U.toast('Данные стёрты');
-            refresh();
-          },
-        );
-      }, { kind: 'danger' }),
+      U.sectionTitle('Заменить данные'),
+      U.callout('Каждое действие ниже стирает всё, что сейчас в приложении. Сделайте копию, если данные важны.', 'warn'),
+      U.button('Загрузить демо-данные', () => replaceData(
+        'Загрузить демо-данные?',
+        'Вымышленный набор для знакомства с приложением. Текущие данные будут стёрты.',
+        store.loadDemo,
+        'Загружены демо-данные',
+      ), { class: 'btn-wide' }),
+      U.button('Загрузить личный слепок', () => replaceData(
+        'Загрузить личный слепок?',
+        'Состояние баз Notion на 29.07.2026: 5 активов, 3 цели, 2 операции. Текущие данные будут стёрты.',
+        store.loadSeed,
+        'Слепок загружен',
+      ), { class: 'btn-wide' }),
+      U.button('Стереть всё', () => replaceData(
+        'Стереть все данные?',
+        'Активы, цели, операции и история исчезнут без возможности восстановления.',
+        store.wipe,
+        'Данные стёрты',
+      ), { kind: 'danger', class: 'btn-wide' }),
     ]),
   ];
 }

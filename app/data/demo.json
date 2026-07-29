@@ -1,0 +1,168 @@
+{
+  "seedVersion": 1,
+  "note": "Вымышленные демо-данные для знакомства с приложением. Ничьих настоящих финансов здесь нет — личный слепок лежит отдельно в seed.json.",
+  "settings": {
+    "quickAmount": 500,
+    "quickAssetId": "demo-savings",
+    "quickGoalId": "demo-goal-trip",
+    "backupReminderDays": 14,
+    "taxLimitBase": 1000000,
+    "classByTicker": { "SBER": "Акции", "TMOS": "Акции", "LQDT": "Денежный рынок" },
+    "classFallback": "Прочее",
+    "autoQuotes": true
+  },
+  "assets": [
+    {
+      "id": "demo-savings",
+      "name": "Накопительный счёт",
+      "type": "Деньги",
+      "status": "Активен",
+      "liquidity": "Мгновенная",
+      "ticker": null, "board": null, "quantity": null, "price": null, "updated": null,
+      "opening": 84000,
+      "openingDate": "2026-04-01",
+      "rate": 16,
+      "capDay": 5,
+      "capDaily": true,
+      "lastCap": "2026-07-05",
+      "accrued": null,
+      "maturitySum": false,
+      "maturityDate": null,
+      "bankBalance": null,
+      "reconciledAt": "2026-07-05",
+      "goalIds": ["demo-goal-trip"],
+      "notes": "Основной счёт для регулярных взносов. Ставка меняется банком без предупреждения — проверяйте при ежемесячной сверке."
+    },
+    {
+      "id": "demo-deposit",
+      "name": "Вклад на 12 месяцев",
+      "type": "Инвестиции",
+      "status": "Активен",
+      "liquidity": "Низкая",
+      "ticker": null, "board": null, "quantity": null, "price": null, "updated": null,
+      "opening": 300000,
+      "openingDate": "2026-02-15",
+      "rate": 18,
+      "capDay": 15,
+      "capDaily": false,
+      "lastCap": "2026-07-15",
+      "accrued": null,
+      "maturitySum": false,
+      "maturityDate": "2027-02-15",
+      "bankBalance": null,
+      "reconciledAt": null,
+      "goalIds": ["demo-goal-cushion"],
+      "notes": "Проценты причисляются раз в месяц 15-го числа."
+    },
+    {
+      "id": "demo-sber",
+      "name": "Сбербанк",
+      "type": "Инвестиции",
+      "status": "Активен",
+      "liquidity": "T+1",
+      "ticker": "SBER",
+      "board": "TQBR",
+      "quantity": 140,
+      "price": 318.4,
+      "updated": "2026-07-28",
+      "opening": 0, "openingDate": null,
+      "rate": null, "capDay": null, "capDaily": false, "lastCap": null, "accrued": null,
+      "maturitySum": false, "maturityDate": null,
+      "bankBalance": null, "reconciledAt": null,
+      "goalIds": ["demo-goal-million"],
+      "notes": null
+    },
+    {
+      "id": "demo-lqdt",
+      "name": "Фонд денежного рынка",
+      "type": "Инвестиции",
+      "status": "Активен",
+      "liquidity": "Мгновенная",
+      "ticker": "LQDT",
+      "board": "TQTF",
+      "quantity": 1800,
+      "price": 2.0481,
+      "updated": "2026-07-28",
+      "opening": 0, "openingDate": null,
+      "rate": null, "capDay": null, "capDaily": false, "lastCap": null, "accrued": null,
+      "maturitySum": false, "maturityDate": null,
+      "bankBalance": null, "reconciledAt": null,
+      "goalIds": ["demo-goal-million"],
+      "notes": "Место для денег между сделками."
+    }
+  ],
+  "goals": [
+    {
+      "id": "demo-goal-trip",
+      "name": "🌍 Поездка",
+      "target": 180000,
+      "deadline": "2027-05-01",
+      "planPerDay": 500,
+      "status": "Активна"
+    },
+    {
+      "id": "demo-goal-cushion",
+      "name": "🛡 Подушка безопасности",
+      "target": 400000,
+      "deadline": null,
+      "planPerDay": null,
+      "status": "Активна"
+    },
+    {
+      "id": "demo-goal-million",
+      "name": "💰 Первый миллион инвестиций",
+      "target": 1000000,
+      "deadline": null,
+      "planPerDay": null,
+      "status": "На паузе"
+    }
+  ],
+  "operations": [
+    { "id": "demo-op-1", "date": "2026-07-05", "type": "Доход", "amount": 1104.32, "assetId": "demo-savings", "goalId": "demo-goal-trip", "source": "Расчёт", "comment": "Проценты за июнь" },
+    { "id": "demo-op-2", "date": "2026-07-15", "type": "Доход", "amount": 4536.99, "assetId": "demo-deposit", "goalId": "demo-goal-cushion", "source": "Расчёт", "comment": "Проценты по вкладу" },
+    { "id": "demo-op-3", "date": "2026-07-24", "type": "Взнос", "amount": 500, "assetId": "demo-savings", "goalId": "demo-goal-trip", "source": "Вручную", "comment": null },
+    { "id": "demo-op-4", "date": "2026-07-25", "type": "Взнос", "amount": 500, "assetId": "demo-savings", "goalId": "demo-goal-trip", "source": "Вручную", "comment": null },
+    { "id": "demo-op-5", "date": "2026-07-26", "type": "Взнос", "amount": 500, "assetId": "demo-savings", "goalId": "demo-goal-trip", "source": "Вручную", "comment": null },
+    { "id": "demo-op-6", "date": "2026-07-27", "type": "Расход", "amount": 12000, "assetId": "demo-savings", "goalId": null, "source": "Вручную", "comment": "Ремонт ноутбука" },
+    { "id": "demo-op-7", "date": "2026-07-28", "type": "Взнос", "amount": 500, "assetId": "demo-savings", "goalId": "demo-goal-trip", "source": "Вручную", "comment": null },
+    { "id": "demo-op-8", "date": "2026-07-29", "type": "Взнос", "amount": 500, "assetId": "demo-savings", "goalId": "demo-goal-trip", "source": "Вручную", "comment": null }
+  ],
+  "portfolio": [
+    { "id": "demo-cls-shares", "class": "Акции", "targetShare": 40 },
+    { "id": "demo-cls-bonds", "class": "Облигации", "targetShare": 25 },
+    { "id": "demo-cls-money", "class": "Денежный рынок", "targetShare": 35 }
+  ],
+  "tax": [
+    {
+      "year": 2026,
+      "ndflRate": 13,
+      "limit": 210000,
+      "limitManual": false,
+      "updated": "2026-07-29",
+      "notes": null
+    }
+  ],
+  "netWorth": [
+    { "month": "2026-03", "date": "2026-03-31", "total": 384200, "liquid": 52300, "invested": 331900 },
+    { "month": "2026-04", "date": "2026-04-30", "total": 402800, "liquid": 61400, "invested": 341400 },
+    { "month": "2026-05", "date": "2026-05-31", "total": 398100, "liquid": 58900, "invested": 339200 },
+    { "month": "2026-06", "date": "2026-06-30", "total": 427600, "liquid": 70100, "invested": 357500 },
+    { "month": "2026-07", "date": "2026-07-28", "total": 446900, "liquid": 76800, "invested": 370100 }
+  ],
+  "keyRate": [
+    { "date": "2026-01-01", "rate": 16 },
+    { "date": "2026-03-20", "rate": 18 },
+    { "date": "2026-06-05", "rate": 21 },
+    { "date": "2026-07-24", "rate": 20 }
+  ],
+  "priceHistory": [
+    { "date": "2026-06-30", "ticker": "SBER", "price": 304.1, "board": "TQBR", "source": "LAST" },
+    { "date": "2026-07-10", "ticker": "SBER", "price": 311.75, "board": "TQBR", "source": "LAST" },
+    { "date": "2026-07-20", "ticker": "SBER", "price": 309.2, "board": "TQBR", "source": "LAST" },
+    { "date": "2026-07-28", "ticker": "SBER", "price": 318.4, "board": "TQBR", "source": "LAST" },
+    { "date": "2026-06-30", "ticker": "LQDT", "price": 2.0164, "board": "TQTF", "source": "LAST" },
+    { "date": "2026-07-10", "ticker": "LQDT", "price": 2.0281, "board": "TQTF", "source": "LAST" },
+    { "date": "2026-07-20", "ticker": "LQDT", "price": 2.0397, "board": "TQTF", "source": "LAST" },
+    { "date": "2026-07-28", "ticker": "LQDT", "price": 2.0481, "board": "TQTF", "source": "LAST" }
+  ]
+}

@@ -119,35 +119,53 @@ function migrate(loaded) {
   return next;
 }
 
+/**
+ * Загрузка состояния.
+ *
+ * Ничего не подставляется само: приложение не имеет права молча положить
+ * человеку чужие цифры и выдать их за его капитал. Если сохранённого
+ * состояния нет, возвращаем признак пустоты — экран первого запуска
+ * спросит, начать с нуля или посмотреть на демо-данных.
+ */
 export async function init() {
   const loaded = await readRaw();
   if (loaded) {
     state = migrate(loaded);
-    return { seeded: false };
+    return { empty: false };
   }
-  state = await loadSeed();
-  await writeRaw(state);
-  return { seeded: true };
+  state = emptyState();
+  return { empty: true };
 }
 
-async function loadSeed() {
-  try {
-    const res = await fetch('./data/seed.json', { cache: 'no-cache' });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const seed = await res.json();
-    const next = migrate({
-      ...emptyState(),
-      ...seed,
-      seedVersion: seed.seedVersion || 1,
-    });
-    delete next.note;
-    delete next.generatedAt;
-    return next;
-  } catch (err) {
-    // Без стартовых данных приложение всё равно рабочее — просто пустое.
-    console.warn('Стартовые данные не загрузились, начинаю с нуля:', err);
-    return emptyState();
-  }
+async function loadFile(path) {
+  const res = await fetch(path, { cache: 'no-cache' });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  const data = await res.json();
+  const next = migrate({ ...emptyState(), ...data, seedVersion: data.seedVersion || 1 });
+  delete next.note;
+  delete next.generatedAt;
+  return next;
+}
+
+/** Начать с чистого листа: активов нет, экраны показывают пустые состояния. */
+export async function startEmpty() {
+  state = emptyState();
+  await writeRaw(state);
+  notify();
+}
+
+/** Вымышленные демо-данные — посмотреть, как всё работает. */
+export async function loadDemo() {
+  state = await loadFile('./data/demo.json');
+  await writeRaw(state);
+  notify();
+}
+
+/** Личный слепок из Notion. Отдельно от демо и намеренно не по умолчанию. */
+export async function loadSeed() {
+  state = await loadFile('./data/seed.json');
+  await writeRaw(state);
+  notify();
 }
 
 export function getState() {
@@ -240,15 +258,13 @@ export async function markBackedUp() {
   });
 }
 
-/** Полный сброс — обратно к стартовому слепку. */
-export async function resetToSeed() {
-  state = await loadSeed();
-  await writeRaw(state);
-  notify();
-}
-
 export async function wipe() {
   state = emptyState();
   await writeRaw(state);
   notify();
+}
+
+/** Есть ли вообще с чем работать — от этого зависит, показывать ли первый запуск. */
+export function isEmpty() {
+  return !state.assets.length && !state.operations.length && !state.goals.length;
 }

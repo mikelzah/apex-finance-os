@@ -6,14 +6,35 @@
      индикатором, а safe-area-inset-* в CSS возвращает отступы обратно. -->
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
 <meta name="theme-color" content="#080a0e">
-<meta name="color-scheme" content="dark">
 <meta name="description" content="Система управления капиталом. Данные хранятся только в этом устройстве.">
 
 <title>APEX Finance OS</title>
 
+<!--
+  Тема ставится до первой отрисовки и до загрузки CSS. Если сделать это
+  позже, на светлой теме приложение мигнёт тёмным, а строка состояния iOS
+  на мгновение окажется не того цвета.
+-->
+<script>
+  (function () {
+    var saved = null;
+    try { saved = localStorage.getItem('apex-finance-os:theme'); } catch (e) { /* приватный режим */ }
+    var theme = saved === 'light' || saved === 'dark'
+      ? saved
+      : (window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark');
+    document.documentElement.dataset.theme = theme;
+    document.querySelector('meta[name="theme-color"]')
+      .setAttribute('content', theme === 'light' ? '#f4f8fb' : '#080a0e');
+  })();
+</script>
+
 <link rel="manifest" href="./manifest.webmanifest">
 <link rel="icon" href="./icons/icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="./icons/apple-touch-icon.png">
+
+<!-- Шрифт грузится параллельно со стилями: иначе браузер узнаёт о нём
+     только разобрав CSS, и первый кадр выходит системным. -->
+<link rel="preload" href="./fonts/inter-subset.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="./css/app.css">
 
 <!-- Старые ключи Apple: iOS до 17.4 понимает только их. -->
@@ -23,12 +44,12 @@
 <meta name="apple-mobile-web-app-title" content="APEX">
 </head>
 <body>
-  <header id="header" class="header"></header>
+  <header id="header" class="header" hidden></header>
   <main id="screen" class="screen" role="main"></main>
   <nav id="tabbar" class="tabbar" role="navigation" aria-label="Разделы"></nav>
 
   <noscript>
-    <p style="padding:2rem;color:#e6e8ec">Приложение работает на JavaScript — включите его в настройках Safari.</p>
+    <p style="padding:2rem">Приложение работает на JavaScript — включите его в настройках Safari.</p>
   </noscript>
 
   <script type="module" src="./js/app.js"></script>
