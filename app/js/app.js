@@ -4,6 +4,7 @@ import * as U from './ui.js';
 import * as D from './dates.js';
 import * as F from './fmt.js';
 import * as store from './store.js';
+import { icon } from './icons.js';
 
 import * as dashboard from './views/dashboard.js';
 import * as goals from './views/goals.js';
@@ -14,11 +15,11 @@ import * as more from './views/more.js';
 const { h } = U;
 
 const TABS = [
-  { id: 'dashboard', label: 'Главная', icon: '◎' },
-  { id: 'goals', label: 'Цели', icon: '◈' },
-  { id: 'portfolio', label: 'Портфель', icon: '◧' },
-  { id: 'journal', label: 'Журнал', icon: '≡' },
-  { id: 'more', label: 'Ещё', icon: '⋯' },
+  { id: 'dashboard', label: 'Главная', icon: 'home' },
+  { id: 'goals', label: 'Цели', icon: 'target' },
+  { id: 'portfolio', label: 'Портфель', icon: 'bars' },
+  { id: 'journal', label: 'Журнал', icon: 'list' },
+  { id: 'more', label: 'Ещё', icon: 'more' },
 ];
 
 const VIEWS = { dashboard, goals, portfolio, journal, more };
@@ -58,9 +59,10 @@ function render() {
   const ctx = context();
   const view = VIEWS[route.tab];
 
-  renderHeader(ctx);
+  renderHeader();
 
   U.clear(screen);
+  screen.classList.toggle('is-bare', header.hidden);
   const banner = backupBanner(ctx);
   if (banner) screen.appendChild(banner);
   U.append(screen, view.render(ctx));
@@ -70,18 +72,23 @@ function render() {
   if (route.tab !== 'journal') screen.scrollTop = 0;
 }
 
-function renderHeader(ctx) {
+/**
+ * Шапка есть только во вложенных разделах — там она несёт кнопку «назад».
+ * На основных экранах заголовок дублировал бы таб-бар и забирал полосу
+ * в 110 пикселей, ничего не сообщая.
+ */
+function renderHeader() {
   U.clear(header);
   const isSub = route.tab === 'more' && route.sub;
-  const heading = isSub ? more.title(route.sub) : TABS.find((t) => t.id === route.tab)?.label || '';
+  header.hidden = !isSub;
+  if (!isSub) return;
 
   U.append(header, [
-    isSub
-      ? h('button', { class: 'back', type: 'button', onclick: () => go('more'), 'aria-label': 'Назад' }, ['‹'])
-      : null,
-    h('h1', { text: heading }),
+    h('button', { class: 'back', type: 'button', onclick: () => go('more'), 'aria-label': 'Назад' }, [
+      h('span', { class: 'back-chevron', text: '‹' }),
+    ]),
+    h('h1', { text: more.title(route.sub) }),
   ]);
-  header.classList.toggle('has-back', Boolean(isSub));
 }
 
 function renderTabs() {
@@ -92,12 +99,13 @@ function renderTabs() {
       h('button', {
         class: `tab${tab.id === route.tab ? ' is-on' : ''}`,
         type: 'button',
+        'aria-current': tab.id === route.tab ? 'page' : null,
         onclick: () => {
           U.tap();
           go(tab.id);
         },
       }, [
-        h('span', { class: 'tab-icon', text: tab.icon }),
+        icon(tab.icon),
         h('span', { class: 'tab-label', text: tab.label }),
       ]),
     ),

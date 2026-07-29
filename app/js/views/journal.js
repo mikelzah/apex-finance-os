@@ -33,11 +33,11 @@ export function render(ctx) {
   const spent = inMonth.filter((o) => o.type === C.OP_EXPENSE).reduce((s, o) => s + o.amount, 0);
 
   return [
+    h('div', { class: 'screen-head' }, [
+      h('h2', { text: 'Журнал' }),
+      U.button('Добавить', () => forms.operationSheet(null, { onDone: refresh }), { kind: 'primary' }),
+    ]),
     U.card([
-      U.sectionTitle(
-        'Журнал',
-        U.button('Добавить', () => forms.operationSheet(null, { onDone: refresh }), { kind: 'primary' }),
-      ),
       h('div', { class: 'grid-3' }, [
         U.stat('Внесено', F.money(contributed), { hint: 'за месяц' }),
         U.stat('Начислено', F.money(earned), { hint: 'проценты' }),
@@ -77,7 +77,7 @@ function groups(operations, state, today, refresh) {
     return U.card([
       h('div', { class: 'month-head' }, [
         h('h2', { text: F.monthName(month) }),
-        h('span', { class: sum >= 0 ? 'is-plus' : 'is-minus', text: F.signedMoney(sum) }),
+        h('span', { class: `month-total ${sum >= 0 ? 'is-plus' : 'is-minus'}`, text: F.signedMoney(sum) }),
       ]),
       ...list.map((op) => {
         const goal = goalName(op.goalId);

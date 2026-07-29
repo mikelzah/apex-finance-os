@@ -223,7 +223,7 @@ function history(ctx) {
       U.sectionTitle('История капитала', U.button('Снимок за месяц', snapshot, { kind: 'primary' })),
       charts.line(
         rows.map((r) => ({ x: r.date, y: r.total })).reverse(),
-        { hint: 'Нужно минимум два снимка' },
+        { label: 'Капитал', hint: 'Нужно минимум два снимка' },
       ),
     ]),
     U.card([
@@ -278,7 +278,7 @@ function keyRate(ctx) {
       U.stat('Действует сейчас', F.percent(C.rateOn(state.keyRate, today)), { big: true }),
       charts.line(
         rows.map((r) => ({ x: r.date, y: r.rate })).reverse(),
-        { format: (v) => F.percent(v), hint: 'Нужно минимум две точки' },
+        { label: 'Ставка', format: (v) => F.percent(v), hint: 'Нужно минимум две точки' },
       ),
     ]),
     U.card([

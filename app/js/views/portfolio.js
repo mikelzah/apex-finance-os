@@ -123,7 +123,8 @@ function priceChart(state, today) {
       .map((p) => ({ x: p.date, y: p.price }));
     chart.appendChild(
       charts.line(points, {
-        format: (v) => F.num(v, 2),
+        label: `Цена ${current}`,
+        format: (v) => `${F.num(v, 2)} ₽`,
         hint: 'История цен наберётся по мере обновлений',
       }),
     );

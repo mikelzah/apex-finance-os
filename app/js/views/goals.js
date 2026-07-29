@@ -15,10 +15,13 @@ export function render(ctx) {
   const goals = [...state.goals].sort((a, b) => (order[a.status] ?? 3) - (order[b.status] ?? 3));
 
   return [
-    U.card([
-      U.sectionTitle('Цели', U.button('Добавить', () => forms.goalSheet(null, { onDone: refresh }), { kind: 'primary' })),
-      goals.length ? null : U.emptyState('Целей пока нет.'),
+    // Карточка вокруг одного заголовка и кнопки была бы пустой рамой —
+    // строка справляется с этим сама.
+    h('div', { class: 'screen-head' }, [
+      h('h2', { text: 'Цели' }),
+      U.button('Добавить', () => forms.goalSheet(null, { onDone: refresh }), { kind: 'primary' }),
     ]),
+    goals.length ? null : U.card([U.emptyState('Целей пока нет.')]),
     ...goals.map((goal) => goalCard(goal, ctx)),
     U.card([
       U.callout(
