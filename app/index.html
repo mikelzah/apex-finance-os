@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<!-- viewport-fit=cover отдаёт нам область под Dynamic Island и домашним
+     индикатором, а safe-area-inset-* в CSS возвращает отступы обратно. -->
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="theme-color" content="#0b0d10">
+<meta name="color-scheme" content="dark">
+<meta name="description" content="Система управления капиталом. Данные хранятся только в этом устройстве.">
+
+<title>APEX Finance OS</title>
+
+<link rel="manifest" href="./manifest.webmanifest">
+<link rel="icon" href="./icons/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="./icons/apple-touch-icon.png">
+<link rel="stylesheet" href="./css/app.css">
+
+<!-- Старые ключи Apple: iOS до 17.4 понимает только их. -->
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="APEX">
+</head>
+<body>
+  <header id="header" class="header"></header>
+  <main id="screen" class="screen" role="main"></main>
+  <nav id="tabbar" class="tabbar" role="navigation" aria-label="Разделы"></nav>
+
+  <noscript>
+    <p style="padding:2rem;color:#e6e8ec">Приложение работает на JavaScript — включите его в настройках Safari.</p>
+  </noscript>
+
+  <script type="module" src="./js/app.js"></script>
+</body>
+</html>
