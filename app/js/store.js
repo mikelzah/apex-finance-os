@@ -105,7 +105,14 @@ function emptyState() {
       classFallback: 'Прочее',
       autoQuotes: true,
     },
-    meta: { lastBackupAt: null, createdAt: new Date().toISOString() },
+    meta: {
+      lastBackupAt: null,
+      createdAt: new Date().toISOString(),
+      // Сделан ли выбор на первом запуске. Пустота сама по себе не признак
+      // новичка: «начать с нуля» тоже оставляет пустое состояние, и без
+      // этого флага такой человек бесконечно возвращался бы на экран выбора.
+      onboarded: false,
+    },
   };
 }
 
@@ -144,6 +151,7 @@ async function loadFile(path) {
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   const data = await res.json();
   const next = migrate({ ...emptyState(), ...data, seedVersion: data.seedVersion || 1 });
+  next.meta.onboarded = true;
   delete next.note;
   delete next.generatedAt;
   return next;
@@ -152,6 +160,7 @@ async function loadFile(path) {
 /** Начать с чистого листа: активов нет, экраны показывают пустые состояния. */
 export async function startEmpty() {
   state = emptyState();
+  state.meta.onboarded = true;
   await writeRaw(state);
   notify();
 }
@@ -247,6 +256,7 @@ export async function importText(text) {
     throw new Error('В файле нет активов и операций — похоже, это не та копия');
   }
   const next = migrate(parsed);
+  next.meta.onboarded = true;
   delete next.app;
   delete next.exportedAt;
   state = next;
@@ -271,7 +281,7 @@ export async function wipe() {
   notify();
 }
 
-/** Есть ли вообще с чем работать — от этого зависит, показывать ли первый запуск. */
-export function isEmpty() {
-  return !state.assets.length && !state.operations.length && !state.goals.length;
+/** Показывать ли экран первого запуска: выбор ещё не сделан. */
+export function needsOnboarding() {
+  return !state.meta.onboarded;
 }

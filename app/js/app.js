@@ -6,6 +6,7 @@ import * as F from './fmt.js';
 import * as store from './store.js';
 import * as theme from './theme.js';
 import { icon } from './icons.js';
+import * as mascot from './mascot.js';
 
 import * as dashboard from './views/dashboard.js';
 import * as goals from './views/goals.js';
@@ -59,9 +60,9 @@ function context() {
 // --------------------------------------------------------------------------
 
 function render() {
-  // Пока данных нет вовсе, вкладки нечего показывать: приложение
-  // спрашивает, с чего начать, и не притворяется наполненным.
-  if (store.isEmpty()) return renderIntro();
+  // Пока выбор на первом запуске не сделан, вкладки нечего показывать:
+  // приложение спрашивает, с чего начать, и не притворяется наполненным.
+  if (store.needsOnboarding()) return renderIntro();
 
   const ctx = context();
   const view = VIEWS[route.tab];
@@ -183,6 +184,7 @@ function skeleton() {
 
 async function boot() {
   theme.apply();
+  mascot.apply();
   // Чтение из IndexedDB обычно занимает миллисекунды, но на холодном старте
   // после перезагрузки телефона бывает и заметно дольше. Пустой белый экран
   // в этот момент читается как поломка, скелетон — как загрузка.

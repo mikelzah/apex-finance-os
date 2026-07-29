@@ -4,7 +4,7 @@
 // Версию поднимайте при каждом изменении файлов: иначе на телефоне останется
 // старая копия, а понять это по внешнему виду невозможно.
 
-const VERSION = 'v3';
+const VERSION = 'v4';
 const CACHE = `apex-finance-os-${VERSION}`;
 
 const SHELL = [
@@ -27,6 +27,7 @@ const SHELL = [
   './js/theme.js',
   './js/table.js',
   './js/config.js',
+  './js/mascot.js',
   './js/views/dashboard.js',
   './js/views/goals.js',
   './js/views/portfolio.js',

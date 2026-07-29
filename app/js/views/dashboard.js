@@ -13,11 +13,14 @@ import * as charts from '../charts.js';
 import * as store from '../store.js';
 import * as forms from '../forms.js';
 import { statusIcon } from '../icons.js';
+import * as mascot from '../mascot.js';
 
 const { h } = U;
 
 export function render(ctx) {
   const { state, today } = ctx;
+  if (!state.assets.length) return gettingStarted(ctx);
+
   const worth = C.netWorth(state.assets, state.operations);
 
   return [
@@ -33,6 +36,32 @@ export function render(ctx) {
 }
 
 // --------------------------------------------------------------------------
+
+/**
+ * Пока активов нет, показывать нечего: капитал ноль, календарь дисциплины —
+ * тридцать пустых клеток, а «Добавить операцию» ведёт в форму с пустым
+ * списком активов. Вместо этого называем первый шаг.
+ */
+function gettingStarted(ctx) {
+  const { refresh } = ctx;
+  return [
+    h('section', { class: 'hero' }, [
+      h('p', { class: 'hero-label', text: 'Чистый капитал' }),
+      h('p', { class: 'hero-value', text: F.money(0) }),
+    ]),
+    U.card([
+      h('h2', { class: 'start-title', text: 'Начните с актива' }),
+      h('p', { class: 'start-text', text: 'Деньги живут в активах: накопительный счёт, вклад, бумаги. Цели и операции опираются на них, поэтому первый актив — первый шаг.' }),
+      U.button('Добавить актив', () => forms.assetSheet(null, { onDone: refresh }), {
+        kind: 'primary',
+        class: 'btn-wide',
+      }),
+    ]),
+    U.card([
+      U.callout('Если хочется сперва осмотреться — в «Ещё → Настройки» можно загрузить вымышленные демо-данные и стереть их в любой момент.', 'info'),
+    ]),
+  ];
+}
 
 function hero(state, worth, today) {
   // Изменение за день считается по записанным операциям, а не по переоценке:
@@ -98,6 +127,7 @@ function quickAdd(ctx) {
           });
         });
         U.tap();
+        mascot.celebrate();
         U.toast(`Взнос ${F.money(amount)} записан`);
         refresh();
       },

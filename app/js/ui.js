@@ -92,6 +92,24 @@ export function emptyState(text) {
 // Поля формы
 // --------------------------------------------------------------------------
 
+/**
+ * Сворачиваемая группа полей.
+ *
+ * Форма актива описывает и вклад, и биржевую бумагу, и квартиру — у каждого
+ * своя половина полей. Показывать вкладу «Режим торгов», а акции «День
+ * капитализации» значит топить нужное в ненужном. Группа раскрыта, если
+ * в ней уже что-то заполнено.
+ */
+export function group(title, open, children) {
+  return h('details', { class: 'group', open: open || null }, [
+    h('summary', { class: 'group-summary' }, [
+      h('span', { text: title }),
+      h('span', { class: 'group-chevron', text: '⌄' }),
+    ]),
+    h('div', { class: 'group-body' }, children),
+  ]);
+}
+
 export function field(label, input, hint) {
   return h('label', { class: 'field' }, [
     h('span', { class: 'field-label', text: label }),

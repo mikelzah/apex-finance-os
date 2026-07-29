@@ -79,6 +79,9 @@ body.is-locked { overflow: hidden; }
   border-bottom: 1px solid var(--line-soft);
 }
 
+/* Атрибут hidden сам по себе бессилен против явного display в правиле:
+   UA-стиль [hidden]{display:none} проигрывает по специфичности. Каждому
+   элементу, у которого мы задали display, нужна своя пара. */
 .header[hidden] { display: none; }
 
 .header h1 {
@@ -142,6 +145,8 @@ body.is-locked { overflow: hidden; }
   -webkit-backdrop-filter: saturate(150%) blur(18px);
   border-top: 1px solid var(--line-soft);
 }
+
+.tabbar[hidden] { display: none; }
 
 .tab {
   appearance: none;
@@ -983,6 +988,30 @@ select.control {
 
 .form-group { padding: var(--space-4) 0 0; margin-top: var(--space-4); border-top: 1px solid var(--line-soft); }
 
+/* Сворачиваемая группа полей */
+
+.group { border-top: 1px solid var(--line-soft); margin-top: var(--space-3); }
+
+.group-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  padding: var(--space-3) 0;
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+  color: var(--ink-3);
+  cursor: pointer;
+  list-style: none;
+}
+
+/* Safari рисует свой треугольник и игнорирует list-style. */
+.group-summary::-webkit-details-marker { display: none; }
+
+.group-chevron { color: var(--ink-4); transition: transform var(--dur-fast) var(--ease-out); }
+.group[open] .group-chevron { transform: rotate(180deg); }
+.group-body { padding-bottom: var(--space-2); }
+
 /* -------------------------------------------------------------------------- */
 /* Первый запуск                                                              */
 /* -------------------------------------------------------------------------- */
@@ -1001,6 +1030,82 @@ select.control {
 .intro p { margin: var(--space-3) 0 0; color: var(--ink-3); font-size: var(--text-base); line-height: var(--leading-normal); }
 .intro-actions { display: flex; flex-direction: column; gap: var(--space-2); margin-top: var(--space-8); }
 .intro-note { font-size: var(--text-xs); color: var(--ink-4); margin-top: var(--space-5); }
+
+.start-title { margin: 0; font-size: var(--text-lg); font-weight: var(--weight-semibold); letter-spacing: var(--tracking-lg); }
+.start-text { margin: 0; font-size: var(--text-sm); color: var(--ink-3); line-height: var(--leading-normal); }
+
+/* -------------------------------------------------------------------------- */
+/* Зверь на Dynamic Island                                                    */
+/* -------------------------------------------------------------------------- */
+
+/* Висит на нижнем крае острова. Руки уходят выше safe-area-inset-top —
+   в зону, которую закрывает сам остров: из-за этого кажется, что он за
+   неё держится. Сдвиг вверх на 12 пикселей заводит кисти под пилюлю. */
+.mascot {
+  position: fixed;
+  /* max() не даёт уехать за верхнюю кромку там, где острова нет и
+     safe-area-inset-top равен нулю: иначе зверю срезает голову. */
+  top: max(0px, calc(var(--safe-top) - 12px));
+  left: 50%;
+  transform: translateX(-50%);
+  width: 2.5rem;
+  z-index: 40;
+  /* Касания проходят насквозь: зверь не должен перехватывать нажатия
+     по тому, что под ним. */
+  pointer-events: none;
+  transition: opacity var(--dur-fast) var(--ease-out);
+}
+
+/* При открытой шторке экран принадлежит ей одной. */
+body.is-locked .mascot { opacity: 0; }
+
+.mascot-svg { display: block; width: 100%; height: auto; overflow: visible; }
+
+.mascot-body { fill: var(--accent); }
+.mascot-limb { fill: none; stroke: var(--accent); stroke-width: 2.6; stroke-linecap: round; }
+.mascot-foot { fill: var(--accent); }
+.mascot-eye { fill: #fff; }
+.mascot-pupil { fill: #0a1018; }
+.mascot-smile { fill: none; stroke: #0a1018; stroke-width: 1.4; stroke-linecap: round; opacity: 0; }
+
+/* Моргание — сжатие глаз по вертикали, а не подмена фигур. */
+.mascot-eyes {
+  transform-box: fill-box;
+  transform-origin: center;
+  transition: transform 80ms var(--ease-out);
+}
+
+.mascot.is-blinking .mascot-eyes { transform: scaleY(0.12); }
+
+.mascot-legs {
+  transform-box: fill-box;
+  transform-origin: top center;
+  animation: mascot-sway 3.6s ease-in-out infinite;
+}
+
+.mascot.is-happy { animation: mascot-hop 0.9s var(--ease-out); }
+.mascot.is-happy .mascot-smile { opacity: 1; transition: opacity var(--dur-fast) var(--ease-out); }
+
+@keyframes mascot-sway {
+  0%, 100% { transform: rotate(-5deg); }
+  50% { transform: rotate(5deg); }
+}
+
+@keyframes mascot-hop {
+  0%, 100% { transform: translateX(-50%) translateY(0); }
+  25% { transform: translateX(-50%) translateY(6px); }
+  55% { transform: translateX(-50%) translateY(-3px); }
+}
+
+/* Зверь занимает полосу сверху — экран уступает ему место, иначе он
+   ложится на заголовок. */
+body.has-mascot .screen.is-bare { padding-top: calc(var(--safe-top) + var(--space-8)); }
+body.has-mascot .header { padding-top: calc(var(--safe-top) + var(--space-6)); }
+
+@media (prefers-reduced-motion: reduce) {
+  .mascot-legs { animation: none; }
+  .mascot.is-happy { animation: none; }
+}
 
 /* -------------------------------------------------------------------------- */
 /* Скелетоны                                                                  */

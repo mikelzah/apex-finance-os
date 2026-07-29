@@ -209,22 +209,21 @@ export function assetSheet(existing, options = {}) {
       U.field('Статус', status),
       U.field('Ликвидность', liquidity, 'Мгновенная — попадает в «Доступно сегодня».'),
 
-      h('div', { class: 'form-group' }, [
-        h('h3', { text: 'Котировки' }),
+      // Раскрыта та половина полей, которая относится к этому активу:
+      // у вклада нет режима торгов, у акции — дня капитализации.
+      U.group('Котировки', Boolean(a.ticker), [
         U.field('Тикер', ticker),
         U.field('Режим торгов', board, 'TQBR для акций, TQTF для фондов. Пусто — переберём сами.'),
         U.field('Количество', quantity),
         U.field('Цена, ₽', price, a.updated ? `Обновлена ${F.date(a.updated)}` : 'Обновляется с Мосбиржи или вручную'),
       ]),
 
-      h('div', { class: 'form-group' }, [
-        h('h3', { text: 'Остаток' }),
+      U.group('Остаток', !a.ticker, [
         U.field('Начальный остаток, ₽', opening, 'Баланс на момент заведения актива, а не текущий. Иначе сегодняшний взнос посчитается дважды.'),
         U.field('Дата начального остатка', openingDate),
       ]),
 
-      h('div', { class: 'form-group' }, [
-        h('h3', { text: 'Проценты' }),
+      U.group('Проценты', Boolean(a.rate || a.maturitySum), [
         U.field('Ставка, % годовых', rate),
         U.field('День капитализации', capDay, 'Число месяца, когда создаётся операция «Доход». Пусто — автоначисления нет.'),
         capDaily.node,
@@ -234,14 +233,12 @@ export function assetSheet(existing, options = {}) {
         U.callout('«Сумма на выходе» отключает начисление: проценты уже заложены в остаток, начислять их второй раз значило бы посчитать доход дважды.', 'info'),
       ]),
 
-      h('div', { class: 'form-group' }, [
-        h('h3', { text: 'Сверка с банком' }),
+      U.group('Сверка с банком', a.bankBalance != null || Boolean(a.reconciledAt), [
         U.field('Остаток по банку, ₽', bankBalance),
         U.field('Дата сверки', reconciledAt),
       ]),
 
-      h('div', { class: 'form-group' }, [
-        h('h3', { text: 'Цели' }),
+      U.group('Цели', (a.goalIds || []).length > 0, [
         ...goalBoxes.map((c) => c.node),
         U.callout('Один актив — одна цель. Две галочки означают, что те же деньги посчитаются в обеих целях.', 'warn'),
       ]),

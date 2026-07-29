@@ -9,6 +9,7 @@ import * as charts from '../charts.js';
 import * as store from '../store.js';
 import * as forms from '../forms.js';
 import * as theme from '../theme.js';
+import * as mascot from '../mascot.js';
 import { table } from '../table.js';
 
 const { h } = U;
@@ -512,6 +513,13 @@ function settings(ctx) {
       }),
       U.row('Напоминание о копии', s.backupReminderDays ? `раз в ${F.days(s.backupReminderDays)}` : 'выключено', {
         onClick: reminder,
+      }),
+      U.row('Зверь на острове', mascot.enabled() ? 'включён' : 'выключен', {
+        sub: 'висит на Dynamic Island и радуется взносам',
+        onClick: () => {
+          mascot.setEnabled(!mascot.enabled());
+          refresh();
+        },
       }),
     ]),
     U.card([
