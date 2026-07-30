@@ -120,24 +120,28 @@ function scrollTo(y) {
 }
 
 /**
- * Шапка есть только во вложенных разделах — там она несёт кнопку «назад».
+ * Шапка есть только во вложенных страницах — там она несёт кнопку «назад».
  * На основных экранах заголовок дублировал бы таб-бар и забирал полосу
  * в 110 пикселей, ничего не сообщая.
+ *
+ * Вложенные страницы бывают у любой вкладки: раздел в «Ещё», бумага
+ * в «Портфеле». Признак один — вьюха умеет назвать страницу по её адресу.
  */
 function renderHeader(ctx) {
   U.clear(header);
-  const isSub = route.tab === 'more' && route.sub;
+  const view = VIEWS[route.tab];
+  const isSub = Boolean(route.sub) && typeof view.title === 'function';
   header.hidden = !isSub;
   if (!isSub) return;
 
   U.append(header, [
-    h('button', { class: 'back', type: 'button', onclick: () => go('more'), 'aria-label': 'Назад' }, [
+    h('button', { class: 'back', type: 'button', onclick: () => go(route.tab), 'aria-label': 'Назад' }, [
       h('span', { class: 'back-chevron', text: '‹' }),
     ]),
-    h('h1', { text: more.title(route.sub) }),
-    // Действие раздела живёт в шапке: заголовок экрана под ней повторял бы
-    // название раздела, и на экране оказывалось бы два одинаковых заголовка.
-    h('div', { class: 'header-action' }, [more.action(route.sub, ctx)]),
+    h('h1', { text: view.title(route.sub, ctx) }),
+    // Действие страницы живёт в шапке: заголовок экрана под ней повторял бы
+    // название, и на экране оказывалось бы два одинаковых заголовка.
+    h('div', { class: 'header-action' }, [view.action ? view.action(route.sub, ctx) : null]),
   ]);
 }
 

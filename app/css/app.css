@@ -347,6 +347,15 @@ body.is-locked .screen { overflow: hidden; }
 .card-table { padding: var(--space-4) 0; overflow: hidden; }
 .card-table > .section-title, .card-table > .callout { margin-left: var(--space-4); margin-right: var(--space-4); }
 
+/* Сумма по классу в заголовке карточки: она отвечает на «сколько у меня
+   этого», не заставляя складывать строки глазами. */
+.section-sum {
+  font-size: var(--text-base);
+  font-weight: var(--weight-semibold);
+  font-variant-numeric: tabular-nums;
+  color: var(--ink-2);
+}
+
 .section-title {
   display: flex;
   align-items: center;
