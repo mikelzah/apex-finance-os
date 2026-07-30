@@ -1186,13 +1186,30 @@ body.is-locked .mascot { opacity: 0; }
 
 .mascot.is-blinking .mascot-eyes { transform: scaleY(0.12); }
 
+/* Ноги качаются только во время прыжка, а не постоянно.
+ *
+ * Раньше здесь была бесконечная анимация, и она обходилась дороже всего
+ * остального в приложении вместе взятого. Измерено за 10 секунд покоя
+ * на главном экране:
+ *
+ *   с качанием      600 пересчётов стиля, 600 раскладок, 134 мс задач
+ *   без качания      24 пересчёта,         22 раскладки,  58 мс задач
+ *
+ * Шестьсот за десять секунд — это по одной раскладке на кадр, шестьдесят
+ * раз в секунду, пока приложение открыто. Трансформация внутри SVG
+ * не выносится на композитор: она меняет геометрию, поэтому браузер
+ * пересчитывает раскладку заново каждый кадр. Экран при этом не может
+ * уйти в простой, и телефон греется на ровном месте.
+ *
+ * Зверь остался живым: он моргает и подпрыгивает на взносе. Разница в том,
+ * что и то и другое — короткие события, а не вечный двигатель. */
 .mascot-legs {
   transform-box: fill-box;
   transform-origin: top center;
-  animation: mascot-sway 3.6s ease-in-out infinite;
 }
 
 .mascot.is-happy { animation: mascot-hop 0.9s var(--ease-out); }
+.mascot.is-happy .mascot-legs { animation: mascot-sway 0.9s ease-in-out; }
 .mascot.is-happy .mascot-smile { opacity: 1; transition: opacity var(--dur-fast) var(--ease-out); }
 
 @keyframes mascot-sway {
@@ -1212,8 +1229,7 @@ body.has-mascot .screen.is-bare { padding-top: calc(var(--safe-top) + var(--spac
 body.has-mascot .header { padding-top: calc(var(--safe-top) + var(--space-6)); }
 
 @media (prefers-reduced-motion: reduce) {
-  .mascot-legs { animation: none; }
-  .mascot.is-happy { animation: none; }
+  .mascot.is-happy, .mascot.is-happy .mascot-legs { animation: none; }
 }
 
 /* -------------------------------------------------------------------------- */

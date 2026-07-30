@@ -33,6 +33,12 @@ export function apply() {
   else unmount();
 }
 
+// Возвращаемся на экран — возобновляем моргание, уходим — гасим таймер.
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'hidden') clearTimeout(blinkTimer);
+  else if (node) scheduleBlink();
+});
+
 function mount() {
   if (node) return;
   node = draw();
@@ -42,6 +48,7 @@ function mount() {
 }
 
 function unmount() {
+  clearTimeout(blinkTimer);
   if (!node) return;
   node.remove();
   node = null;
@@ -64,6 +71,9 @@ let blinkTimer = null;
 function scheduleBlink() {
   clearTimeout(blinkTimer);
   if (!node) return;
+  // В свёрнутом приложении моргать некому. Таймер, который продолжает будить
+  // страницу в фоне, — это расход батареи без единого зрителя.
+  if (document.visibilityState === 'hidden') return;
   // Неровный ритм: моргание по таймеру с одинаковым шагом выглядит
   // механическим, а не живым.
   const delay = 2600 + Math.random() * 4200;

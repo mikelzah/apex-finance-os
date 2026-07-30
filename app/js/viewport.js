@@ -79,15 +79,24 @@ export function measure() {
   };
 }
 
+let applied = null;
+
 /**
  * Отдать полную высоту в CSS.
  *
  * От неё считается высота страницы, и только от этого. Завышенное значение
  * добавит пустой прокрутки — неприятно, но безобидно. Заниженное вернёт
  * исходную задачу, но не сломает ничего нового.
+ *
+ * Пишем только при изменении: запись свойства в корне обесценивает стиль
+ * всего документа, а вызывается apply дважды на каждую отрисовку — значение
+ * при этом почти всегда одно и то же.
  */
 export function apply() {
-  document.documentElement.style.setProperty('--full-height', `${measure().full}px`);
+  const full = measure().full;
+  if (full === applied) return;
+  applied = full;
+  document.documentElement.style.setProperty('--full-height', `${full}px`);
 }
 
 export function watch() {
