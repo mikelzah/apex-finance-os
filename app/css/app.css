@@ -18,6 +18,19 @@
 
 * { box-sizing: border-box; }
 
+/* Атрибут hidden обязан скрывать — всегда и без исключений.
+ *
+ * В браузерном стиле это [hidden] { display: none }, но авторский стиль
+ * побеждает браузерный при любой специфичности. Поэтому каждое правило вида
+ * .что-то { display: flex } молча ломало hidden у своего элемента, и элемент
+ * оставался на экране, хотя в DOM был помечен скрытым.
+ *
+ * Наступил на это дважды: таб-бар не прятался на экране первого запуска,
+ * а блок сигналов не сворачивался — и оба раза это выглядело как «кнопка
+ * не работает». Одно правило с !important закрывает весь класс ошибок вместо
+ * того, чтобы дописывать .класс[hidden] после каждого промаха. */
+[hidden] { display: none !important; }
+
 html, body {
   margin: 0;
   padding: 0;
@@ -81,11 +94,6 @@ body.is-locked { overflow: hidden; }
   background: var(--bg);
   border-bottom: 1px solid var(--line-soft);
 }
-
-/* Атрибут hidden сам по себе бессилен против явного display в правиле:
-   UA-стиль [hidden]{display:none} проигрывает по специфичности. Каждому
-   элементу, у которого мы задали display, нужна своя пара. */
-.header[hidden] { display: none; }
 
 .header h1 {
   /* Заголовок забирает всё свободное место, действие прижимается вправо. */
@@ -171,8 +179,6 @@ body.is-locked { overflow: hidden; }
   background: var(--bg);
   border-top: 1px solid var(--line-soft);
 }
-
-.tabbar[hidden] { display: none; }
 
 .tab {
   appearance: none;
