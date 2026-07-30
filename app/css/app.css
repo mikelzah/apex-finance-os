@@ -462,6 +462,7 @@ h3 {
 .stat-value.is-big { font-size: var(--text-2xl); letter-spacing: var(--tracking-2xl); }
 .stat-hint { font-size: var(--text-xs); color: var(--ink-4); margin-top: var(--space-1); }
 .stat.is-bad .stat-value { color: var(--critical-ink); }
+.stat.is-good .stat-value { color: var(--good-ink); }
 
 .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-4) var(--space-3); }
 .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--space-3); }
@@ -612,6 +613,7 @@ h3 {
 }
 .dt-plus { color: var(--good-ink); }
 .dt-minus { color: var(--critical-ink); }
+.dt-neutral { color: var(--ink-2); }
 
 /* -------------------------------------------------------------------------- */
 /* Сигналы и статусы                                                          */
@@ -1103,11 +1105,15 @@ button.alloc-row { cursor: pointer; }
 .op-contribution { background: var(--accent-mark); }
 .op-income { background: var(--good); }
 .op-expense { background: var(--critical); }
+/* Сделка не приход и не расход — обмен. Поэтому и точка нейтральная,
+   и сумма без знака: знак здесь означал бы движение денег, которого нет. */
+.op-trade { background: var(--ink-4); }
 
 .op-main { flex: 1; min-width: 0; }
 .op-title { display: block; font-size: var(--text-base); }
 .op-sub { display: block; font-size: var(--text-xs); color: var(--ink-4); margin-top: 1px; }
 .op-amount { font-size: var(--text-base); font-weight: var(--weight-semibold); white-space: nowrap; }
+.op-amount.is-neutral { color: var(--ink-2); }
 
 /* -------------------------------------------------------------------------- */
 /* Шторка и формы                                                             */
@@ -1176,6 +1182,29 @@ button.alloc-row { cursor: pointer; }
 }
 
 .sheet-foot .btn { flex: 1; padding: var(--space-3); border-radius: var(--radius-sm); font-size: var(--text-base); }
+
+/* Итог сделки. Не поле ввода, а результат — поэтому он и выглядит иначе:
+   без рамки, крупнее и на подложке. Сумма считается из количества и цены,
+   вводить её отдельно было бы вторым источником одной величины. */
+.total {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: baseline;
+  gap: var(--space-1) var(--space-2);
+  margin-bottom: var(--space-4);
+  padding: var(--space-3);
+  border-radius: var(--radius-md);
+  background: var(--accent-wash);
+}
+
+.total-label { font-size: var(--text-sm); color: var(--ink-2); }
+.total-value {
+  font-size: var(--text-lg);
+  font-weight: var(--weight-bold);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+.total-note { grid-column: 1 / -1; font-size: var(--text-xs); color: var(--ink-3); }
 
 .field { display: block; margin-bottom: var(--space-4); }
 .field-label { display: block; font-size: var(--text-xs); color: var(--ink-3); margin-bottom: var(--space-1); }

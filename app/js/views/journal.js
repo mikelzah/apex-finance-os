@@ -19,6 +19,7 @@ const FILTERS = [
   { value: C.OP_CONTRIBUTION, label: 'Взносы' },
   { value: C.OP_INCOME, label: 'Доходы' },
   { value: C.OP_EXPENSE, label: 'Расходы' },
+  { value: 'trades', label: 'Сделки' },
 ];
 
 // Выбор переживает перерисовку, но не перезапуск: это вид, а не настройка.
@@ -32,7 +33,10 @@ export function render(ctx) {
     .filter((op) => D.isValid(op.date))
     .sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0));
 
-  const visible = filter === 'all' ? all : all.filter((op) => op.type === filter);
+  // «Сделки» — один фильтр на покупки и продажи: разводить их по двум чипам
+  // значило бы занять всю полосу ради разделения, которое видно в самой строке.
+  const match = (op) => (filter === 'trades' ? C.isTrade(op) : op.type === filter);
+  const visible = filter === 'all' ? all : all.filter(match);
 
   const month = D.month(today);
   const inMonth = all.filter((op) => D.month(op.date) === month);
@@ -122,9 +126,12 @@ function tableView(operations, state, refresh) {
           key: 'amount',
           title: 'Сумма',
           align: 'right',
-          value: (op) => C.signed(op),
-          render: (op) => F.signedMoney(C.signed(op)),
-          cellClass: (op) => (C.signed(op) >= 0 ? 'dt-plus' : 'dt-minus'),
+          // Сделка показывается своей суммой без знака: это не приход
+          // и не расход, а обмен. В итог столбца она поэтому и не входит —
+          // деньги по ней двигает отдельная операция по счёту оплаты.
+          value: (op) => (C.isTrade(op) ? C.tradeAmount(op) : C.signed(op)),
+          render: (op) => (C.isTrade(op) ? F.money(C.tradeAmount(op)) : F.signedMoney(C.signed(op))),
+          cellClass: (op) => (C.isTrade(op) ? 'dt-neutral' : C.signed(op) >= 0 ? 'dt-plus' : 'dt-minus'),
           total: (rows) => F.signedMoney(rows.reduce((s, op) => s + C.signed(op), 0)),
         },
       ],
@@ -162,15 +169,25 @@ function groups(operations, state, today, refresh) {
             h('span', { class: 'op-title', text: `${op.type} · ${assetName(op.assetId)}` }),
             h('span', {
               class: 'op-sub',
-              text: [F.relativeDate(op.date, today), goal, op.source === C.SOURCE_COMPUTED ? 'расчёт' : null, op.comment]
+              text: [
+                F.relativeDate(op.date, today),
+                // У сделки на месте пояснения стоит её суть: сколько бумаг
+                // и по какой цене. Это то, что перечитывают в отчёте брокера.
+                C.isTrade(op) ? `${F.num(op.quantity, 0)} шт × ${F.num(op.unitPrice, 4)} ₽` : null,
+                goal,
+                op.source === C.SOURCE_COMPUTED ? 'расчёт' : null,
+                op.comment,
+              ]
                 .filter(Boolean)
                 .join(' · '),
             }),
           ]),
-          h('span', {
-            class: `op-amount ${C.signed(op) >= 0 ? 'is-plus' : 'is-minus'}`,
-            text: F.signedMoney(C.signed(op)),
-          }),
+          C.isTrade(op)
+            ? h('span', { class: 'op-amount is-neutral', text: F.money(C.tradeAmount(op)) })
+            : h('span', {
+                class: `op-amount ${C.signed(op) >= 0 ? 'is-plus' : 'is-minus'}`,
+                text: F.signedMoney(C.signed(op)),
+              }),
         ]);
       }),
     ]);
@@ -180,5 +197,6 @@ function groups(operations, state, today, refresh) {
 function kind(type) {
   if (type === C.OP_INCOME) return 'income';
   if (type === C.OP_EXPENSE) return 'expense';
+  if (type === C.OP_BUY || type === C.OP_SELL) return 'trade';
   return 'contribution';
 }

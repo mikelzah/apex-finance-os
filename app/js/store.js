@@ -7,7 +7,8 @@
 
 // Список классов живёт в расчётном ядре — там же, где им пользуются.
 // Дублировать его здесь значило бы однажды разойтись.
-import { ASSET_CLASSES } from './calc.js';
+import * as C from './calc.js';
+const { ASSET_CLASSES } = C;
 
 const DB_NAME = 'apex-finance-os';
 const DB_VERSION = 1;
@@ -132,6 +133,11 @@ function migrate(loaded) {
   next.meta = { ...base.meta, ...(loaded.meta || {}) };
   for (const key of ['assets', 'goals', 'operations', 'portfolio', 'tax', 'netWorth', 'keyRate', 'priceHistory']) {
     if (!Array.isArray(next[key])) next[key] = [];
+  }
+  // Размер лота появился вместе со сделками. Единица — не догадка, а самый
+  // частый случай на Мосбирже; где не так, поправляется в карточке бумаги.
+  for (const a of next.assets) {
+    if (a.lotSize == null) a.lotSize = 1;
   }
   return next;
 }
@@ -266,6 +272,60 @@ export function upsert(list, item) {
 export function remove(list, id) {
   const i = list.findIndex((x) => x.id === id);
   if (i !== -1) list.splice(i, 1);
+}
+
+// --------------------------------------------------------------------------
+// Сделки
+// --------------------------------------------------------------------------
+
+/**
+ * Сделка и списание с денежного счёта записываются одной правкой.
+ *
+ * Двойной записи в приложении нет — операция принадлежит одному активу.
+ * Поэтому денежная сторона сделки это обычная операция по счёту, привязанная
+ * к сделке полем linkedTo. Так её видно в журнале как настоящее списание,
+ * и она сама уходит вслед за сделкой при удалении.
+ *
+ * Вид денежной операции выбран не произвольно. Покупка — расход: он уменьшает
+ * базу начисления процентов ровно так, как уменьшил её реальный платёж.
+ * Продажа — взнос без цели: доходом её записать нельзя, доходы читает расчёт
+ * процентов и налог, и выручка от продажи испортила бы оба. Пустая цель
+ * оставляет в стороне и дисциплину: план по цели считает только взносы,
+ * относящиеся к ней.
+ */
+export function saveTrade(draft, trade, cashAssetId) {
+  upsert(draft.operations, trade);
+
+  const legs = draft.operations.filter((op) => op.linkedTo === trade.id);
+  for (const leg of legs) remove(draft.operations, leg.id);
+  if (!cashAssetId) return trade;
+
+  const isBuy = trade.type === C.OP_BUY;
+  upsert(draft.operations, {
+    id: legs[0]?.id || newId('op'),
+    date: trade.date,
+    type: isBuy ? C.OP_EXPENSE : C.OP_CONTRIBUTION,
+    amount: trade.amount,
+    assetId: cashAssetId,
+    goalId: null,
+    source: C.SOURCE_MANUAL,
+    comment: `${trade.type}: ${trade.ticker || ''}`.trim(),
+    linkedTo: trade.id,
+  });
+  return trade;
+}
+
+/** Сделка уходит вместе со своим списанием: одна без другой — перекос. */
+export function removeTrade(draft, tradeId) {
+  for (const leg of draft.operations.filter((op) => op.linkedTo === tradeId)) {
+    remove(draft.operations, leg.id);
+  }
+  remove(draft.operations, tradeId);
+}
+
+/** Денежный счёт, с которого оплачена сделка, — чтобы форма открылась как есть. */
+export function tradeCashAsset(operations, tradeId) {
+  return operations.find((op) => op.linkedTo === tradeId)?.assetId || '';
 }
 
 // --------------------------------------------------------------------------

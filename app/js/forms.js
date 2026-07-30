@@ -13,7 +13,24 @@ const { h } = U;
 // Операция
 // --------------------------------------------------------------------------
 
+/**
+ * Операция. Для бумаги это сделка, для счёта — движение денег.
+ *
+ * Развилка здесь, а не у каждого места вызова: операцию открывают из журнала,
+ * со страницы бумаги, из карточки цели, и решать в каждой точке, какую форму
+ * показать, значило бы четыре раза повторить одно правило.
+ */
 export function operationSheet(existing, options = {}) {
+  const state = store.getState();
+  if (C.isTrade(existing)) return tradeSheet(existing, options);
+  if (!existing) {
+    const target = state.assets.find((a) => a.id === options.assetId);
+    if (target && target.ticker) return tradeSheet(null, options);
+  }
+  return moneySheet(existing, options);
+}
+
+function moneySheet(existing, options = {}) {
   const state = store.getState();
   const isNew = !existing;
   const op = existing || {
@@ -21,7 +38,10 @@ export function operationSheet(existing, options = {}) {
     date: D.today(),
     type: C.OP_CONTRIBUTION,
     amount: options.amount ?? state.settings.quickAmount ?? null,
-    assetId: options.assetId ?? state.settings.quickAssetId ?? state.assets[0]?.id ?? null,
+    // По умолчанию — денежный актив, а не первый попавшийся: бумаги в этом
+    // списке нет вовсе, и подставленный тикер оставил бы поле пустым.
+    assetId: options.assetId ?? state.settings.quickAssetId
+      ?? state.assets.find((a) => !a.ticker)?.id ?? null,
     goalId: options.goalId ?? state.settings.quickGoalId ?? null,
     source: C.SOURCE_MANUAL,
     comment: null,
@@ -31,8 +51,14 @@ export function operationSheet(existing, options = {}) {
     const date = U.input({ type: 'date', value: op.date });
     const type = U.select([C.OP_CONTRIBUTION, C.OP_INCOME, C.OP_EXPENSE], op.type);
     const amount = U.numberInput(op.amount, { 'data-autofocus': isNew ? 'yes' : 'no' });
+    // Бумаг в списке нет: движение денег их стоимость не меняет — она
+    // считается как количество × цена. Записанный на бумагу взнос ровно так
+    // и пропадал. Уже записанную такую операцию из списка не выбрасываем,
+    // иначе её нельзя было бы открыть и исправить.
     const asset = U.select(
-      state.assets.map((a) => ({ value: a.id, label: a.name })),
+      state.assets
+        .filter((a) => !a.ticker || a.id === op.assetId)
+        .map((a) => ({ value: a.id, label: a.name })),
       op.assetId,
     );
     const goal = U.select(
@@ -89,6 +115,167 @@ export function operationSheet(existing, options = {}) {
 }
 
 // --------------------------------------------------------------------------
+// Сделка
+// --------------------------------------------------------------------------
+
+/**
+ * Покупка и продажа бумаги — так, как это выглядит у брокера.
+ *
+ * Спрашивается ровно то, что известно из отчёта: сколько лотов, по какой цене,
+ * какая комиссия. Сумма не вводится, а считается — вводить её отдельно значит
+ * иметь два источника одной величины и однажды их рассогласовать.
+ *
+ * Отдельно спрашивается счёт оплаты. Без него покупка увеличивала бы капитал
+ * на стоимость бумаги: бумаг прибавилось, а деньги ниоткуда не ушли. Поле
+ * можно оставить пустым — если платили не с того счёта, который здесь ведётся.
+ */
+export function tradeSheet(existing, options = {}) {
+  const state = store.getState();
+  const isNew = !existing;
+  const assets = state.assets.filter((a) => a.ticker);
+
+  const op = existing || {
+    id: null,
+    date: D.today(),
+    type: C.OP_BUY,
+    assetId: options.assetId ?? assets[0]?.id ?? null,
+    quantity: null,
+    unitPrice: null,
+    fee: null,
+    goalId: options.goalId ?? null,
+    source: C.SOURCE_MANUAL,
+    comment: null,
+  };
+
+  const assetOf = (id) => state.assets.find((a) => a.id === id) || null;
+  const lotOf = (id) => assetOf(id)?.lotSize || 1;
+
+  U.sheet(isNew ? 'Новая сделка' : `${op.type}`, (api) => {
+    const type = U.select([C.OP_BUY, C.OP_SELL], op.type);
+    const asset = U.select(assets.map((a) => ({ value: a.id, label: a.name })), op.assetId);
+    // В лотах — как в заявке у брокера. Штуки показываются рядом сами.
+    const lots = U.numberInput(
+      op.quantity != null ? op.quantity / lotOf(op.assetId) : null,
+      { 'data-autofocus': isNew ? 'yes' : 'no' },
+    );
+    const unitPrice = U.numberInput(op.unitPrice ?? (isNew ? assetOf(op.assetId)?.price : null));
+    const fee = U.numberInput(op.fee);
+    const date = U.input({ type: 'date', value: op.date });
+    const cash = U.select(
+      [
+        { value: '', label: '— не указывать —' },
+        ...state.assets.filter((a) => !a.ticker && a.type === C.TYPE_MONEY)
+          .map((a) => ({ value: a.id, label: a.name })),
+      ],
+      isNew ? '' : store.tradeCashAsset(state.operations, op.id),
+    );
+    const goal = U.select(
+      [{ value: '', label: '— без цели —' }, ...state.goals.map((g) => ({ value: g.id, label: g.name }))],
+      op.goalId || '',
+    );
+    const comment = U.input({ type: 'text', value: op.comment || '', placeholder: 'необязательно' });
+
+    // Итог сделки пересчитывается на каждом нажатии клавиши: у брокера
+    // человек привык видеть сумму до того, как подтвердит заявку.
+    const totalValue = h('span', { class: 'total-value' });
+    const totalNote = h('span', { class: 'total-note' });
+    const draft = () => {
+      const lotSize = lotOf(asset.value);
+      const qty = (U.parseNumber(lots.value) || 0) * lotSize;
+      return {
+        type: type.value,
+        quantity: qty,
+        unitPrice: U.parseNumber(unitPrice.value) || 0,
+        fee: U.parseNumber(fee.value) || 0,
+        lotSize,
+      };
+    };
+    const recount = () => {
+      const d = draft();
+      totalValue.textContent = F.money2(C.tradeAmount(d));
+      totalNote.textContent = [
+        `${F.num(d.quantity, 0)} шт × ${F.num(d.unitPrice, 4)} ₽`,
+        d.fee ? `комиссия ${F.money2(d.fee)}` : null,
+        d.lotSize > 1 ? `в лоте ${F.num(d.lotSize, 0)}` : null,
+      ].filter(Boolean).join(' · ');
+    };
+    for (const node of [lots, unitPrice, fee]) node.addEventListener('input', recount);
+    for (const node of [type, asset]) {
+      node.addEventListener('change', () => {
+        if (node === asset && isNew) unitPrice.value = String(assetOf(asset.value)?.price ?? '').replace('.', ',');
+        recount();
+      });
+    }
+    recount();
+
+    api.setFooter([
+      !isNew
+        ? U.button('Удалить', () => {
+            U.confirmSheet('Удалить сделку?', 'Количество бумаг и списание со счёта откатятся.', 'Удалить', async () => {
+              await store.mutate((d) => store.removeTrade(d, op.id));
+              U.toast('Сделка удалена');
+              options.onDone?.();
+            });
+          }, { kind: 'danger' })
+        : U.button('Отмена', () => api.close()),
+      U.button('Сохранить', async () => {
+        const d = draft();
+        if (!asset.value) return U.toast('Выберите бумагу', 'error');
+        if (!d.quantity || d.quantity <= 0) return U.toast('Количество должно быть больше нуля', 'error');
+        if (!d.unitPrice || d.unitPrice <= 0) return U.toast('Цена должна быть больше нуля', 'error');
+        if (!D.isValid(date.value)) return U.toast('Проверьте дату', 'error');
+
+        // Продать больше, чем есть, нельзя: это не строгость ради строгости,
+        // а защита от минусового количества, которое дальше пошло бы
+        // в стоимость и в доли отрицательным числом.
+        if (d.type === C.OP_SELL) {
+          const others = state.operations.filter((x) => x.id !== op.id);
+          const have = C.assetQuantity(assetOf(asset.value), others);
+          if (d.quantity > have) return U.toast(`В наличии ${F.num(have, 0)} шт — продать больше нельзя`, 'error');
+        }
+
+        const payload = {
+          id: op.id || store.newId('op'),
+          date: date.value,
+          type: d.type,
+          quantity: d.quantity,
+          unitPrice: d.unitPrice,
+          fee: d.fee || null,
+          amount: C.tradeAmount(d),
+          assetId: asset.value,
+          ticker: assetOf(asset.value)?.ticker || null,
+          goalId: goal.value || null,
+          source: op.source || C.SOURCE_MANUAL,
+          comment: comment.value.trim() || null,
+        };
+        await store.mutate((dr) => store.saveTrade(dr, payload, cash.value || null));
+        api.close();
+        U.tap();
+        U.toast(`${d.type}: ${F.num(d.quantity, 0)} шт на ${F.money(payload.amount)}`);
+        options.onDone?.();
+      }, { kind: 'primary' }),
+    ]);
+
+    return [
+      U.field('Тип сделки', type),
+      U.field('Бумага', asset),
+      U.field('Количество, лотов', lots),
+      U.field('Цена за штуку, ₽', unitPrice),
+      U.field('Комиссия, ₽', fee, 'Как в отчёте брокера. Покупку удорожает, из выручки вычитается.'),
+      h('div', { class: 'total' }, [
+        h('span', { class: 'total-label', text: 'Итого' }),
+        totalValue,
+        totalNote,
+      ]),
+      U.field('Дата', date),
+      U.field('Оплата со счёта', cash, 'Отсюда спишутся деньги (при продаже — сюда зачислятся). Пусто — движение денег не записывать.'),
+      U.field('Цель', goal),
+      U.field('Комментарий', comment),
+    ];
+  });
+}
+
+// --------------------------------------------------------------------------
 // Актив
 // --------------------------------------------------------------------------
 
@@ -109,6 +296,7 @@ export function assetSheet(existing, options = {}) {
     ticker: null,
     board: null,
     quantity: null,
+    lotSize: 1,
     price: null,
     updated: null,
     opening: 0,
@@ -142,6 +330,7 @@ export function assetSheet(existing, options = {}) {
     const ticker = U.input({ type: 'text', value: a.ticker || '', placeholder: 'пусто для активов без котировок' });
     const board = U.input({ type: 'text', value: a.board || '', placeholder: 'TQBR, TQTF' });
     const quantity = U.numberInput(a.quantity);
+    const lotSize = U.numberInput(a.lotSize ?? 1);
     const price = U.numberInput(a.price);
 
     const opening = U.numberInput(a.opening);
@@ -194,6 +383,7 @@ export function assetSheet(existing, options = {}) {
           ticker: ticker.value.trim().toUpperCase() || null,
           board: board.value.trim().toUpperCase() || null,
           quantity: U.parseNumber(quantity.value),
+          lotSize: U.parseNumber(lotSize.value) || 1,
           price: U.parseNumber(price.value),
           updated: a.updated,
           opening: U.parseNumber(opening.value) || 0,
@@ -231,7 +421,8 @@ export function assetSheet(existing, options = {}) {
       U.group('Котировки', Boolean(a.ticker) || (isNew && a.type === C.TYPE_INVESTMENT), [
         U.field('Тикер', ticker),
         U.field('Режим торгов', board, 'TQBR для акций, TQTF для фондов. Пусто — переберём сами.'),
-        U.field('Количество', quantity),
+        U.field('Количество на начало, шт', quantity, 'Сколько было на момент заведения бумаги. Сделки прибавляются к нему сами — правьте это поле, только если ошиблись в исходном остатке.'),
+        U.field('Бумаг в лоте', lotSize, 'Сколько бумаг в одном лоте на бирже. Обычно 1 или 10 — по нему считается количество в сделке.'),
         U.field('Цена, ₽', price, a.updated ? `Обновлена ${F.date(a.updated)}` : 'Обновляется с Мосбиржи или вручную'),
       ]),
 

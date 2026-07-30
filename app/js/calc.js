@@ -22,6 +22,24 @@ export const OP_CONTRIBUTION = 'Взнос';
 export const OP_INCOME = 'Доход';
 export const OP_EXPENSE = 'Расход';
 
+/**
+ * Сделки по бумагам. Отдельный вид операции, а не «взнос на актив».
+ *
+ * У вклада операция это движение денег: внёс — остаток вырос. У бумаги так
+ * не выходит: её стоимость считается как количество × цена, и записанный
+ * на неё взнос не менял ровным счётом ничего — количество оставалось
+ * прежним, а деньги пропадали. Сделка меняет то, что у бумаги меняется
+ * на самом деле: количество.
+ */
+export const OP_BUY = 'Покупка';
+export const OP_SELL = 'Продажа';
+
+export const OP_TYPES = [OP_CONTRIBUTION, OP_INCOME, OP_EXPENSE, OP_BUY, OP_SELL];
+
+export function isTrade(op) {
+  return Boolean(op) && (op.type === OP_BUY || op.type === OP_SELL);
+}
+
 export const SOURCE_MANUAL = 'Вручную';
 export const SOURCE_COMPUTED = 'Расчёт';
 
@@ -43,10 +61,25 @@ export const GOAL_ACTIVE = 'Активна';
 export const GOAL_PAUSED = 'На паузе';
 export const GOAL_DONE = 'Достигнута';
 
-/** Взнос и доход прибавляют, расход отнимает. */
+/**
+ * Взнос и доход прибавляют, расход отнимает.
+ *
+ * Сделка не даёт ноль по недосмотру, а по существу: это обмен, а не движение
+ * денег. Бумаг стало больше, денег на счёте меньше — и списание записывается
+ * отдельной операцией по самому счёту. Если бы сделка тоже считалась деньгами,
+ * одна покупка уменьшила бы капитал дважды.
+ */
 export function signed(op) {
+  if (isTrade(op)) return 0;
   const amount = op.amount || 0;
   return op.type === OP_EXPENSE ? -amount : amount;
+}
+
+/** Деньги по сделке: комиссия удорожает покупку и уменьшает выручку. */
+export function tradeAmount(op) {
+  const gross = (op.quantity || 0) * (op.unitPrice || 0);
+  const fee = op.fee || 0;
+  return op.type === OP_SELL ? gross - fee : gross + fee;
 }
 
 // --------------------------------------------------------------------------
@@ -54,12 +87,29 @@ export function signed(op) {
 // --------------------------------------------------------------------------
 
 /**
+ * Сколько бумаг на руках: начальное количество плюс сделки.
+ *
+ * Количество в карточке актива — начальное, как opening у счёта. Держать
+ * его как «текущее» и править при каждой сделке значило бы хранить
+ * производную величину: правка или удаление сделки её бы уже не поправили,
+ * и остаток тихо разошёлся бы с историей.
+ */
+export function assetQuantity(asset, operations) {
+  let q = asset.quantity || 0;
+  for (const op of operations) {
+    if (op.assetId !== asset.id || !isTrade(op)) continue;
+    q += op.type === OP_BUY ? op.quantity || 0 : -(op.quantity || 0);
+  }
+  return q;
+}
+
+/**
  * Повторяет формулу «Стоимость» из Notion: актив с тикером стоит
  * Количество × Цена, остальные — начальный остаток плюс движение по операциям.
  */
 export function assetValue(asset, operations) {
   if (asset.ticker) {
-    return (asset.quantity || 0) * (asset.price || 0);
+    return assetQuantity(asset, operations) * (asset.price || 0);
   }
   let movement = 0;
   for (const op of operations) {

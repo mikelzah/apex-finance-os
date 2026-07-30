@@ -134,7 +134,7 @@ function holdings(ctx, total) {
       U.sectionTitle(cls, h('span', { class: 'section-sum', text: F.money(sum) })),
       ...own.map((r) =>
         U.row(r.asset.name, F.money(r.value), {
-          sub: holdingSub(r.asset, total, r.value),
+          sub: holdingSub(r.asset, total, r.value, ops),
           tag: r.asset.status === C.STATUS_ACTIVE ? null : r.asset.status.toLowerCase(),
           tagClass: 'muted',
           onClick: () => ctx.go(`portfolio/${r.asset.id}`),
@@ -166,16 +166,16 @@ function actions(ctx, withTickers) {
   return h('div', { class: 'act act-row' }, [
     U.button('Добавить бумагу', () => forms.assetSheet(null, {
       onDone: refresh,
-      preset: { type: C.TYPE_INVESTMENT, liquidity: 'T+1', assetClass: 'Акции' },
+      preset: { type: C.TYPE_INVESTMENT, liquidity: 'T+1', assetClass: 'Акции', lotSize: 1 },
     }), { kind: 'primary', class: 'btn-wide' }),
     withTickers.length ? U.button('Обновить котировки', () => updateQuotes(ctx, withTickers, status), { class: 'btn-wide' }) : null,
     withTickers.length ? status : null,
   ]);
 }
 
-function holdingSub(asset, total, value) {
+function holdingSub(asset, total, value, ops) {
   const parts = [];
-  if (asset.ticker) parts.push(`${F.num(asset.quantity, 0)} × ${F.num(asset.price, 4)} ₽`);
+  if (asset.ticker) parts.push(`${F.num(C.assetQuantity(asset, ops), 0)} × ${F.num(asset.price, 4)} ₽`);
   else if (asset.rate) parts.push(`${F.percent(asset.rate)} годовых`);
   if (total > 0 && C.ASSET_CLASSES.includes(asset.assetClass)) {
     parts.push(`${F.percent((value / total) * 100)} портфеля`);
@@ -233,13 +233,14 @@ function instrument(ctx) {
   if (!asset) return [U.card([U.emptyState('Бумага не найдена.')])];
 
   const value = C.assetValue(asset, state.operations);
+  const held = C.assetQuantity(asset, state.operations);
   const own = state.operations
     .filter((op) => op.assetId === asset.id)
     .sort((a, b) => (a.date < b.date ? 1 : -1));
 
   return [
     U.card([
-      U.stat('Стоимость', F.money(value), { big: true, hint: valueHint(asset) }),
+      U.stat('Стоимость', F.money(value), { big: true, hint: valueHint(asset, held) }),
       h('div', { class: 'grid-2' }, [
         U.stat('Класс', asset.assetClass || 'не задан'),
         U.stat('Статус', asset.status),
@@ -247,28 +248,89 @@ function instrument(ctx) {
       asset.ticker ? singleQuote(ctx, asset) : null,
     ]),
 
+    // Средняя цена есть только там, где сделки записаны. У бумаги, заведённой
+    // одним начальным количеством, её взять неоткуда — и придумывать нечего.
+    asset.ticker ? averageCard(asset, state.operations, value, held) : null,
+
     priceCard(state, asset),
 
     U.card([
-      U.sectionTitle('Операции', U.button('Добавить', () => forms.operationSheet(null, {
+      U.sectionTitle(asset.ticker ? 'Сделки' : 'Операции', U.button(asset.ticker ? 'Сделка' : 'Добавить', () => forms.operationSheet(null, {
         assetId: asset.id,
         goalId: (asset.goalIds || [])[0] || null,
         onDone: refresh,
       }), { kind: 'primary' })),
       ...own.map((op) =>
-        U.row(`${op.type} · ${F.relativeDate(op.date, today)}`, F.signedMoney(C.signed(op)), {
-          sub: [op.source === C.SOURCE_COMPUTED ? 'расчёт' : null, op.comment].filter(Boolean).join(' · ') || null,
+        U.row(`${op.type} · ${F.relativeDate(op.date, today)}`, opValue(op), {
+          sub: opSub(op),
           onClick: () => forms.operationSheet(op, { onDone: refresh }),
         }),
       ),
-      own.length ? null : U.emptyState('Операций по этой бумаге ещё нет.'),
+      own.length ? null : U.emptyState(asset.ticker ? 'Сделок по этой бумаге ещё не было.' : 'Операций по этой бумаге ещё нет.'),
     ]),
   ];
 }
 
-function valueHint(asset) {
+/** У сделки показываем сумму сделки, у денежной операции — знак движения. */
+function opValue(op) {
+  return C.isTrade(op) ? F.money(C.tradeAmount(op)) : F.signedMoney(C.signed(op));
+}
+
+function opSub(op) {
+  if (C.isTrade(op)) {
+    return [`${F.num(op.quantity, 0)} шт × ${F.num(op.unitPrice, 4)} ₽`, op.fee ? `комиссия ${F.money2(op.fee)}` : null, op.comment]
+      .filter(Boolean).join(' · ');
+  }
+  return [op.source === C.SOURCE_COMPUTED ? 'расчёт' : null, op.comment].filter(Boolean).join(' · ') || null;
+}
+
+/**
+ * Средняя цена покупки и результат по позиции.
+ *
+ * Средняя считается по покупкам: продажи уменьшают количество, но цену входа
+ * не меняют — иначе после частичной продажи она перестала бы что-либо значить.
+ *
+ * Прибыль показывается только тогда, когда все бумаги на руках пришли
+ * сделками. Если часть количества задана начальным блоком, цена его покупки
+ * неизвестна, и распространить на него среднюю по сделкам значило бы выдать
+ * придуманное число за результат. В этом случае честнее сказать, чего
+ * не хватает, чем показать красивую, но выдуманную прибыль.
+ */
+function averageCard(asset, operations, value, held) {
+  let spent = 0;
+  let bought = 0;
+  for (const op of operations) {
+    if (op.assetId !== asset.id || op.type !== C.OP_BUY) continue;
+    spent += C.tradeAmount(op);
+    bought += op.quantity || 0;
+  }
+  if (!bought) return null;
+
+  const average = spent / bought;
+  const opening = asset.quantity || 0;
+  const invested = average * held;
+  const result = value - invested;
+
+  return U.card([
+    U.sectionTitle('Позиция'),
+    h('div', { class: 'grid-2' }, [
+      U.stat('Средняя цена', `${F.num(average, 4)} ₽`, { hint: `куплено ${F.num(bought, 0)} шт` }),
+      U.stat('Сейчас', `${F.num(asset.price, 4)} ₽`),
+    ]),
+    opening
+      ? U.stat('Цена входа известна не для всей позиции', `${F.num(opening, 0)} шт`, {
+          hint: 'начальное количество заведено без сделки — результат по позиции не посчитать',
+        })
+      : U.stat(result >= 0 ? 'Прибыль' : 'Убыток', F.signedMoney(result), {
+          class: result >= 0 ? 'is-good' : 'is-bad',
+          hint: invested ? `${F.percent((result / invested) * 100)} к вложенному` : null,
+        }),
+  ]);
+}
+
+function valueHint(asset, held) {
   if (asset.ticker) {
-    const price = `${F.num(asset.quantity, 0)} шт × ${F.num(asset.price, 4)} ₽`;
+    const price = `${F.num(held, 0)} шт × ${F.num(asset.price, 4)} ₽`;
     return asset.updated ? `${price} · цена от ${F.date(asset.updated)}` : `${price} · цена не обновлялась`;
   }
   if (asset.rate) return `${F.percent(asset.rate)} годовых`;
