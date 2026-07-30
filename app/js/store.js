@@ -102,6 +102,12 @@ function emptyState() {
       classByTicker: {},
       classFallback: 'Прочее',
       autoQuotes: true,
+      // Скрытые сигналы: [{ key, text }]. Формулировка хранится рядом с
+      // ключом, чтобы изменившийся сигнал показался заново.
+      mutedSignals: [],
+      // Развёрнут ли блок сигналов. null — человек ещё не выбирал, тогда
+      // блок открывается сам, если есть ошибки.
+      signalsOpen: null,
     },
     meta: {
       lastBackupAt: null,
@@ -119,6 +125,7 @@ function migrate(loaded) {
   const base = emptyState();
   const next = { ...base, ...loaded };
   next.settings = { ...base.settings, ...(loaded.settings || {}) };
+  if (!Array.isArray(next.settings.mutedSignals)) next.settings.mutedSignals = [];
   next.meta = { ...base.meta, ...(loaded.meta || {}) };
   for (const key of ['assets', 'goals', 'operations', 'portfolio', 'tax', 'netWorth', 'keyRate', 'priceHistory']) {
     if (!Array.isArray(next[key])) next[key] = [];

@@ -238,26 +238,29 @@ function primaryGoal(ctx) {
  */
 function attention(ctx) {
   const { state, today, refresh } = ctx;
-  const list = C.signals(state.assets, state.operations, today);
-  if (!list.length) return h('p', { class: 'quiet-line' }, [h('span', { text: 'Всё в порядке — сигналов нет' })]);
+  const all = C.signals(state.assets, state.operations, today);
+  const { shown, hidden } = C.splitSignals(all, state.settings.mutedSignals);
 
-  const errors = list.filter((s) => s.level === 'error');
-  const open = errors.length > 0;
+  if (!shown.length) {
+    const line = [h('span', { text: 'Всё в порядке — сигналов нет' })];
+    if (hidden.length) {
+      line.push(h('span', { class: 'quiet-line-dot', text: '·' }));
+      line.push(h('button', { class: 'link', type: 'button', onclick: () => hiddenSheet(ctx, hidden) },
+        [h('span', { text: `скрыто ${hidden.length}` })]));
+    }
+    return h('p', { class: 'quiet-line' }, line);
+  }
+
+  const errors = shown.filter((s) => s.level === 'error');
+  // Пока человек сам не свернул или не развернул блок, решает содержимое:
+  // ошибку прятать нельзя, предупреждение того не стоит. Как только выбор
+  // сделан, он сохраняется — иначе принятая ошибка раскрывала бы блок
+  // каждый день, и свернуть его было бы невозможно.
+  const pref = state.settings.signalsOpen;
+  const open = pref == null ? errors.length > 0 : Boolean(pref);
 
   const items = h('div', { class: 'signals', hidden: !open },
-    list.map((s) =>
-      h('button', {
-        class: `signal signal-${s.level}`,
-        type: 'button',
-        onclick: () => forms.assetSheet(s.asset, { onDone: refresh }),
-      }, [
-        statusIcon(s.level),
-        h('span', { class: 'signal-text' }, [
-          h('span', { class: 'signal-asset', text: s.asset.name }),
-          h('span', { class: 'signal-note', text: s.text }),
-        ]),
-      ]),
-    ),
+    shown.map((s) => signalRow(ctx, s)),
   );
 
   const toggle = h('button', {
@@ -268,14 +271,97 @@ function attention(ctx) {
       items.hidden = !items.hidden;
       e.currentTarget.setAttribute('aria-expanded', String(!items.hidden));
       e.currentTarget.querySelector('.disclosure-chevron').textContent = items.hidden ? '⌄' : '⌃';
+      // Без перерисовки: она бы схлопнула только что раскрытый блок обратно
+      // в анимацию появления, а положение выбора и так уже на экране.
+      store.mutate((draft) => { draft.settings.signalsOpen = !items.hidden; });
     },
   }, [
     statusIcon(errors.length ? 'error' : 'warn'),
-    h('span', { class: 'disclosure-label', text: `Требует внимания: ${list.length}` }),
+    h('span', { class: 'disclosure-label', text: `Требует внимания: ${shown.length}` }),
+    hidden.length ? h('span', { class: 'disclosure-hidden', text: `скрыто ${hidden.length}` }) : null,
     h('span', { class: 'disclosure-chevron', text: open ? '⌃' : '⌄' }),
   ]);
 
-  return U.card([toggle, items], { class: 'card-signals' });
+  const foot = hidden.length
+    ? h('button', { class: 'signals-foot', type: 'button', onclick: () => hiddenSheet(ctx, hidden) }, [
+        h('span', { text: `Скрытые сигналы: ${hidden.length}` }),
+        h('span', { class: 'row-chevron', text: '›' }),
+      ])
+    : null;
+
+  return U.card([toggle, items, foot], { class: 'card-signals' });
+}
+
+/**
+ * Строка сигнала: слева — переход к активу, справа — «скрыть».
+ *
+ * Две отдельные кнопки, а не одна: кнопку внутри кнопки браузер разбирать
+ * не обязан, да и промахнуться пальцем по такому было бы легко.
+ */
+function signalRow(ctx, s) {
+  const { refresh } = ctx;
+  return h('div', { class: `signal signal-${s.level}` }, [
+    h('button', {
+      class: 'signal-main',
+      type: 'button',
+      onclick: () => forms.assetSheet(s.asset, { onDone: refresh }),
+    }, [
+      statusIcon(s.level),
+      h('span', { class: 'signal-text' }, [
+        h('span', { class: 'signal-asset', text: s.asset.name }),
+        h('span', { class: 'signal-note', text: s.text }),
+      ]),
+    ]),
+    h('button', {
+      class: 'signal-mute',
+      type: 'button',
+      'aria-label': `Скрыть сигнал: ${s.asset.name}, ${s.text}`,
+      onclick: async () => {
+        await store.mutate((draft) => {
+          const key = C.signalKey(s);
+          const kept = (draft.settings.mutedSignals || []).filter((m) => (m.key || m) !== key);
+          kept.push({ key, text: s.text });
+          draft.settings.mutedSignals = kept;
+        });
+        U.toast('Сигнал скрыт — вернётся, если изменится');
+        refresh();
+      },
+    }, [h('span', { text: '✕' })]),
+  ]);
+}
+
+/**
+ * Скрытые сигналы. Список нужен обязательно: скрытое, о котором нельзя
+ * вспомнить, — это не скрытое, а потерянное.
+ */
+function hiddenSheet(ctx, hidden) {
+  const { refresh } = ctx;
+  U.sheet('Скрытые сигналы', (api) => {
+    const unmute = async (keys) => {
+      await store.mutate((draft) => {
+        const drop = new Set(keys);
+        draft.settings.mutedSignals = (draft.settings.mutedSignals || [])
+          .filter((m) => !drop.has(m.key || m));
+      });
+      api.close();
+      refresh();
+    };
+
+    api.setFooter([
+      U.button('Закрыть', () => api.close()),
+      U.button('Показать все', () => unmute(hidden.map((s) => C.signalKey(s))), { kind: 'primary' }),
+    ]);
+
+    return [
+      ...hidden.map((s) =>
+        U.row(s.asset.name, 'показать', {
+          sub: s.text,
+          onClick: () => unmute([C.signalKey(s)]),
+        }),
+      ),
+      U.callout('Скрытый сигнал вернётся сам, если изменится формулировка: расхождение на копейку и расхождение на сто тысяч — разные сигналы, и второй не спрячется за первым.', 'info'),
+    ];
+  }, { focus: false });
 }
 
 function capitalChart(state, worth, today) {

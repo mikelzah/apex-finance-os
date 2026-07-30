@@ -390,44 +390,80 @@ export function planCompletion(goal, operations, day) {
  */
 export function signals(assets, operations, day) {
   const out = [];
-  const push = (asset, text, level = 'warn') => out.push({ asset, text, level });
+  const push = (asset, kind, text, level = 'warn') => out.push({ asset, kind, text, level });
 
   for (const a of assets) {
     if (a.status === STATUS_SOLD) continue;
 
     if (a.type === TYPE_MONEY && a.status === STATUS_ACTIVE) {
-      if (!a.rate) push(a, 'ставка не заполнена — проценты не начисляются');
-      if (!a.reconciledAt) push(a, 'ни разу не сверялся с банком');
+      if (!a.rate) push(a, 'no-rate', 'ставка не заполнена — проценты не начисляются');
+      if (!a.reconciledAt) push(a, 'never-reconciled', 'ни разу не сверялся с банком');
       else if (D.diffDays(day, a.reconciledAt) > 31) {
-        push(a, `сверка просрочена на ${D.diffDays(day, a.reconciledAt) - 31} дн.`);
+        push(a, 'reconcile-overdue', `сверка просрочена на ${D.diffDays(day, a.reconciledAt) - 31} дн.`);
       }
     }
 
     if (a.bankBalance != null) {
       const gap = a.bankBalance - assetValue(a, operations);
       if (Math.abs(gap) >= 1) {
-        push(a, `расхождение с банком ${gap > 0 ? '+' : ''}${round2(gap)} ₽`);
+        push(a, 'bank-gap', `расхождение с банком ${gap > 0 ? '+' : ''}${round2(gap)} ₽`);
       }
     }
 
     if ((a.goalIds || []).length > 1) {
       push(
         a,
+        'multi-goal',
         `привязан к нескольким целям (${a.goalIds.length}) — деньги считаются дважды`,
         'error',
       );
     }
 
     if (a.ticker && a.updated && D.diffDays(day, a.updated) > 5) {
-      push(a, `цена не обновлялась ${D.diffDays(day, a.updated)} дн.`, 'info');
+      push(a, 'stale-price', `цена не обновлялась ${D.diffDays(day, a.updated)} дн.`, 'info');
     }
-    if (a.ticker && !a.price) push(a, 'нет цены — стоимость считается нулевой');
+    if (a.ticker && !a.price) push(a, 'no-price', 'нет цены — стоимость считается нулевой');
 
     if (a.maturityDate && D.diffDays(a.maturityDate, day) >= 0 && D.diffDays(a.maturityDate, day) <= 30) {
-      push(a, `погашение через ${D.diffDays(a.maturityDate, day)} дн.`, 'info');
+      push(a, 'maturity', `погашение через ${D.diffDays(a.maturityDate, day)} дн.`, 'info');
     }
   }
   return out;
+}
+
+/**
+ * Опознавательный ключ сигнала: актив и вид правила.
+ *
+ * Формулировка в ключ не входит — она меняется вместе с цифрами. Зато
+ * скрытие хранит её отдельно, и по ней видно, тот же это сигнал или уже
+ * другой: расхождение на 4 ₽ и расхождение на 4000 ₽ — не одно и то же.
+ */
+export function signalKey(signal) {
+  return `${signal.asset.id}:${signal.kind}`;
+}
+
+/**
+ * Разложить сигналы на видимые и скрытые.
+ *
+ * Скрытие — это «я это видел и согласен», а не «не показывай никогда».
+ * Поэтому сигнал возвращается, если формулировка изменилась: иначе однажды
+ * скрытое расхождение на копейку молча прикрыло бы расхождение на сто тысяч.
+ */
+export function splitSignals(list, muted) {
+  const byKey = new Map();
+  for (const m of muted || []) {
+    if (typeof m === 'string') byKey.set(m, null);
+    else if (m && m.key) byKey.set(m.key, m.text == null ? null : m.text);
+  }
+
+  const shown = [];
+  const hidden = [];
+  for (const s of list) {
+    const key = signalKey(s);
+    if (byKey.has(key) && (byKey.get(key) === null || byKey.get(key) === s.text)) hidden.push(s);
+    else shown.push(s);
+  }
+  return { shown, hidden };
 }
 
 // --------------------------------------------------------------------------
