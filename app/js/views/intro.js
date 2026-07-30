@@ -6,9 +6,9 @@
 
 import * as U from '../ui.js';
 import * as store from '../store.js';
+import * as mascot from '../mascot.js';
 
 const { h } = U;
-const NS = 'http://www.w3.org/2000/svg';
 
 export function render(ctx) {
   const start = async (action, message) => {
@@ -23,8 +23,8 @@ export function render(ctx) {
 
   return [
     h('section', { class: 'intro' }, [
-      mark(),
-      h('h1', { text: 'APEX Finance OS' }),
+      mascot.portrait('intro-mark'),
+      h('h1', { text: mascot.NAME }),
       h('p', { text: 'Капитал, цели и портфель в одном месте. Данные хранятся только в этом устройстве и никуда не отправляются.' }),
 
       h('div', { class: 'intro-actions' }, [
@@ -69,18 +69,3 @@ function restore(ctx) {
   picker.click();
 }
 
-function mark() {
-  const svg = document.createElementNS(NS, 'svg');
-  svg.setAttribute('viewBox', '0 0 512 512');
-  svg.setAttribute('class', 'intro-mark');
-  svg.setAttribute('aria-hidden', 'true');
-  const path = document.createElementNS(NS, 'path');
-  path.setAttribute('d', 'M112 364 L256 148 L400 364');
-  path.setAttribute('fill', 'none');
-  path.setAttribute('stroke', 'var(--accent)');
-  path.setAttribute('stroke-width', '56');
-  path.setAttribute('stroke-linecap', 'round');
-  path.setAttribute('stroke-linejoin', 'round');
-  svg.appendChild(path);
-  return svg;
-}

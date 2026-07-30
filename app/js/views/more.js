@@ -81,7 +81,7 @@ function hub(ctx) {
         tagClass: 'sell',
       }),
     ]),
-    h('p', { class: 'version', text: 'APEX Finance OS · локальная версия' }),
+    h('p', { class: 'version', text: `${mascot.NAME} · локальная версия` }),
   ];
 }
 
@@ -425,7 +425,7 @@ function settings(ctx) {
       U.row('Напоминание о копии', s.backupReminderDays ? `раз в ${F.days(s.backupReminderDays)}` : 'выключено', {
         onClick: reminder,
       }),
-      U.row('Зверь на острове', mascot.enabled() ? 'включён' : 'выключен', {
+      U.row(`${mascot.NAME} на острове`, mascot.enabled() ? 'висит' : 'выключен', {
         sub: 'висит на Dynamic Island и радуется взносам',
         onClick: () => {
           mascot.setEnabled(!mascot.enabled());
@@ -496,7 +496,9 @@ function backup(ctx) {
   const last = state.meta.lastBackupAt;
   const age = last ? D.diffDays(today, last.slice(0, 10)) : null;
 
-  const filename = () => `apex-finance-os-${today}.json`;
+  // Латиницей: файл уходит в «Файлы», почту и мессенджеры, а кириллица
+  // в имени переживает такую дорогу не везде.
+  const filename = () => `kubysh-${today}.json`;
 
   const save = async () => {
     const text = store.exportText();
@@ -506,7 +508,7 @@ function backup(ctx) {
     // Куда именно ляжет копия — решаете вы, приложение не выбирает за вас.
     if (navigator.canShare && navigator.canShare({ files: [file] })) {
       try {
-        await navigator.share({ files: [file], title: 'APEX Finance OS' });
+        await navigator.share({ files: [file], title: mascot.NAME });
         await store.markBackedUp();
         refresh();
         return;

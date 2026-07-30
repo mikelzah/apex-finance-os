@@ -1,4 +1,7 @@
-// Маленький зверь, висящий на Dynamic Island.
+// Кубыш — зверь, висящий на Dynamic Island.
+//
+// Имя от кубышки: место, где копят. Приложение названо в его честь, и он же
+// стоит на иконке — поэтому здесь не просто украшение, а лицо приложения.
 //
 // Почему висит, а не сидит. Dynamic Island — вырез в матрице: пикселей там
 // физически нет, и поверх этой области система рисует своё. Всё, что
@@ -68,6 +71,23 @@ export function celebrate() {
   setTimeout(() => node && node.classList.remove('is-happy'), 900);
 }
 
+/** Имя. Живёт здесь, чтобы в текстах его нельзя было написать иначе. */
+export const NAME = 'Кубыш';
+
+/**
+ * Кубыш в полный рост — для первого экрана и всюду, где он не висит.
+ *
+ * Тот же рисунок, что и на острове, но без рук, уходящих вверх: держаться
+ * здесь не за что, и торчащие вверх штрихи читались бы как антенны.
+ */
+export function portrait(className = 'portrait') {
+  const wrap = draw();
+  wrap.className = className;
+  for (const limb of wrap.querySelectorAll('.mascot-svg > .mascot-limb')) limb.remove();
+  wrap.querySelector('.mascot-smile').style.opacity = '1';
+  return wrap;
+}
+
 /**
  * Занавес на весь экран — на время обновления.
  *
@@ -91,9 +111,7 @@ export function curtain(text = 'Обновляюсь…') {
   crowd.className = 'curtain-crowd';
   // Пятеро: меньше — не толпа, больше — на узком экране каша.
   for (let i = 0; i < 5; i += 1) {
-    const one = draw();
-    one.classList.remove('mascot');
-    one.classList.add('curtain-one');
+    const one = portrait('curtain-one');
     // Каждый прыгает в своём ритме и на своей высоте: одинаковый шаг
     // у всех сразу читается как один объект, размноженный копированием.
     one.style.setProperty('--i', String(i));

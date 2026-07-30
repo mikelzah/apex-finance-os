@@ -37,7 +37,7 @@ jobs:
         # exportedAt и app проставляет только резервная копия. У демо-данных
         # их нет, поэтому ложных срабатываний не будет.
         run: |
-          if grep -rl '"exportedAt"' deploy/ || grep -rl '"app": "APEX Finance OS"' deploy/ ; then
+          if grep -rl '"exportedAt"' deploy/ || grep -rlE '"app": "(Кубыш|APEX Finance OS)"' deploy/ ; then
             echo "В сборку попала резервная копия с настоящими данными — публикация остановлена" >&2
             exit 1
           fi

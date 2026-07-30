@@ -10,6 +10,10 @@
 import * as C from './calc.js';
 const { ASSET_CLASSES } = C;
 
+// Имя базы не меняется вместе с названием приложения — и не должно:
+// в IndexedDB это адрес хранилища, а не подпись. Переименуй его — и телефон
+// откроет пустую базу, а все данные останутся лежать под прежним именем,
+// невидимые. То же и с ключом в localStorage ниже.
 const DB_NAME = 'apex-finance-os';
 const DB_VERSION = 1;
 const STORE = 'kv';
@@ -334,7 +338,7 @@ export function tradeCashAsset(operations, tradeId) {
 
 export function exportPayload() {
   return {
-    app: 'APEX Finance OS',
+    app: 'Кубыш',
     exportedAt: new Date().toISOString(),
     ...state,
   };

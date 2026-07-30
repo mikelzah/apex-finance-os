@@ -1,4 +1,4 @@
-/* APEX Finance OS — оформление.
+/* Кубыш — оформление.
  *
  * Сырых значений здесь нет: всё берётся из tokens.css. Если в этом файле
  * появился хекс или пиксель не из шкалы — значит система дала течь.
@@ -1301,7 +1301,9 @@ select.control {
   text-align: center;
 }
 
-.intro-mark { width: 3.5rem; height: 3.5rem; margin: 0 auto var(--space-5); }
+/* Кубыш вместо прежнего знака. Высота свободная: у фигуры ноги, и жёсткие
+   3,5rem по вертикали её бы сплющили. */
+.intro-mark { width: 5rem; margin: 0 auto var(--space-5); }
 .intro h1 { margin: 0; font-size: var(--text-2xl); font-weight: var(--weight-bold); letter-spacing: var(--tracking-2xl); }
 .intro p { margin: var(--space-3) 0 0; color: var(--ink-3); font-size: var(--text-base); line-height: var(--leading-normal); }
 .intro-actions { display: flex; flex-direction: column; gap: var(--space-2); margin-top: var(--space-8); }
@@ -1431,11 +1433,6 @@ body.has-mascot .header { padding-top: calc(var(--safe-top) + var(--space-6)); }
   animation-timing-function: var(--ease-out);
   animation-iteration-count: infinite;
 }
-
-.curtain-one .mascot-smile { opacity: 1; }
-/* Руки у висящего зверя уходят вверх за остров. Здесь острова нет, и торчащие
-   вверх штрихи читались бы как антенны — прячем их. */
-.curtain-one .mascot-svg > .mascot-limb:nth-of-type(-n + 2) { opacity: 0; }
 
 .curtain-text {
   margin: 0;
