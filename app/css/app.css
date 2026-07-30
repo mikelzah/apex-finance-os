@@ -76,11 +76,10 @@ body.is-locked { overflow: hidden; }
   /* Непрозрачный фон, а не размытие. backdrop-filter на position: fixed —
      самый частый источник залипшего слоя в Safari: DOM обновлён, а
      скомпонованные пиксели остаются прежними, и провоцирует это тяжёлый
-     жест вроде свайпа назад.
-     Своя поверхность, а не фон страницы: полоса одного цвета со страницей
-     не читается как панель, и её границы становится не видно. */
-  background: var(--surface);
-  border-bottom: 1px solid var(--line);
+     жест вроде свайпа назад. Фон приложения плоский, размывать под
+     панелью нечего, так что визуально не потеряли ничего. */
+  background: var(--bg);
+  border-bottom: 1px solid var(--line-soft);
 }
 
 /* Атрибут hidden сам по себе бессилен против явного display в правиле:
@@ -122,7 +121,22 @@ body.is-locked { overflow: hidden; }
   padding: var(--space-2) calc(var(--safe-right) + var(--gutter))
            calc(var(--tabbar-h) + var(--safe-bottom) + var(--space-6))
            calc(var(--safe-left) + var(--gutter));
-  min-height: 100%;
+
+  /* Плюс один пиксель — не для красоты.
+   *
+   * Замерено на iPhone 17 Pro Max по снимкам с устройства: когда страница
+   * прокручивается, iOS отдаёт вьюпорт во весь экран (956), и таб-бар с
+   * bottom: 0 встаёт на 864–956, как и задумано. Когда страница
+   * укладывается в экран целиком, вьюпорт оказывается 893 — панель встаёт
+   * на 803–893, и под ней остаётся полоса в 63 пикселя, куда закреплённый
+   * слой не достаёт. Из всех экранов в это попадал только журнал: у него
+   * коротких записей мало, и прокрутки не возникало.
+   *
+   * Один лишний пиксель делает страницу прокручиваемой всегда, поэтому
+   * вьюпорт всегда один и тот же, и все экраны ведут себя одинаково.
+   * Переполнение не исчезает и после того, как вьюпорт вырос: 100%
+   * считается от новой высоты, и пиксель остаётся сверх неё. */
+  min-height: calc(100% + 1px);
 }
 
 /* Без шапки экран сам отвечает за отступ под Dynamic Island. */
@@ -140,17 +154,13 @@ body.is-locked { overflow: hidden; }
   position: fixed;
   left: 0;
   right: 0;
-  /* Не bottom: 0, а ниже на высоту щели. На iPhone в установленном виде
-     вьюпорт короче экрана, и панель с нулевым смещением заканчивалась
-     на 63 пикселя выше края: под ней оставалась пустая полоса. Пока щель
-     нулевая — а так везде, кроме этого случая — правило равно bottom: 0. */
-  bottom: calc(-1 * var(--viewport-gap));
+  bottom: 0;
   z-index: 30;
   display: grid;
   grid-template-columns: repeat(5, 1fr);
   padding: 0 var(--safe-right) var(--safe-bottom) var(--safe-left);
-  background: var(--surface);
-  border-top: 1px solid var(--line);
+  background: var(--bg);
+  border-top: 1px solid var(--line-soft);
 }
 
 .tabbar[hidden] { display: none; }
@@ -904,9 +914,7 @@ button.alloc-row { cursor: pointer; }
 /* Шторка и формы                                                             */
 /* -------------------------------------------------------------------------- */
 
-/* Шторка прижата к низу тем же смещением, что и таб-бар: иначе она повисла бы
-   над той же пустой полосой. */
-.sheet { position: fixed; inset: 0; bottom: calc(-1 * var(--viewport-gap)); z-index: 100; }
+.sheet { position: fixed; inset: 0; z-index: 100; }
 .sheet-backdrop { position: absolute; inset: 0; background: var(--overlay); animation: fade var(--dur-base) var(--ease-out); }
 
 .sheet-panel {

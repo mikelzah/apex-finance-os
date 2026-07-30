@@ -89,6 +89,7 @@ function render() {
   renderTabs();
   shownScreen = key;
   scrollTo(keepScroll);
+  viewport.note(key);
 }
 
 function renderIntro() {
@@ -227,9 +228,6 @@ function skeleton() {
 
 async function boot() {
   theme.apply();
-  // До первой отрисовки: иначе таб-бар успеет встать не туда и переедет
-  // на глазах у пользователя.
-  viewport.watch();
   mascot.apply();
   // Чтение из IndexedDB обычно занимает миллисекунды, но на холодном старте
   // после перезагрузки телефона бывает и заметно дольше. Пустой белый экран
