@@ -570,7 +570,7 @@ function screenDiagnostics() {
     U.sectionTitle('Вьюпорт по экранам'),
     ...rows.map(([key, r]) =>
       U.row(key.replace(/\/$/, ''), px(r.inner), {
-        sub: `видимая ${r.visible} px · документ ${r.scrollHeight} px`,
+        sub: `видимая ${r.visible} px · максимум ${r.peak} px · документ ${r.scrollHeight} px`,
         // Три разных случая, и путать их нельзя: поправка сработала; щели нет;
         // щель видна, но замеру нельзя доверять — тогда панель останется выше
         // края, и это надо видеть, а не выяснять по снимку.
