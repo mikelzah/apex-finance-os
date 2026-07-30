@@ -560,14 +560,14 @@ function screenDiagnostics() {
   return U.card([
     U.sectionTitle('Диагностика экрана'),
     U.row('Высота экрана', px(m.screenH), { sub: 'screen.height' }),
-    U.row('Видимая область', px(m.visual), { sub: 'visualViewport.height' }),
+    U.row('Видимая область', px(m.visible), { sub: 'visualViewport.height' }),
     U.row('Отдельное окно', m.standalone ? 'да' : 'нет', { sub: 'с домашнего экрана, а не из Safari' }),
     U.sectionTitle('Вьюпорт по экранам'),
     ...rows.map(([key, r]) =>
       U.row(key.replace(/\/$/, ''), px(r.inner), {
-        sub: `документ ${r.scrollHeight} px · ${r.scrollable ? 'прокручивается' : 'влезает целиком'}`,
-        tag: r.gap ? `поправка ${r.gap}` : null,
-        tagClass: 'sell',
+        sub: `видимая ${r.visible} px · документ ${r.scrollHeight} px`,
+        tag: r.gap ? `поправка ${r.gap}` : 'вплотную',
+        tagClass: r.gap ? 'sell' : 'muted',
       }),
     ),
     heights.size > 1
