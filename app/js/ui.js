@@ -168,7 +168,9 @@ export function parseNumber(raw) {
 let sheetHost = null;
 
 export function sheet(title, build, options = {}) {
-  close();
+  // Прежнюю шторку убираем мгновенно: если дать ей уехать с анимацией,
+  // она на четверть секунды наложится на новую.
+  close(true);
 
   const body = h('div', { class: 'sheet-body' });
   const backdrop = h('div', { class: 'sheet-backdrop', onclick: () => close() });
@@ -184,6 +186,7 @@ export function sheet(title, build, options = {}) {
   sheetHost = h('div', { class: 'sheet' }, [backdrop, panel]);
   document.body.appendChild(sheetHost);
   document.body.classList.add('is-locked');
+  attachSwipeToClose(panel, body, backdrop);
 
   const api = {
     close,
@@ -204,12 +207,113 @@ export function sheet(title, build, options = {}) {
   return api;
 }
 
-export function close() {
-  if (sheetHost) {
-    sheetHost.remove();
-    sheetHost = null;
-    document.body.classList.remove('is-locked');
+/**
+ * Закрытие шторки.
+ *
+ * @param {number|boolean} from  смещение в пикселях, с которого уезжать
+ *                               (когда закрывают протяжкой), либо true —
+ *                               убрать мгновенно, без анимации.
+ */
+export function close(from = 0) {
+  if (!sheetHost) return;
+  const host = sheetHost;
+  sheetHost = null;
+  document.body.classList.remove('is-locked');
+
+  const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  if (from === true || reduced) {
+    host.remove();
+    return;
   }
+
+  const panel = host.querySelector('.sheet-panel');
+  const backdrop = host.querySelector('.sheet-backdrop');
+  // Панель уезжает вниз, а не исчезает: мгновенное removeChild после
+  // протяжки выглядит как обрыв — палец ещё движется, а окна уже нет.
+  host.style.pointerEvents = 'none';
+  panel.style.animation = 'none';
+  panel.style.transform = `translateY(${Number(from) || 0}px)`;
+  panel.style.transition = 'transform var(--dur-base) var(--ease-out)';
+  backdrop.style.transition = 'opacity var(--dur-base) var(--ease-out)';
+
+  // Смена transform в том же кадре, где включён transition, не даёт
+  // анимации: браузер склеивает оба присваивания в одно состояние.
+  requestAnimationFrame(() => {
+    panel.style.transform = 'translateY(100%)';
+    backdrop.style.opacity = '0';
+  });
+  setTimeout(() => host.remove(), 260);
+}
+
+/**
+ * Закрытие протяжкой вниз.
+ *
+ * За грип и шапку тянем всегда. За тело — только когда оно прокручено
+ * вверх: иначе жест отбирал бы прокрутку у длинной формы. Кнопки и поля
+ * ввода перетаскивание не начинают, чтобы нажатие оставалось нажатием.
+ */
+function attachSwipeToClose(panel, body, backdrop) {
+  const CONTROLS = 'button, input, select, textarea, a, summary';
+  let dragging = false;
+  let startY = 0;
+  let dy = 0;
+  let startedAt = 0;
+
+  const canStart = (target) => {
+    if (target.closest && target.closest(CONTROLS)) return false;
+    if (body.contains(target)) return body.scrollTop <= 0;
+    return true;
+  };
+
+  panel.addEventListener('touchstart', (e) => {
+    if (e.touches.length !== 1 || !canStart(e.target)) return;
+    dragging = true;
+    startY = e.touches[0].clientY;
+    dy = 0;
+    startedAt = Date.now();
+    panel.style.animation = 'none';
+    panel.style.transition = 'none';
+    backdrop.style.transition = 'none';
+  }, { passive: true });
+
+  panel.addEventListener('touchmove', (e) => {
+    if (!dragging) return;
+    const delta = e.touches[0].clientY - startY;
+    if (delta <= 0) {
+      // Тянут вверх — шторка уже наверху, двигать нечего.
+      dy = 0;
+      panel.style.transform = '';
+      backdrop.style.opacity = '';
+      return;
+    }
+    dy = delta;
+    // Без этого iOS начинает тянуть страницу под шторкой.
+    e.preventDefault();
+    panel.style.transform = `translateY(${dy}px)`;
+    backdrop.style.opacity = String(Math.max(0, 1 - dy / (panel.offsetHeight || 1)));
+  }, { passive: false });
+
+  const release = () => {
+    if (!dragging) return;
+    dragging = false;
+
+    const height = panel.offsetHeight || 1;
+    const speed = dy / Math.max(1, Date.now() - startedAt);
+    // Либо утащили заметно, либо смахнули быстро — короткий резкий жест
+    // читается как «закрой», даже если палец прошёл немного.
+    if (dy > height * 0.28 || (dy > 56 && speed > 0.5)) {
+      close(dy);
+      return;
+    }
+
+    panel.style.transition = 'transform var(--dur-base) var(--ease-panel)';
+    backdrop.style.transition = 'opacity var(--dur-base) var(--ease-out)';
+    panel.style.transform = '';
+    backdrop.style.opacity = '';
+  };
+
+  panel.addEventListener('touchend', release, { passive: true });
+  panel.addEventListener('touchcancel', release, { passive: true });
 }
 
 // --------------------------------------------------------------------------
