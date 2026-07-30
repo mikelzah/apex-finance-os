@@ -73,9 +73,12 @@ body.is-locked { overflow: hidden; }
   gap: var(--space-1);
   padding: calc(var(--safe-top) + var(--space-3)) calc(var(--safe-right) + var(--gutter))
            var(--space-3) calc(var(--safe-left) + var(--gutter));
-  background: color-mix(in srgb, var(--bg) 85%, transparent);
-  backdrop-filter: saturate(150%) blur(18px);
-  -webkit-backdrop-filter: saturate(150%) blur(18px);
+  /* Непрозрачный фон, а не размытие. backdrop-filter на position: fixed —
+     самый частый источник залипшего слоя в Safari: DOM обновлён, а
+     скомпонованные пиксели остаются прежними, и провоцирует это тяжёлый
+     жест вроде свайпа назад. Фон приложения плоский, размывать под
+     панелью нечего, так что визуально не потеряли ничего. */
+  background: var(--bg);
   border-bottom: 1px solid var(--line-soft);
 }
 
@@ -141,9 +144,7 @@ body.is-locked { overflow: hidden; }
   display: grid;
   grid-template-columns: repeat(5, 1fr);
   padding: 0 var(--safe-right) var(--safe-bottom) var(--safe-left);
-  background: color-mix(in srgb, var(--bg) 90%, transparent);
-  backdrop-filter: saturate(150%) blur(18px);
-  -webkit-backdrop-filter: saturate(150%) blur(18px);
+  background: var(--bg);
   border-top: 1px solid var(--line-soft);
 }
 

@@ -138,15 +138,22 @@ function renderHeader(ctx) {
   ]);
 }
 
+let tabNodes = null;
+
+/**
+ * Таб-бар собирается один раз, дальше меняется только подсветка.
+ *
+ * Пересобирать закреплённую панель на каждой перерисовке незачем: сами
+ * кнопки не меняются никогда. Чем меньше правок в composited-слое, тем
+ * меньше поводов для расхождения между тем, что в DOM, и тем, что
+ * на экране.
+ */
 function renderTabs() {
-  U.clear(tabbar);
-  U.append(
-    tabbar,
-    TABS.map((tab) =>
+  if (!tabNodes) {
+    tabNodes = TABS.map((tab) =>
       h('button', {
-        class: `tab${tab.id === route.tab ? ' is-on' : ''}`,
+        class: 'tab',
         type: 'button',
-        'aria-current': tab.id === route.tab ? 'page' : null,
         onclick: () => {
           U.tap();
           go(tab.id);
@@ -155,8 +162,16 @@ function renderTabs() {
         icon(tab.icon),
         h('span', { class: 'tab-label', text: tab.label }),
       ]),
-    ),
-  );
+    );
+    U.append(U.clear(tabbar), tabNodes);
+  }
+
+  TABS.forEach((tab, i) => {
+    const active = tab.id === route.tab;
+    tabNodes[i].classList.toggle('is-on', active);
+    if (active) tabNodes[i].setAttribute('aria-current', 'page');
+    else tabNodes[i].removeAttribute('aria-current');
+  });
 }
 
 /**
@@ -235,11 +250,20 @@ async function boot() {
 
   booted = true;
 
-  window.addEventListener('hashchange', () => {
-    route = parseHash();
+  // Свайп по центру экрана в standalone-режиме — это жест назад/вперёд
+  // по истории. Слушаем оба события: hashchange не приходит, когда хеш
+  // совпадает, а запись в истории другая, и тогда экран остался бы старым.
+  // Сверка с текущим маршрутом не даёт перерисовать дважды: при обычном
+  // переходе Safari присылает и popstate, и hashchange.
+  const onNavigate = () => {
+    const next = parseHash();
+    if (next.tab === route.tab && next.sub === route.sub) return;
+    route = next;
     U.close();
     render();
-  });
+  };
+  window.addEventListener('hashchange', onNavigate);
+  window.addEventListener('popstate', onNavigate);
 
   theme.watch(() => booted && render());
 
