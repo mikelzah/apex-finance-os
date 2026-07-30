@@ -556,8 +556,7 @@ function screenDiagnostics() {
   const m = viewport.measure();
   const px = (n) => `${n} px`;
   const rows = viewport.records();
-  const heights = new Set(rows.map(([, r]) => r.inner));
-  const untrusted = rows.filter(([, r]) => !r.gap && r.screenH > r.inner).length;
+  const short = rows.filter(([, r]) => r.short).length;
 
   return U.card([
     U.sectionTitle('Диагностика экрана'),
@@ -570,19 +569,16 @@ function screenDiagnostics() {
     U.sectionTitle('Вьюпорт по экранам'),
     ...rows.map(([key, r]) =>
       U.row(key.replace(/\/$/, ''), px(r.inner), {
-        sub: `видимая ${r.visible} px · максимум ${r.peak} px · документ ${r.scrollHeight} px`,
-        // Три разных случая, и путать их нельзя: поправка сработала; щели нет;
-        // щель видна, но замеру нельзя доверять — тогда панель останется выше
-        // края, и это надо видеть, а не выяснять по снимку.
-        tag: r.gap ? `поправка ${r.gap}` : (r.screenH > r.inner ? 'экран выше, не доверяем' : 'вплотную'),
-        tagClass: r.gap ? 'sell' : (r.screenH > r.inner ? 'sell' : 'muted'),
+        sub: `документ ${r.scrollHeight} px · полная ${r.full} px · ${r.scrollable ? 'прокручивается' : 'влезает целиком'}`,
+        // Единственное, что здесь важно: дотягивает вьюпорт до экрана или нет.
+        // Если нет — панель заканчивается выше края, и видно это только так.
+        tag: r.short ? `короче экрана на ${r.screenH - r.inner}` : 'во весь экран',
+        tagClass: r.short ? 'sell' : 'muted',
       }),
     ),
-    untrusted
-      ? U.callout('Экран выше вьюпорта, но замеру нельзя доверять — поправка не применяется, и панель останется выше края.', 'warn')
-      : heights.size > 1
-        ? U.callout('Высота вьюпорта разная у разных экранов. Это нормально: поправка приводит нижний край панели к краю экрана при любой из них.', 'info')
-        : U.callout('Высота вьюпорта одна у всех открытых экранов.', 'info'),
+    short
+      ? U.callout('На части экранов вьюпорт не дотягивает до высоты экрана — там таб-бар заканчивается выше края. Страница на таком экране не прокручивается.', 'warn')
+      : U.callout('Вьюпорт на всех открытых экранах во весь экран — таб-бар везде стоит вплотную к краю.', 'info'),
     U.button('Обновить приложение', forceRefresh, { class: 'btn-wide' }),
     U.callout('Стирает сохранённую копию кода и перезагружает страницу. Данные не затрагиваются — они лежат отдельно.', 'info'),
   ]);
