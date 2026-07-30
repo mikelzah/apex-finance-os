@@ -301,32 +301,73 @@ function attention(ctx) {
 function signalRow(ctx, s) {
   const { refresh } = ctx;
   return h('div', { class: `signal signal-${s.level}` }, [
-    h('button', {
-      class: 'signal-main',
-      type: 'button',
-      onclick: () => forms.assetSheet(s.asset, { onDone: refresh }),
-    }, [
-      statusIcon(s.level),
-      h('span', { class: 'signal-text' }, [
-        h('span', { class: 'signal-asset', text: s.asset.name }),
-        h('span', { class: 'signal-note', text: s.text }),
+    h('div', { class: 'signal-row' }, [
+      h('button', {
+        class: 'signal-main',
+        type: 'button',
+        onclick: () => forms.assetSheet(s.asset, { onDone: refresh }),
+      }, [
+        statusIcon(s.level),
+        h('span', { class: 'signal-text' }, [
+          h('span', { class: 'signal-asset', text: s.asset.name }),
+          h('span', { class: 'signal-note', text: s.text }),
+        ]),
       ]),
+      h('button', {
+        class: 'signal-mute',
+        type: 'button',
+        'aria-label': `Скрыть сигнал: ${s.asset.name}, ${s.text}`,
+        onclick: async () => {
+          await store.mutate((draft) => {
+            const key = C.signalKey(s);
+            const kept = (draft.settings.mutedSignals || []).filter((m) => (m.key || m) !== key);
+            kept.push({ key, text: s.text });
+            draft.settings.mutedSignals = kept;
+          });
+          U.toast('Сигнал скрыт — вернётся, если изменится');
+          refresh();
+        },
+      }, [h('span', { text: '✕' })]),
     ]),
-    h('button', {
-      class: 'signal-mute',
-      type: 'button',
-      'aria-label': `Скрыть сигнал: ${s.asset.name}, ${s.text}`,
-      onclick: async () => {
-        await store.mutate((draft) => {
-          const key = C.signalKey(s);
-          const kept = (draft.settings.mutedSignals || []).filter((m) => (m.key || m) !== key);
-          kept.push({ key, text: s.text });
-          draft.settings.mutedSignals = kept;
+    signalAction(ctx, s),
+  ]);
+}
+
+/**
+ * Действие по сигналу, если оно однозначно.
+ *
+ * Пока такое одно: банк показывает больше, чем насчитало приложение. Разница
+ * почти всегда — начисленные проценты, которые ещё не записаны, и закрыть её
+ * можно только операцией «Доход»: приложение сравнивает банк с расчётом,
+ * а не с прошлым значением сверки, поэтому переписать число сверки — не выход.
+ *
+ * Обратный случай — банк показывает меньше — кнопки не получает намеренно.
+ * Там причина обычно другая: после сверки были взносы, а число осталось
+ * старым. Записать расход на эту разницу значило бы стереть настоящие деньги,
+ * и решать это должен человек, открыв карточку актива.
+ */
+function signalAction(ctx, s) {
+  const { today, refresh } = ctx;
+  if (s.kind !== 'bank-gap' || !(s.gap > 0)) return null;
+
+  return h('div', { class: 'signal-actions' }, [
+    U.button(`Записать разницу ${F.money2(s.gap)}`, async () => {
+      await store.mutate((draft) => {
+        draft.operations.push({
+          id: store.newId('op'),
+          date: today,
+          type: C.OP_INCOME,
+          amount: s.gap,
+          assetId: s.asset.id,
+          goalId: (s.asset.goalIds || [])[0] || null,
+          source: C.SOURCE_COMPUTED,
+          comment: 'Разница со сверкой',
         });
-        U.toast('Сигнал скрыт — вернётся, если изменится');
-        refresh();
-      },
-    }, [h('span', { text: '✕' })]),
+      });
+      U.tap();
+      U.toast(`Доход ${F.money2(s.gap)} записан`);
+      refresh();
+    }, { kind: 'primary', class: 'btn-wide' }),
   ]);
 }
 

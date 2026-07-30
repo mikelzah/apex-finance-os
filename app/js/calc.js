@@ -6,6 +6,7 @@
 // нечего — источник истины это активы и операции, остальное производная.
 
 import * as D from './dates.js';
+import * as F from './fmt.js';
 
 export const STATUS_ACTIVE = 'Активен';
 export const STATUS_FROZEN = 'Заморожен';
@@ -390,7 +391,11 @@ export function planCompletion(goal, operations, day) {
  */
 export function signals(assets, operations, day) {
   const out = [];
-  const push = (asset, kind, text, level = 'warn') => out.push({ asset, kind, text, level });
+  // extra — то, что нужно не для показа, а для действия по сигналу. Пока это
+  // только величина расхождения: считать её второй раз во вьюхе значило бы
+  // держать формулу в двух местах.
+  const push = (asset, kind, text, level = 'warn', extra = null) =>
+    out.push({ asset, kind, text, level, ...(extra || {}) });
 
   for (const a of assets) {
     if (a.status === STATUS_SOLD) continue;
@@ -406,7 +411,12 @@ export function signals(assets, operations, day) {
     if (a.bankBalance != null) {
       const gap = a.bankBalance - assetValue(a, operations);
       if (Math.abs(gap) >= 1) {
-        push(a, 'bank-gap', `расхождение с банком ${gap > 0 ? '+' : ''}${round2(gap)} ₽`);
+        // Форматирование здесь, а не сырое число: текст сигнала человек читает,
+        // и «+3.96 ₽» рядом с кнопкой «Записать разницу 3,96 ₽» выглядело бы
+        // как два разных числа.
+        push(a, 'bank-gap', `расхождение с банком ${gap > 0 ? '+' : ''}${F.money2(round2(gap))}`, 'warn', {
+          gap: round2(gap),
+        });
       }
     }
 

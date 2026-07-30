@@ -562,14 +562,21 @@ h3 {
 
 .signals { display: flex; flex-direction: column; gap: var(--space-1); }
 
-/* Сигнал — не одна кнопка, а две: переход к активу и «скрыть». Фон и радиус
-   живут на обёртке, чтобы обе кнопки читались как одна плашка. */
+/* Сигнал — не одна кнопка: переход к активу, «скрыть», иногда действие.
+   Фон и радиус живут на обёртке, чтобы всё читалось как одна плашка. */
 .signal {
-  display: flex;
-  align-items: stretch;
   border-radius: var(--radius-sm);
   background: var(--sunken);
   overflow: hidden;
+}
+
+.signal-row { display: flex; align-items: stretch; }
+
+/* Действие идёт отдельной строкой, а не третьей кнопкой в ряд: «Записать
+   разницу 3,96 ₽» рядом с названием актива и крестиком не помещается,
+   а резать подпись до «Записать» — терять смысл. */
+.signal-actions {
+  padding: 0 var(--space-3) var(--space-3);
 }
 
 .signal-main {
