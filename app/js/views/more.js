@@ -557,6 +557,7 @@ function screenDiagnostics() {
   const px = (n) => `${n} px`;
   const rows = viewport.records();
   const heights = new Set(rows.map(([, r]) => r.inner));
+  const untrusted = rows.filter(([, r]) => !r.gap && r.screenH > r.inner).length;
 
   return U.card([
     U.sectionTitle('Диагностика экрана'),
@@ -570,13 +571,18 @@ function screenDiagnostics() {
     ...rows.map(([key, r]) =>
       U.row(key.replace(/\/$/, ''), px(r.inner), {
         sub: `видимая ${r.visible} px · документ ${r.scrollHeight} px`,
-        tag: r.gap ? `поправка ${r.gap}` : 'вплотную',
-        tagClass: r.gap ? 'sell' : 'muted',
+        // Три разных случая, и путать их нельзя: поправка сработала; щели нет;
+        // щель видна, но замеру нельзя доверять — тогда панель останется выше
+        // края, и это надо видеть, а не выяснять по снимку.
+        tag: r.gap ? `поправка ${r.gap}` : (r.screenH > r.inner ? 'экран выше, не доверяем' : 'вплотную'),
+        tagClass: r.gap ? 'sell' : (r.screenH > r.inner ? 'sell' : 'muted'),
       }),
     ),
-    heights.size > 1
-      ? U.callout('Высота вьюпорта разная у разных экранов. Это нормально: поправка приводит нижний край панели к краю экрана при любой из них.', 'info')
-      : U.callout('Высота вьюпорта одна у всех открытых экранов.', 'info'),
+    untrusted
+      ? U.callout('Экран выше вьюпорта, но замеру нельзя доверять — поправка не применяется, и панель останется выше края.', 'warn')
+      : heights.size > 1
+        ? U.callout('Высота вьюпорта разная у разных экранов. Это нормально: поправка приводит нижний край панели к краю экрана при любой из них.', 'info')
+        : U.callout('Высота вьюпорта одна у всех открытых экранов.', 'info'),
     U.button('Обновить приложение', forceRefresh, { class: 'btn-wide' }),
     U.callout('Стирает сохранённую копию кода и перезагружает страницу. Данные не затрагиваются — они лежат отдельно.', 'info'),
   ]);
