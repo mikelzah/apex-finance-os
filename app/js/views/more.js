@@ -10,6 +10,7 @@ import * as store from '../store.js';
 import * as forms from '../forms.js';
 import * as theme from '../theme.js';
 import * as viewport from '../viewport.js';
+import { BUILD } from '../build.js';
 import * as mascot from '../mascot.js';
 import { table } from '../table.js';
 
@@ -559,6 +560,9 @@ function screenDiagnostics() {
 
   return U.card([
     U.sectionTitle('Диагностика экрана'),
+    // Первой строкой: без неё нельзя понять, к какой версии кода относятся
+    // все остальные числа.
+    U.row('Сборка', BUILD, { sub: 'время выкладки по UTC' }),
     U.row('Высота экрана', px(m.screenH), { sub: 'screen.height' }),
     U.row('Видимая область', px(m.visible), { sub: 'visualViewport.height' }),
     U.row('Отдельное окно', m.standalone ? 'да' : 'нет', { sub: 'с домашнего экрана, а не из Safari' }),
@@ -571,9 +575,38 @@ function screenDiagnostics() {
       }),
     ),
     heights.size > 1
-      ? U.callout('Высота вьюпорта разная у разных экранов — на тех, где она меньше, под таб-баром останется полоса.', 'warn')
-      : U.callout('Высота вьюпорта одна у всех открытых экранов — таб-бар везде стоит одинаково.', 'info'),
+      ? U.callout('Высота вьюпорта разная у разных экранов. Это нормально: поправка приводит нижний край панели к краю экрана при любой из них.', 'info')
+      : U.callout('Высота вьюпорта одна у всех открытых экранов.', 'info'),
+    U.button('Обновить приложение', forceRefresh, { class: 'btn-wide' }),
+    U.callout('Стирает сохранённую копию кода и перезагружает страницу. Данные не затрагиваются — они лежат отдельно.', 'info'),
   ]);
+}
+
+/**
+ * Принудительное обновление.
+ *
+ * Обычно оно не нужно: service worker берёт код оболочки из сети. Но если на
+ * устройстве уже застряла старая копия — а именно это и случилось, и несколько
+ * исправлений подряд проверялись на сборке двухдневной давности — нужен способ
+ * вычистить её, не переустанавливая приложение.
+ *
+ * Данные живут в IndexedDB и здесь не трогаются.
+ */
+async function forceRefresh() {
+  try {
+    if ('caches' in window) {
+      const keys = await caches.keys();
+      await Promise.all(keys.map((k) => caches.delete(k)));
+    }
+    if (navigator.serviceWorker) {
+      const regs = await navigator.serviceWorker.getRegistrations();
+      await Promise.all(regs.map((r) => r.unregister()));
+    }
+  } catch (err) {
+    U.toast(`Не удалось очистить копию: ${err.message}`, 'error');
+    return;
+  }
+  location.reload();
 }
 
 // --------------------------------------------------------------------------

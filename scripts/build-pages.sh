@@ -27,6 +27,15 @@ stamp="$(date -u +%Y%m%d-%H%M)"
 sed -i.bak "s/^const VERSION = .*/const VERSION = '$stamp';/" "$out/sw.js"
 rm -f "$out/sw.js.bak"
 
+# Той же меткой штампуется build.js. Она видна в разделе диагностики, и это
+# единственный способ понять с телефона, какая версия там открыта: по внешнему
+# виду отличить сборки невозможно.
+sed -i.bak "s/^export const BUILD = .*/export const BUILD = '$stamp';/" "$out/js/build.js"
+rm -f "$out/js/build.js.bak"
+
+grep -q "BUILD = '$stamp'" "$out/js/build.js" || { echo "ОШИБКА: метка сборки не проставилась" >&2; exit 1; }
+grep -q "VERSION = '$stamp'" "$out/sw.js" || { echo "ОШИБКА: версия service worker не проставилась" >&2; exit 1; }
+
 # Страховка на будущее: в data/ должны быть только вымышленные демо-данные.
 # Если рядом когда-нибудь окажется файл с настоящими остатками, сборка
 # должна упасть, а не выложить его в открытый доступ.
