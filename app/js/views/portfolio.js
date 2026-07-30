@@ -33,6 +33,13 @@ export function render(ctx) {
         hint: 'активы с заданным классом',
       }),
       charts.allocation(rows, (row) => forms.portfolioSheet(row, { onDone: refresh })),
+
+      // Бумаги заводят отсюда, а не из «Ещё → Активы»: думают о них на этом
+      // экране, и уходить за добавлением на другой — лишний шаг.
+      U.button('Добавить бумагу', () => forms.assetSheet(null, {
+        onDone: refresh,
+        preset: { type: C.TYPE_INVESTMENT, liquidity: 'T+1', assetClass: 'Акции' },
+      }), { class: 'btn-wide' }),
     ]),
 
     // Не подсказка, а состояние: перечислены настоящие активы, которым класс
@@ -40,6 +47,8 @@ export function render(ctx) {
     // законно — им класс и не нужен.
     noClass.length
       ? U.card([
+          // Название класса рядом с суммой: чтобы стало видно, чего не хватает,
+          // достаточно открыть актив и выбрать класс.
           U.sectionTitle('Вне расчёта долей'),
           ...noClass.map((a) =>
             U.row(a.name, F.money(C.assetValue(a, state.operations)), {

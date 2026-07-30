@@ -92,6 +92,11 @@ export function operationSheet(existing, options = {}) {
 // Актив
 // --------------------------------------------------------------------------
 
+/**
+ * Карточка актива. options.preset заполняет поля нового актива заранее —
+ * с экрана портфеля бумагу заводят как бумагу, а не как счёт, и переключать
+ * тип с «Деньги» на «Инвестиции» каждый раз незачем.
+ */
 export function assetSheet(existing, options = {}) {
   const state = store.getState();
   const isNew = !existing;
@@ -119,6 +124,7 @@ export function assetSheet(existing, options = {}) {
     goalIds: [],
     notes: '',
     assetClass: null,
+    ...(options.preset || {}),
   };
 
   U.sheet(isNew ? 'Новый актив' : a.name, (api) => {
@@ -219,15 +225,17 @@ export function assetSheet(existing, options = {}) {
       U.field('Класс в портфеле', assetClass, 'Определяет, в какую долю попадёт актив. Пусто — в расчёт долей не входит.'),
 
       // Раскрыта та половина полей, которая относится к этому активу:
-      // у вклада нет режима торгов, у акции — дня капитализации.
-      U.group('Котировки', Boolean(a.ticker), [
+      // у вклада нет режима торгов, у акции — дня капитализации. У новой
+      // бумаги, заведённой с экрана портфеля, тикера ещё нет — открываем
+      // по типу, иначе первое же поле пришлось бы искать за складкой.
+      U.group('Котировки', Boolean(a.ticker) || (isNew && a.type === C.TYPE_INVESTMENT), [
         U.field('Тикер', ticker),
         U.field('Режим торгов', board, 'TQBR для акций, TQTF для фондов. Пусто — переберём сами.'),
         U.field('Количество', quantity),
         U.field('Цена, ₽', price, a.updated ? `Обновлена ${F.date(a.updated)}` : 'Обновляется с Мосбиржи или вручную'),
       ]),
 
-      U.group('Остаток', !a.ticker, [
+      U.group('Остаток', !a.ticker && !(isNew && a.type === C.TYPE_INVESTMENT), [
         U.field('Начальный остаток, ₽', opening, 'Баланс на момент заведения актива, а не текущий. Иначе сегодняшний взнос посчитается дважды.'),
         U.field('Дата начального остатка', openingDate),
       ]),
