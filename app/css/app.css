@@ -111,12 +111,13 @@ body.is-locked { overflow: hidden; }
   align-items: center;
 }
 
+/* Прокручивается документ, а не этот блок: высота у него не ограничена,
+   и overflow здесь только сбивал бы с толку — внутренней прокрутки
+   не возникло бы всё равно. Сброс положения живёт в app.js. */
 .screen {
   padding: var(--space-2) calc(var(--safe-right) + var(--gutter))
            calc(var(--tabbar-h) + var(--safe-bottom) + var(--space-6))
            calc(var(--safe-left) + var(--gutter));
-  overflow-y: auto;
-  -webkit-overflow-scrolling: touch;
   min-height: 100%;
 }
 

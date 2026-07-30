@@ -33,6 +33,10 @@ const tabbar = document.getElementById('tabbar');
 
 let route = { tab: 'dashboard', sub: null };
 let booted = false;
+// Какой экран показан сейчас. Нужен, чтобы отличить переход на другой экран
+// от перерисовки того же: первый начинается сверху, вторая обязана сохранить
+// положение — иначе запись взноса из середины списка выкидывала бы наверх.
+let shownScreen = null;
 
 // --------------------------------------------------------------------------
 
@@ -66,6 +70,10 @@ function render() {
 
   const ctx = context();
   const view = VIEWS[route.tab];
+  const key = `${route.tab}/${route.sub || ''}`;
+
+  // Положение читаем до перестройки: после очистки экрана оно теряется.
+  const keepScroll = key === shownScreen ? scrollTopNow() : 0;
 
   renderHeader(ctx);
   tabbar.hidden = false;
@@ -78,7 +86,8 @@ function render() {
   U.append(screen, view.render(ctx));
 
   renderTabs();
-  if (route.tab !== 'journal') screen.scrollTop = 0;
+  shownScreen = key;
+  scrollTo(keepScroll);
 }
 
 function renderIntro() {
@@ -87,6 +96,24 @@ function renderIntro() {
   U.clear(screen);
   screen.classList.add('is-bare');
   U.append(screen, intro.render({ refresh: render, go }));
+  shownScreen = 'intro';
+  scrollTo(0);
+}
+
+/**
+ * Прокручивается документ, а не #screen.
+ *
+ * У .screen стоит overflow-y: auto, но высота не ограничена — блок растёт
+ * под содержимое, внутренней прокрутки не возникает, и screen.scrollTop
+ * всегда равен нулю. Раньше сброс был написан именно так и потому
+ * не работал: при переходе на другой экран оставалось положение прошлого.
+ */
+function scrollTopNow() {
+  return window.scrollY || document.documentElement.scrollTop || 0;
+}
+
+function scrollTo(y) {
+  window.scrollTo(0, y);
 }
 
 /**
