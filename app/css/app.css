@@ -59,7 +59,13 @@ html, body {
 }
 
 body {
-  background: var(--bg);
+  /* Два мягких пятна поверх заливки. Без них размытие не видно вовсе:
+     на ровном цвете блюр даёт ровно тот же ровный цвет. Насыщенность
+     нарочно низкая — фон не должен спорить с цифрами. */
+  background:
+    radial-gradient(70% 45% at 12% -5%, var(--wash-a), transparent 65%),
+    radial-gradient(60% 40% at 100% 8%, var(--wash-b), transparent 62%),
+    var(--bg);
   color: var(--ink);
   font-family: var(--font-sans);
   font-size: var(--text-base);
@@ -107,13 +113,19 @@ body.is-locked .screen { overflow: hidden; }
   gap: var(--space-1);
   padding: calc(var(--safe-top) + var(--space-3)) calc(var(--safe-right) + var(--gutter))
            var(--space-3) calc(var(--safe-left) + var(--gutter));
-  /* Непрозрачный фон, а не размытие. backdrop-filter на position: fixed —
-     самый частый источник залипшего слоя в Safari: DOM обновлён, а
-     скомпонованные пиксели остаются прежними, и провоцирует это тяжёлый
-     жест вроде свайпа назад. Фон приложения плоский, размывать под
-     панелью нечего, так что визуально не потеряли ничего. */
-  background: var(--bg);
-  border-bottom: 1px solid var(--line-soft);
+  /* Стекло, как у навигации. Раньше здесь стоял непрозрачный фон: размытие
+     на position: fixed давало в Safari залипший слой при жесте назад.
+     Теперь шапка не fixed, а обычная строка внутри оболочки, и та причина
+     отпала — под ней проходит прокручиваемое содержимое. */
+  background: var(--glass);
+  -webkit-backdrop-filter: blur(24px) saturate(180%);
+  backdrop-filter: blur(24px) saturate(180%);
+  border-bottom: 1px solid var(--glass-edge);
+  box-shadow: inset 0 1px 0 var(--glass-sheen);
+}
+
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .header, .sheet-panel, .toast { background: var(--glass-solid); }
 }
 
 .header h1 {
@@ -330,12 +342,16 @@ body.is-locked .screen { overflow: hidden; }
 /* -------------------------------------------------------------------------- */
 
 .card {
-  background: var(--surface);
-  border: 1px solid var(--line-soft);
-  border-radius: var(--radius-lg);
+  /* Стекло без размытия: полупрозрачность поверх фонового градиента плюс
+     блик по верхней кромке. Тот же материал, но одно альфа-смешение вместо
+     блюра на каждой карточке — размытие здесь стоило бы дороже всего
+     остального в приложении. */
+  background: var(--card);
+  border: 1px solid var(--card-edge);
+  border-radius: var(--radius-xl);
   padding: var(--space-4);
   margin-bottom: var(--space-3);
-  box-shadow: var(--elev-1);
+  box-shadow: var(--elev-1), inset 0 1px 0 var(--glass-sheen);
 }
 
 .card > * + * { margin-top: var(--space-3); }
@@ -769,8 +785,11 @@ h3 {
   appearance: none;
   padding: var(--space-2) var(--space-3);
   border-radius: var(--radius-full);
-  border: 1px solid var(--line);
-  background: transparent;
+  border: 1px solid var(--card-edge);
+  /* Капсула из того же материала, что карточки: кнопка читается как стекло,
+     а не как контурная рамка на пустом месте. */
+  background: var(--card);
+  box-shadow: var(--elev-1), inset 0 1px 0 var(--glass-sheen);
   color: var(--ink);
   font-family: inherit;
   font-size: var(--text-sm);
@@ -780,10 +799,20 @@ h3 {
   transition: filter var(--dur-fast) var(--ease-out), background-color var(--dur-fast) var(--ease-out);
 }
 
-.btn:active { filter: brightness(0.9); }
-.btn-primary { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
+.btn:active { filter: brightness(0.92); }
+
+/* Главное действие остаётся плотным цветом: сквозь него ничего не должно
+   просвечивать, иначе оно перестаёт быть главным. Свечение под ним даёт
+   ту же приподнятость, что у стекла блик. */
+.btn-primary {
+  background: var(--accent);
+  border-color: transparent;
+  color: var(--on-accent);
+  box-shadow: 0 4px 14px var(--accent-wash), inset 0 1px 0 rgba(255, 255, 255, 0.22);
+}
+
 .btn-danger { color: var(--critical-ink); border-color: color-mix(in srgb, var(--critical) 40%, transparent); }
-.btn-wide { display: block; width: 100%; padding: var(--space-3); border-radius: var(--radius-sm); font-size: var(--text-base); }
+.btn-wide { display: block; width: 100%; padding: var(--space-3); border-radius: var(--radius-full); font-size: var(--text-base); }
 .btn:disabled { opacity: 0.45; cursor: default; }
 
 .chips { display: flex; gap: var(--space-1); flex-wrap: wrap; }
@@ -1065,10 +1094,12 @@ button.alloc-row { cursor: pointer; }
   max-height: 92vh;
   display: flex;
   flex-direction: column;
-  background: var(--raised);
+  background: var(--glass-panel);
+  -webkit-backdrop-filter: blur(30px) saturate(180%);
+  backdrop-filter: blur(30px) saturate(180%);
   border-radius: var(--radius-xl) var(--radius-xl) 0 0;
-  border-top: 1px solid var(--line);
-  box-shadow: var(--elev-3);
+  border-top: 1px solid var(--glass-edge);
+  box-shadow: var(--elev-3), inset 0 1px 0 var(--glass-sheen);
   animation: rise var(--dur-slow) var(--ease-panel);
 }
 
@@ -1314,12 +1345,14 @@ body.has-mascot .header { padding-top: calc(var(--safe-top) + var(--space-6)); }
   max-width: min(24rem, calc(100vw - var(--space-8)));
   padding: var(--space-3) var(--space-4);
   border-radius: var(--radius-full);
-  background: var(--raised);
-  border: 1px solid var(--line);
+  background: var(--glass);
+  -webkit-backdrop-filter: blur(24px) saturate(180%);
+  backdrop-filter: blur(24px) saturate(180%);
+  border: 1px solid var(--glass-edge);
   color: var(--ink);
   font-size: var(--text-base);
   text-align: center;
-  box-shadow: var(--elev-3);
+  box-shadow: var(--elev-3), inset 0 1px 0 var(--glass-sheen);
   animation: rise var(--dur-base) var(--ease-out);
   /* Сообщение висит три секунды поверх экрана. Без этого оно всё это время
      перехватывает касания по тому, что под ним. */
