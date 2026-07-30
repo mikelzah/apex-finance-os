@@ -103,19 +103,20 @@ function renderIntro() {
 }
 
 /**
- * Прокручивается документ, а не #screen.
+ * Прокручивается #screen, а не документ.
  *
- * У .screen стоит overflow-y: auto, но высота не ограничена — блок растёт
- * под содержимое, внутренней прокрутки не возникает, и screen.scrollTop
- * всегда равен нулю. Раньше сброс был написан именно так и потому
- * не работал: при переходе на другой экран оставалось положение прошлого.
+ * Так стало после перехода на оболочку в высоту экрана: страница не
+ * прокручивается вовсе, иначе навигацию было бы нечем удержать у нижнего
+ * края. Раньше здесь стояло window.scrollY — и до этого, ещё раньше,
+ * screen.scrollTop, который тогда всегда возвращал ноль. Проверять надо
+ * тот элемент, который действительно прокручивается.
  */
 function scrollTopNow() {
-  return window.scrollY || document.documentElement.scrollTop || 0;
+  return screen.scrollTop || 0;
 }
 
 function scrollTo(y) {
-  window.scrollTo(0, y);
+  screen.scrollTop = y;
 }
 
 /**
@@ -268,6 +269,14 @@ async function boot() {
   };
   window.addEventListener('hashchange', onNavigate);
   window.addEventListener('popstate', onNavigate);
+
+  // Документ не должен прокручиваться никогда: на нём держится вся привязка
+  // навигации к низу экрана. overflow: hidden отменяет жест, но не программную
+  // прокрутку — а её вызывает сам браузер, подводя поле ввода под клавиатуру.
+  // Уехавший на триста пикселей документ утащил бы за собой всю оболочку.
+  window.addEventListener('scroll', () => {
+    if (window.scrollY !== 0 || window.scrollX !== 0) window.scrollTo(0, 0);
+  }, { passive: true });
 
   theme.watch(() => booted && render());
 

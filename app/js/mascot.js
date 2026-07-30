@@ -13,6 +13,8 @@
 // Персонаж придуман для этого приложения. Похожие жёлтые существа
 // в комбинезонах — чужая собственность, и копировать их облик незачем.
 
+import { shell } from './ui.js';
+
 const NS = 'http://www.w3.org/2000/svg';
 const KEY = 'apex-finance-os:mascot';
 
@@ -42,7 +44,7 @@ document.addEventListener('visibilitychange', () => {
 function mount() {
   if (node) return;
   node = draw();
-  document.body.appendChild(node);
+  shell().appendChild(node);
   document.body.classList.add('has-mascot');
   scheduleBlink();
 }

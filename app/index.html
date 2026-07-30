@@ -44,9 +44,14 @@
 <meta name="apple-mobile-web-app-title" content="APEX">
 </head>
 <body>
-  <header id="header" class="header" hidden></header>
-  <main id="screen" class="screen" role="main"></main>
-  <nav id="tabbar" class="tabbar" role="navigation" aria-label="Разделы"></nav>
+  <!-- Оболочка ровно в экран. Внутри неё прокручивается только содержимое,
+       поэтому ничему не нужен position: fixed — а он на этом устройстве
+       и не работает: закреплённый слой ниже низа вьюпорта не рисуется. -->
+  <div id="app" class="app">
+    <header id="header" class="header" hidden></header>
+    <main id="screen" class="screen" role="main"></main>
+    <nav id="tabbar" class="tabbar" role="navigation" aria-label="Разделы"></nav>
+  </div>
 
   <noscript>
     <p style="padding:2rem">Приложение работает на JavaScript — включите его в настройках Safari.</p>

@@ -3,6 +3,16 @@
 // занимает меньше миллисекунды. Виртуальный DOM здесь решал бы
 // несуществующую проблему.
 
+/**
+ * Оболочка приложения. Всё наложенное — шторки, сообщения, зверь — живёт
+ * внутри неё, а не в body: оболочка ровно в экран, и от неё считаются
+ * absolute-привязки. В body они считались бы от вьюпорта, который на этом
+ * устройстве бывает меньше экрана.
+ */
+export function shell() {
+  return document.getElementById('app') || document.body;
+}
+
 export function h(tag, attrs = {}, children = []) {
   const node = document.createElement(tag);
   for (const [key, value] of Object.entries(attrs || {})) {
@@ -184,7 +194,7 @@ export function sheet(title, build, options = {}) {
   ]);
 
   sheetHost = h('div', { class: 'sheet' }, [backdrop, panel]);
-  document.body.appendChild(sheetHost);
+  shell().appendChild(sheetHost);
   document.body.classList.add('is-locked');
   attachSwipeToClose(panel, body, backdrop);
 
@@ -326,7 +336,7 @@ export function toast(text, kind = 'ok') {
   const existing = document.querySelector('.toast');
   if (existing) existing.remove();
   const node = h('div', { class: `toast toast-${kind}`, text });
-  document.body.appendChild(node);
+  shell().appendChild(node);
   clearTimeout(toastTimer);
   toastTimer = setTimeout(() => node.remove(), 3200);
 }

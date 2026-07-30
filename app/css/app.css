@@ -31,11 +31,31 @@
  * того, чтобы дописывать .класс[hidden] после каждого промаха. */
 [hidden] { display: none !important; }
 
+/* Страница не прокручивается вовсе. Прокручивается только содержимое внутри
+ * оболочки — и это единственный способ удержать навигацию у нижнего края.
+ *
+ * Замерено на устройстве: вьюпорт бывает втрое меньше экрана (611 при 956),
+ * и панель с position: fixed; bottom: 0 встаёт на низ вьюпорта, то есть
+ * посреди экрана. При этом содержимое документа ниже вьюпорта отрисовано
+ * и читается — рисуется всё, кроме закреплённого слоя.
+ *
+ * Отсюда решение: высота оболочки — не 100% вьюпорта, а замеренная высота
+ * экрана, и внутри неё нет ни одного position: fixed. Панель становится
+ * обычным содержимым документа и потому попадает ровно на низ экрана. */
 html, body {
   margin: 0;
   padding: 0;
+  height: var(--full-height);
+  overflow: hidden;
+  overscroll-behavior: none;
+}
+
+.app {
+  position: relative;
   height: 100%;
-  overscroll-behavior-y: none;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
 }
 
 body {
@@ -54,7 +74,8 @@ body {
   transition: background-color var(--dur-base) var(--ease-out);
 }
 
-body.is-locked { overflow: hidden; }
+/* Под открытой шторкой содержимое не ездит. */
+body.is-locked .screen { overflow: hidden; }
 
 /* Табличные цифры — только там, где числа стоят столбцом. На крупном
    одиночном значении они делают разряды рыхлыми. */
@@ -78,9 +99,9 @@ body.is-locked { overflow: hidden; }
 /* -------------------------------------------------------------------------- */
 
 .header {
-  position: sticky;
-  top: 0;
+  position: relative;
   z-index: 20;
+  flex: none;
   display: flex;
   align-items: center;
   gap: var(--space-1);
@@ -122,38 +143,18 @@ body.is-locked { overflow: hidden; }
   align-items: center;
 }
 
-/* Прокручивается документ, а не этот блок: высота у него не ограничена,
-   и overflow здесь только сбивал бы с толку — внутренней прокрутки
-   не возникло бы всё равно. Сброс положения живёт в app.js. */
+/* Единственный прокручиваемый блок в приложении. */
 .screen {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  /* Тяга за край не должна утаскивать страницу под приложением. */
+  overscroll-behavior: contain;
   padding: var(--space-2) calc(var(--safe-right) + var(--gutter))
-           calc(var(--tabbar-h) + var(--safe-bottom) + var(--space-6))
+           /* Под плавающей панелью: её высота, её отступ снизу и воздух. */
+           calc(var(--tabbar-h) + var(--safe-bottom) + var(--space-2) + var(--space-6))
            calc(var(--safe-left) + var(--gutter));
-
-  /* Страница всегда выше вьюпорта — и это не про красоту.
-   *
-   * Замерено покадрово по записи с iPhone 17 Pro Max (экран 440×956 CSS).
-   * На главной, где документ 1879, вьюпорт полный: панель 865–956, иконки
-   * 876–893, подписи 903–913, всё на месте. На журнале, где документ ровно
-   * 894, вьюпорт 894 — панель заканчивается на 62 пикселя выше края экрана.
-   *
-   * Опустить панель ниже вьюпорта нельзя: там же, по кадрам, иконки встали
-   * правильно, а подписи на 903–913 не нарисовались вовсе. Содержимое
-   * закреплённого слоя ниже низа вьюпорта не отрисовывается. Поэтому лечится
-   * это только со стороны вьюпорта — страница должна прокручиваться.
-   *
-   * Размер запаса важен, и на нём я ошибся дважды. Считать надо от полной
-   * высоты экрана, а не от короткого вьюпорта: чтобы прокрутка осталась и
-   * после того, как вьюпорт вырос до 956, документ должен превышать 956.
-   * Запас в 1 пиксель пропадал на округлении, запас в 32 от короткого
-   * вьюпорта давал 894 + 32 = 926 — всё ещё меньше 956.
-   *
-   * Полную высоту даёт --full-height: его замеряет viewport.js. Ошибиться
-   * тут не страшно — завышенное значение всего лишь добавит пустой прокрутки,
-   * панель от этого никуда не уедет. Первая строка — фолбэк, если скрипт
-   * почему-то не отработал. */
-  min-height: calc(100% + 6rem);
-  min-height: calc(var(--full-height) + var(--space-8));
 }
 
 /* Без шапки экран сам отвечает за отступ под Dynamic Island. */
@@ -167,20 +168,53 @@ body.is-locked { overflow: hidden; }
 .screen > *:nth-child(3) { animation-delay: 40ms; }
 .screen > *:nth-child(n + 4) { animation-delay: 60ms; }
 
+/* Навигация — стекло: полупрозрачная капсула, под которой проходит
+ * содержимое. Эффект даёт не размытие само по себе, а то, что сквозь него
+ * видно движение страницы, поэтому панель лежит поверх прокрутки, а не
+ * рядом с ней.
+ *
+ * position: absolute, не fixed: оболочка не прокручивается, поэтому
+ * абсолютной привязки достаточно, а fixed на этом устройстве кладёт панель
+ * на низ вьюпорта, который бывает много меньше экрана. */
 .tabbar {
-  position: fixed;
-  left: 0;
-  right: 0;
-  bottom: 0;
+  position: absolute;
+  left: calc(var(--safe-left) + var(--space-3));
+  right: calc(var(--safe-right) + var(--space-3));
+  bottom: calc(var(--safe-bottom) + var(--space-2));
   z-index: 30;
   display: grid;
   grid-template-columns: repeat(5, 1fr);
-  padding: 0 var(--safe-right) var(--safe-bottom) var(--safe-left);
-  background: var(--bg);
-  border-top: 1px solid var(--line-soft);
+  padding: var(--space-2) var(--space-1);
+  border-radius: var(--radius-full);
+  border: 1px solid var(--glass-edge);
+  background: var(--glass);
+  /* Размытие крупное намеренно: под панелью проходят цифры, и сквозь слабый
+     блюр они читаются как вторая строка подписи. Финансовый экран этого
+     не прощает — подпись вкладки должна оставаться единственным текстом. */
+  -webkit-backdrop-filter: blur(28px) saturate(180%);
+  backdrop-filter: blur(28px) saturate(180%);
+  box-shadow: var(--elev-2);
+  isolation: isolate;
+}
+
+/* Блик по верхней кромке: без него стекло выглядит просто мутным. */
+.tabbar::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: linear-gradient(180deg, var(--glass-sheen), transparent 55%);
+  pointer-events: none;
+}
+
+/* Там, где размытия нет, прозрачная подложка превратилась бы в кашу
+   из просвечивающего текста. Тогда — непрозрачный фон. */
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .tabbar { background: var(--glass-solid); }
 }
 
 .tab {
+  position: relative;
   appearance: none;
   border: 0;
   background: none;
@@ -195,7 +229,16 @@ body.is-locked { overflow: hidden; }
   transition: color var(--dur-fast) var(--ease-out);
 }
 
+/* Выбранная вкладка — своя капсула под иконкой, как в системе. */
 .tab.is-on { color: var(--accent-ink); }
+.tab.is-on::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: var(--radius-full);
+  background: var(--accent-wash);
+  z-index: -1;
+}
 .tab.is-on .icon { transform: translateY(-1px); }
 .tab-label { font-size: var(--text-micro); }
 .icon { width: 1.375rem; height: 1.375rem; display: block; transition: transform var(--dur-fast) var(--ease-out); }
@@ -1002,7 +1045,7 @@ button.alloc-row { cursor: pointer; }
 /* Шторка и формы                                                             */
 /* -------------------------------------------------------------------------- */
 
-.sheet { position: fixed; inset: 0; z-index: 100; }
+.sheet { position: absolute; inset: 0; z-index: 100; }
 .sheet-backdrop { position: absolute; inset: 0; background: var(--overlay); animation: fade var(--dur-base) var(--ease-out); }
 
 .sheet-panel {
@@ -1151,7 +1194,7 @@ select.control {
    в зону, которую закрывает сам остров: из-за этого кажется, что он за
    неё держится. Сдвиг вверх на 12 пикселей заводит кисти под пилюлю. */
 .mascot {
-  position: fixed;
+  position: absolute;
   /* max() не даёт уехать за верхнюю кромку там, где острова нет и
      safe-area-inset-top равен нулю: иначе зверю срезает голову. */
   top: max(0px, calc(var(--safe-top) - 12px));
@@ -1254,9 +1297,9 @@ body.has-mascot .header { padding-top: calc(var(--safe-top) + var(--space-6)); }
 /* -------------------------------------------------------------------------- */
 
 .toast {
-  position: fixed;
+  position: absolute;
   left: 50%;
-  bottom: calc(var(--tabbar-h) + var(--safe-bottom) + var(--space-4));
+  bottom: calc(var(--tabbar-h) + var(--safe-bottom) + var(--space-2) + var(--space-4));
   transform: translateX(-50%);
   z-index: 200;
   max-width: min(24rem, calc(100vw - var(--space-8)));
