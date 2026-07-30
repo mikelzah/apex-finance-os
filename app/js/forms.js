@@ -505,6 +505,9 @@ export function goalSheet(existing, options = {}) {
           deadline: deadline.value || null,
           planPerDay: U.parseNumber(plan.value),
           status: status.value,
+          // Новая цель встаёт в конец списка. Порядок задаёт человек
+          // перетаскиванием, и подставлять новую в середину незачем.
+          sort: Number.isFinite(g.sort) ? g.sort : store.getState().goals.length,
         };
         await store.mutate((draft) => store.upsert(draft.goals, payload));
         api.close();

@@ -9,7 +9,6 @@ import * as charts from '../charts.js';
 import * as store from '../store.js';
 import * as forms from '../forms.js';
 import * as theme from '../theme.js';
-import * as viewport from '../viewport.js';
 import { BUILD } from '../build.js';
 import * as mascot from '../mascot.js';
 import { table } from '../table.js';
@@ -411,18 +410,6 @@ function settings(ctx) {
     }, { focus: false });
   };
 
-  const replaceData = (title, message, action, done) => {
-    U.confirmSheet(title, message, 'Заменить', async () => {
-      try {
-        await action();
-        U.toast(done);
-        refresh();
-      } catch (err) {
-        U.toast(`Не удалось: ${err.message}`, 'error');
-      }
-    });
-  };
-
   const asset = state.assets.find((a) => a.id === s.quickAssetId);
 
   return [
@@ -446,61 +433,23 @@ function settings(ctx) {
         },
       }),
     ]),
-    U.card([
-      U.sectionTitle('Заменить данные'),
-      U.callout('Каждое действие ниже стирает всё, что сейчас в приложении. Сделайте копию, если данные важны.', 'warn'),
-      U.button('Загрузить демо-данные', () => replaceData(
-        'Загрузить демо-данные?',
-        'Вымышленный набор для знакомства с приложением. Текущие данные будут стёрты.',
-        store.loadDemo,
-        'Загружены демо-данные',
-      ), { class: 'btn-wide' }),
-      U.button('Стереть всё', () => replaceData(
-        'Стереть все данные?',
-        'Активы, цели, операции и история исчезнут без возможности восстановления.',
-        store.wipe,
-        'Данные стёрты',
-      ), { kind: 'danger', class: 'btn-wide' }),
-    ]),
-    screenDiagnostics(),
+    version(),
   ];
 }
 
 /**
- * Замеры вьюпорта по каждому открытому экрану.
+ * Версия и обновление.
  *
- * Нужны потому, что iOS отдаёт разную высоту вьюпорта в зависимости от того,
- * прокручивается страница или влезает целиком, и из окружения разработки это
- * не воспроизводится ни в одном настольном браузере. Если высота у всех
- * экранов совпадает — таб-бар везде стоит одинаково.
+ * От прежней диагностики экрана осталась одна строка — та, ради которой всё
+ * и заводилось. По внешнему виду невозможно понять, какая сборка открыта
+ * на телефоне, и без этой строки несколько исправлений подряд проверялись
+ * на копии двухдневной давности. Замеры вьюпорта своё отработали: оболочка
+ * держит панель у края независимо от того, что отдаёт iOS, и смотреть там
+ * больше не на что.
  */
-function screenDiagnostics() {
-  const m = viewport.measure();
-  const px = (n) => `${n} px`;
-  const rows = viewport.records();
-  const short = rows.filter(([, r]) => r.short).length;
-
+function version() {
   return U.card([
-    U.sectionTitle('Диагностика экрана'),
-    // Первой строкой: без неё нельзя понять, к какой версии кода относятся
-    // все остальные числа.
     U.row('Сборка', BUILD, { sub: 'время выкладки по UTC' }),
-    U.row('Высота экрана', px(m.screenH), { sub: 'screen.height' }),
-    U.row('Видимая область', px(m.visible), { sub: 'visualViewport.height' }),
-    U.row('Отдельное окно', m.standalone ? 'да' : 'нет', { sub: 'с домашнего экрана, а не из Safari' }),
-    U.sectionTitle('Вьюпорт по экранам'),
-    ...rows.map(([key, r]) =>
-      U.row(key.replace(/\/$/, ''), px(r.inner), {
-        sub: `документ ${r.scrollHeight} px · полная ${r.full} px · ${r.scrollable ? 'прокручивается' : 'влезает целиком'}`,
-        // Единственное, что здесь важно: дотягивает вьюпорт до экрана или нет.
-        // Если нет — панель заканчивается выше края, и видно это только так.
-        tag: r.short ? `короче экрана на ${r.screenH - r.inner}` : 'во весь экран',
-        tagClass: r.short ? 'sell' : 'muted',
-      }),
-    ),
-    short
-      ? U.callout('На части экранов вьюпорт не дотягивает до высоты экрана — там таб-бар заканчивается выше края. Страница на таком экране не прокручивается.', 'warn')
-      : U.callout('Вьюпорт на всех открытых экранах во весь экран — таб-бар везде стоит вплотную к краю.', 'info'),
     U.button('Обновить приложение', forceRefresh, { class: 'btn-wide' }),
     U.callout('Стирает сохранённую копию кода и перезагружает страницу. Данные не затрагиваются — они лежат отдельно.', 'info'),
   ]);
@@ -517,6 +466,9 @@ function screenDiagnostics() {
  * Данные живут в IndexedDB и здесь не трогаются.
  */
 async function forceRefresh() {
+  // Занавес поднимается до работы, а не после: очистка кэша и перезагрузка
+  // занимают секунду с лишним, и всё это время экран иначе просто белый.
+  const shown = mascot.curtain('Обновляюсь…');
   try {
     if ('caches' in window) {
       const keys = await caches.keys();
@@ -527,9 +479,13 @@ async function forceRefresh() {
       await Promise.all(regs.map((r) => r.unregister()));
     }
   } catch (err) {
+    document.querySelector('.curtain')?.remove();
     U.toast(`Не удалось очистить копию: ${err.message}`, 'error');
     return;
   }
+  // Ждём, пока зверьки набегаются: перезагрузить раньше — значит показать
+  // огрызок анимации, что хуже, чем не показывать её вовсе.
+  await shown;
   location.reload();
 }
 

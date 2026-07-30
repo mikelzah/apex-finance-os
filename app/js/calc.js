@@ -62,6 +62,22 @@ export const GOAL_PAUSED = 'На паузе';
 export const GOAL_DONE = 'Достигнута';
 
 /**
+ * Цели в том порядке, в каком их расставили.
+ *
+ * Поле sort ставится при перетаскивании и при заведении цели. У цели без него
+ * порядок берётся по статусу — тем же правилом, что действовало раньше:
+ * так список из старых данных выглядит ровно как выглядел, пока его не тронут.
+ */
+export function orderedGoals(goals) {
+  const byStatus = { [GOAL_ACTIVE]: 0, [GOAL_PAUSED]: 1, [GOAL_DONE]: 2 };
+  return [...goals].sort((a, b) => {
+    const x = Number.isFinite(a.sort) ? a.sort : 100 + (byStatus[a.status] ?? 3);
+    const y = Number.isFinite(b.sort) ? b.sort : 100 + (byStatus[b.status] ?? 3);
+    return x - y;
+  });
+}
+
+/**
  * Взнос и доход прибавляют, расход отнимает.
  *
  * Сделка не даёт ноль по недосмотру, а по существу: это обмен, а не движение

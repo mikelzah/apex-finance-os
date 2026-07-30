@@ -50,12 +50,8 @@ function overview(ctx) {
   const noClass = state.assets.filter(
     (a) => a.status === C.STATUS_ACTIVE && !C.ASSET_CLASSES.includes(a.assetClass),
   );
-  const held = state.assets.filter(
-    (a) => C.ASSET_CLASSES.includes(a.assetClass) && a.status !== C.STATUS_SOLD,
-  );
-
   return [
-    total_(total, held.length),
+    total_(total),
 
     ...holdings(ctx, total),
 
@@ -90,16 +86,10 @@ function overview(ctx) {
  * «В расчёте долей» объясняла сумму через механику расчёта, хотя человек
  * читает её как «сколько у меня в портфеле».
  */
-function total_(total, count) {
+function total_(total) {
   return h('section', { class: 'hero' }, [
     h('p', { class: 'hero-label', text: 'Портфель' }),
     h('p', { class: 'hero-value', text: F.money(total) }),
-    h('p', {
-      class: 'hero-delta is-quiet',
-      text: count
-        ? `${count} ${F.plural(count, 'бумага', 'бумаги', 'бумаг')} с заданным классом`
-        : 'ни одной бумаги с заданным классом',
-    }),
   ]);
 }
 

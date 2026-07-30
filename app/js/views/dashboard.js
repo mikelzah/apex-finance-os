@@ -46,7 +46,7 @@ function gettingStarted(ctx) {
   const { refresh } = ctx;
   return [
     h('section', { class: 'hero' }, [
-      h('p', { class: 'hero-label', text: 'Чистый капитал' }),
+      h('p', { class: 'hero-label', text: 'Мой капитал' }),
       h('p', { class: 'hero-value', text: F.money(0) }),
     ]),
     U.card([
@@ -72,7 +72,7 @@ function hero(state, worth, today) {
     .reduce((sum, op) => sum + C.signed(op), 0);
 
   return h('section', { class: 'hero' }, [
-    h('p', { class: 'hero-label', text: 'Чистый капитал' }),
+    h('p', { class: 'hero-label', text: 'Мой капитал' }),
     h('p', { class: 'hero-value', text: F.money(worth.total) }),
     delta
       ? h('p', { class: `hero-delta ${delta > 0 ? 'is-up' : 'is-down'}` }, [

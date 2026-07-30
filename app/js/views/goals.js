@@ -6,13 +6,41 @@ import * as F from '../fmt.js';
 import * as C from '../calc.js';
 import * as charts from '../charts.js';
 import * as forms from '../forms.js';
+import * as store from '../store.js';
+import * as reorder from '../reorder.js';
 
 const { h } = U;
 
+/**
+ * Порядок целей задаёт человек, а не статус.
+ *
+ * Раньше список сортировался по статусу: активные, на паузе, достигнутые.
+ * Правило разумное, но не то: что для меня главное сейчас — знаю только я,
+ * и «на паузе» вовсе не значит «показывай ниже». Порядок хранится в самой
+ * цели и меняется перетаскиванием за шапку карточки.
+ */
 export function render(ctx) {
-  const { state, today, refresh } = ctx;
-  const order = { [C.GOAL_ACTIVE]: 0, [C.GOAL_PAUSED]: 1, [C.GOAL_DONE]: 2 };
-  const goals = [...state.goals].sort((a, b) => (order[a.status] ?? 3) - (order[b.status] ?? 3));
+  const { state, refresh } = ctx;
+  const goals = C.orderedGoals(state.goals);
+  const cards = goals.map((goal) => goalCard(goal, ctx));
+
+  // Перетаскивание вешается после того, как карточки окажутся на экране:
+  // до этого их не измерить, а без размеров жест не собрать.
+  if (cards.length > 1) {
+    requestAnimationFrame(() => {
+      reorder.enable(cards, (card) => card.querySelector('.goal-head'), async (order) => {
+        const ids = order.map((i) => goals[i].id);
+        await store.mutate((draft) => {
+          for (const g of draft.goals) {
+            const at = ids.indexOf(g.id);
+            if (at !== -1) g.sort = at;
+          }
+        });
+        U.toast('Порядок сохранён');
+        refresh();
+      });
+    });
+  }
 
   return [
     // Карточка вокруг одного заголовка и кнопки была бы пустой рамой —
@@ -22,7 +50,7 @@ export function render(ctx) {
       U.button('Добавить', () => forms.goalSheet(null, { onDone: refresh }), { kind: 'primary' }),
     ]),
     goals.length ? null : U.card([U.emptyState('Целей пока нет.')]),
-    ...goals.map((goal) => goalCard(goal, ctx)),
+    ...cards,
   ];
 }
 
@@ -74,6 +102,6 @@ function goalCard(goal, ctx) {
             }),
           ),
         ])
-      : U.emptyState('Активы не привязаны — прогресс будет нулевым. Привязка задаётся в карточке актива.'),
+      : null,
   ]);
 }

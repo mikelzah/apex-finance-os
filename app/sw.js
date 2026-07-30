@@ -45,6 +45,7 @@ const SHELL = [
   './js/viewport.js',
   './js/table.js',
   './js/mascot.js',
+  './js/reorder.js',
   './js/views/dashboard.js',
   './js/views/goals.js',
   './js/views/portfolio.js',

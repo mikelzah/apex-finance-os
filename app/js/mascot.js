@@ -68,6 +68,47 @@ export function celebrate() {
   setTimeout(() => node && node.classList.remove('is-happy'), 900);
 }
 
+/**
+ * Занавес на весь экран — на время обновления.
+ *
+ * Обновление стирает кэш и перезагружает страницу: секунду-полторы экран
+ * просто белый, и это читается как «сломалось». Занавес закрывает этот
+ * промежуток и заодно объясняет, что происходит.
+ *
+ * Резвятся здесь наши собственные зверьки — те же, что висят на острове.
+ * Похожие жёлтые существа в комбинезонах — чужие персонажи, рисовать их
+ * нельзя; настроение — гурьба, прыжки, толкотня — своё дело делает и без
+ * копирования чужого облика.
+ *
+ * Возвращает обещание, которое исполнится, когда толпа набегает своё.
+ */
+export function curtain(text = 'Обновляюсь…') {
+  const wrap = document.createElement('div');
+  wrap.className = 'curtain';
+  wrap.setAttribute('role', 'status');
+
+  const crowd = document.createElement('div');
+  crowd.className = 'curtain-crowd';
+  // Пятеро: меньше — не толпа, больше — на узком экране каша.
+  for (let i = 0; i < 5; i += 1) {
+    const one = draw();
+    one.classList.remove('mascot');
+    one.classList.add('curtain-one');
+    // Каждый прыгает в своём ритме и на своей высоте: одинаковый шаг
+    // у всех сразу читается как один объект, размноженный копированием.
+    one.style.setProperty('--i', String(i));
+    one.style.animationDelay = `${i * 90}ms`;
+    one.style.animationDuration = `${520 + i * 40}ms`;
+    crowd.appendChild(one);
+  }
+
+  wrap.appendChild(crowd);
+  wrap.appendChild(Object.assign(document.createElement('p'), { className: 'curtain-text', textContent: text }));
+  shell().appendChild(wrap);
+
+  return new Promise((resolve) => setTimeout(resolve, 1400));
+}
+
 let blinkTimer = null;
 
 function scheduleBlink() {

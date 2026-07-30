@@ -1074,6 +1074,31 @@ button.alloc-row { cursor: pointer; }
 .goal-assets { border-top: 1px solid var(--line-soft); padding-top: var(--space-3); }
 
 /* -------------------------------------------------------------------------- */
+/* Перетаскивание карточек                                                    */
+/* -------------------------------------------------------------------------- */
+
+/* Выделение текста при удержании превратило бы жест в выбор слова. */
+.is-grip { user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
+
+/* Соседи расступаются плавно, перетаскиваемая едет за пальцем без перехода:
+   любая задержка на ней читается как «карточка не слушается». */
+.card { transition: transform var(--dur-base) var(--ease-panel); }
+
+.card.is-dragging {
+  transition: none;
+  position: relative;
+  z-index: 40;
+  box-shadow: var(--elev-3);
+  /* Чуть приподнята и чуть крупнее — признак, что карточка «в руке». */
+  scale: 1.02;
+}
+
+/* Пока карточку тащат, экран не прокручивается и по нему ничего не нажимается:
+   палец занят одним делом. */
+body.is-reordering { touch-action: none; }
+body.is-reordering .screen { overflow: hidden; }
+
+/* -------------------------------------------------------------------------- */
 /* Журнал                                                                     */
 /* -------------------------------------------------------------------------- */
 
@@ -1372,6 +1397,63 @@ body.has-mascot .header { padding-top: calc(var(--safe-top) + var(--space-6)); }
 
 @media (prefers-reduced-motion: reduce) {
   .mascot.is-happy, .mascot.is-happy .mascot-legs { animation: none; }
+}
+
+/* -------------------------------------------------------------------------- */
+/* Занавес обновления                                                         */
+/* -------------------------------------------------------------------------- */
+
+/* Во весь экран поверх всего, включая навигацию и шторку: во время
+   перезагрузки нажимать всё равно нечего, а полупрозрачная заслонка выглядела
+   бы как случайно всплывший слой. */
+.curtain {
+  position: absolute;
+  inset: 0;
+  z-index: 200;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-6);
+  background:
+    radial-gradient(80% 55% at 50% 30%, var(--accent-wash), transparent 70%),
+    var(--bg);
+  animation: fade var(--dur-base) var(--ease-out);
+}
+
+.curtain-crowd { display: flex; align-items: flex-end; gap: var(--space-3); }
+
+/* Каждый прыгает со своей задержкой и длительностью — их задаёт JS.
+   Одинаковый ритм у всех читался бы как один размноженный объект. */
+.curtain-one {
+  width: 3.5rem;
+  animation-name: curtain-hop;
+  animation-timing-function: var(--ease-out);
+  animation-iteration-count: infinite;
+}
+
+.curtain-one .mascot-smile { opacity: 1; }
+/* Руки у висящего зверя уходят вверх за остров. Здесь острова нет, и торчащие
+   вверх штрихи читались бы как антенны — прячем их. */
+.curtain-one .mascot-svg > .mascot-limb:nth-of-type(-n + 2) { opacity: 0; }
+
+.curtain-text {
+  margin: 0;
+  font-size: var(--text-base);
+  color: var(--ink-2);
+}
+
+@keyframes curtain-hop {
+  0%, 100% { transform: translateY(0) rotate(0deg); }
+  30% { transform: translateY(-14px) rotate(-6deg); }
+  60% { transform: translateY(0) rotate(4deg); }
+  75% { transform: translateY(-4px) rotate(0deg); }
+}
+
+/* Здесь анимация и есть содержание экрана: гасить её нечем, но без прыжков
+   она превращается в спокойную надпись — этого достаточно. */
+@media (prefers-reduced-motion: reduce) {
+  .curtain-one { animation: none; }
 }
 
 /* -------------------------------------------------------------------------- */
