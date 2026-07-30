@@ -566,6 +566,8 @@ function screenDiagnostics() {
     ...rows.map(([key, r]) =>
       U.row(key.replace(/\/$/, ''), px(r.inner), {
         sub: `документ ${r.scrollHeight} px · ${r.scrollable ? 'прокручивается' : 'влезает целиком'}`,
+        tag: r.gap ? `поправка ${r.gap}` : null,
+        tagClass: 'sell',
       }),
     ),
     heights.size > 1
