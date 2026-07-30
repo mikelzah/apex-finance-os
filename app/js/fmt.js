@@ -36,9 +36,23 @@ export function num(x, digits = 2) {
   return new Intl.NumberFormat('ru-RU', { maximumFractionDigits: digits }).format(x);
 }
 
-export function percent(x, digits = 1) {
+/**
+ * Проценты. По умолчанию два знака — столько же, сколько принимает поле ввода.
+ *
+ * Была одна десятая, и введённые 14,25 показывались как 14,3. Ставка при этом
+ * хранилась точной: округлял только вывод, и человек видел не то число,
+ * которое сам вписал. Для величины, от которой считается налоговый лимит,
+ * это недопустимо.
+ *
+ * Нули в конце не печатаются: 16 остаётся «16%», а не «16,00%».
+ */
+export function percent(x, digits = 2) {
   if (x == null || Number.isNaN(x)) return '—';
-  return `${new Intl.NumberFormat('ru-RU', { maximumFractionDigits: digits }).format(x)}%`;
+  const nf = new Intl.NumberFormat('ru-RU', {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: digits,
+  });
+  return `${nf.format(x)}%`;
 }
 
 /** Доля 0..1 в проценты. */
