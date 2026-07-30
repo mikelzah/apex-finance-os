@@ -340,7 +340,6 @@ h3 {
   letter-spacing: var(--tracking-xl);
 }
 
-.muted-note { margin: 0; font-size: var(--text-sm); color: var(--ink-4); line-height: var(--leading-snug); }
 .empty { margin: 0; padding: var(--space-4) 0; color: var(--ink-4); font-size: var(--text-base); text-align: center; }
 .version { text-align: center; color: var(--ink-4); font-size: var(--text-xs); margin: var(--space-6) 0 0; }
 

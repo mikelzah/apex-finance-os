@@ -23,12 +23,6 @@ export function render(ctx) {
     ]),
     goals.length ? null : U.card([U.emptyState('Целей пока нет.')]),
     ...goals.map((goal) => goalCard(goal, ctx)),
-    U.card([
-      U.callout(
-        'Прогноз линейный по плану: он не знает, что вы можете пропустить взнос или поменять сумму. Это оценка «если так же, как сейчас», а не обещание.',
-        'info',
-      ),
-    ]),
   ];
 }
 

@@ -30,15 +30,6 @@ export function render(ctx) {
       U.button('Добавить класс', () => forms.portfolioSheet(null, { onDone: refresh })),
     ]),
 
-    rows.some((r) => r.unmapped)
-      ? U.card([
-          U.callout(
-            'Класс без целевой доли появляется, когда актив не найден в списке «Классы по тикерам». Активы без тикера попадают в «Прочее».',
-            'warn',
-          ),
-        ])
-      : null,
-
     quotes(ctx),
     priceChart(state, today),
   ];
@@ -100,10 +91,6 @@ function quotes(ctx) {
       }),
     ),
     status,
-    U.callout(
-      'Цены тянутся прямо с iss.moex.com. Если запрос не проходит, это ограничение браузера, а не поломка — цена вводится руками в карточке актива.',
-      'info',
-    ),
   ]);
 }
 

@@ -396,12 +396,6 @@ function ritualCard(state, today) {
       h('span', { class: 'ritual-count', text: `${filled} из ${elapsed}` }),
     ]),
     node,
-    h('p', {
-      class: 'muted-note',
-      text: goal
-        ? `Пустая клетка — день без взноса по цели «${goal.name}».`
-        : 'Пустая клетка — день без взноса.',
-    }),
   ]);
 }
 
