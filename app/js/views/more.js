@@ -9,6 +9,7 @@ import * as charts from '../charts.js';
 import * as store from '../store.js';
 import * as forms from '../forms.js';
 import * as theme from '../theme.js';
+import * as viewport from '../viewport.js';
 import * as mascot from '../mascot.js';
 import { table } from '../table.js';
 
@@ -538,7 +539,31 @@ function settings(ctx) {
         'Данные стёрты',
       ), { kind: 'danger', class: 'btn-wide' }),
     ]),
+    screenDiagnostics(),
   ];
+}
+
+/**
+ * Замеры вьюпорта.
+ *
+ * Нужны потому, что на iPhone в установленном виде вьюпорт оказался короче
+ * экрана, и объяснить это из окружения разработки не получилось: ни один
+ * настольный браузер такого не воспроизводит. Раздел показывает исходные
+ * числа, по которым считается поправка, — чтобы разбираться по замерам,
+ * а не по догадкам.
+ */
+function screenDiagnostics() {
+  const m = viewport.measure();
+  const px = (n) => `${n} px`;
+
+  return U.card([
+    U.sectionTitle('Диагностика экрана'),
+    U.row('Высота вьюпорта', px(m.inner), { sub: 'window.innerHeight' }),
+    U.row('Видимая область', px(m.visual), { sub: 'visualViewport.height' }),
+    U.row('Высота экрана', px(m.screenH), { sub: 'screen.height' }),
+    U.row('Поправка снизу', px(m.gap), { sub: 'на столько опущены нижние панели' }),
+    U.row('Отдельное окно', m.standalone ? 'да' : 'нет', { sub: 'с домашнего экрана, а не из Safari' }),
+  ]);
 }
 
 // --------------------------------------------------------------------------

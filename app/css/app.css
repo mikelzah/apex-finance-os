@@ -140,7 +140,11 @@ body.is-locked { overflow: hidden; }
   position: fixed;
   left: 0;
   right: 0;
-  bottom: 0;
+  /* Не bottom: 0, а ниже на высоту щели. На iPhone в установленном виде
+     вьюпорт короче экрана, и панель с нулевым смещением заканчивалась
+     на 63 пикселя выше края: под ней оставалась пустая полоса. Пока щель
+     нулевая — а так везде, кроме этого случая — правило равно bottom: 0. */
+  bottom: calc(-1 * var(--viewport-gap));
   z-index: 30;
   display: grid;
   grid-template-columns: repeat(5, 1fr);
@@ -900,7 +904,9 @@ button.alloc-row { cursor: pointer; }
 /* Шторка и формы                                                             */
 /* -------------------------------------------------------------------------- */
 
-.sheet { position: fixed; inset: 0; z-index: 100; }
+/* Шторка прижата к низу тем же смещением, что и таб-бар: иначе она повисла бы
+   над той же пустой полосой. */
+.sheet { position: fixed; inset: 0; bottom: calc(-1 * var(--viewport-gap)); z-index: 100; }
 .sheet-backdrop { position: absolute; inset: 0; background: var(--overlay); animation: fade var(--dur-base) var(--ease-out); }
 
 .sheet-panel {
@@ -946,6 +952,10 @@ button.alloc-row { cursor: pointer; }
 }
 
 .sheet-body { padding: var(--space-2) var(--gutter) var(--space-4); overflow-y: auto; -webkit-overflow-scrolling: touch; }
+
+/* Шторка без подвала: отступ под домашним индикатором держит тело, иначе
+   последняя строка списка оказывается под индикатором. */
+.sheet-panel > .sheet-body:last-child { padding-bottom: calc(var(--safe-bottom) + var(--space-4)); }
 .sheet-text { margin: 0; font-size: var(--text-base); color: var(--ink-2); line-height: var(--leading-normal); }
 
 .sheet-foot {

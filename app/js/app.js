@@ -5,6 +5,7 @@ import * as D from './dates.js';
 import * as F from './fmt.js';
 import * as store from './store.js';
 import * as theme from './theme.js';
+import * as viewport from './viewport.js';
 import { icon } from './icons.js';
 import * as mascot from './mascot.js';
 
@@ -226,6 +227,9 @@ function skeleton() {
 
 async function boot() {
   theme.apply();
+  // До первой отрисовки: иначе таб-бар успеет встать не туда и переедет
+  // на глазах у пользователя.
+  viewport.watch();
   mascot.apply();
   // Чтение из IndexedDB обычно занимает миллисекунды, но на холодном старте
   // после перезагрузки телефона бывает и заметно дольше. Пустой белый экран

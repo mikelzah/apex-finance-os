@@ -25,6 +25,7 @@ const SHELL = [
   './js/moex.js',
   './js/icons.js',
   './js/theme.js',
+  './js/viewport.js',
   './js/table.js',
   './js/mascot.js',
   './js/views/dashboard.js',
