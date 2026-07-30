@@ -1,9 +1,12 @@
 // Портфель: целевая структура против фактической.
 //
-// Замороженные активы в расчёт долей не входят. GMKN не продаётся и не
-// докупается, и если включить его в базу расчёта, портфель навсегда останется
-// «на 100% в акциях», а колонка «Действие» превратится в бесполезное
-// «докупить» по всем остальным классам.
+// В расчёт долей входит только то, чему класс задан явно в карточке актива.
+// Всё остальное — машина, квартира — перечислено отдельным списком: это
+// часть капитала, но не часть портфеля.
+//
+// Замороженные активы не в счёт: актив, который не продаётся и не докупается,
+// перекосил бы доли навсегда, а колонка «Действие» превратилась бы
+// в бесполезное «докупить» по всем остальным классам.
 
 import * as U from '../ui.js';
 import * as F from '../fmt.js';
@@ -18,17 +21,34 @@ const { h } = U;
 
 export function render(ctx) {
   const { state, today, refresh } = ctx;
-  const { rows, total } = C.portfolioRows(state.assets, state.operations, state.portfolio, state.settings);
+  const { rows, total } = C.portfolioRows(state.assets, state.operations, state.portfolio);
+  const noClass = state.assets.filter(
+    (a) => a.status === C.STATUS_ACTIVE && !C.ASSET_CLASSES.includes(a.assetClass),
+  );
 
   return [
     U.card([
       U.stat('В расчёте долей', F.money(total), {
         big: true,
-        hint: 'только активные инвестиции',
+        hint: 'активы с заданным классом',
       }),
       charts.allocation(rows, (row) => forms.portfolioSheet(row, { onDone: refresh })),
-      U.button('Добавить класс', () => forms.portfolioSheet(null, { onDone: refresh })),
     ]),
+
+    // Не подсказка, а состояние: перечислены настоящие активы, которым класс
+    // не задан, и потому в доли они не попали. Машина и квартира живут здесь
+    // законно — им класс и не нужен.
+    noClass.length
+      ? U.card([
+          U.sectionTitle('Вне расчёта долей'),
+          ...noClass.map((a) =>
+            U.row(a.name, F.money(C.assetValue(a, state.operations)), {
+              sub: a.type,
+              onClick: () => forms.assetSheet(a, { onDone: refresh }),
+            }),
+          ),
+        ])
+      : null,
 
     quotes(ctx),
     priceChart(state, today),

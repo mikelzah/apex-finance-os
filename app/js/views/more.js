@@ -22,7 +22,6 @@ export function render(ctx) {
     case 'tax': return tax(ctx);
     case 'history': return history(ctx);
     case 'keyrate': return keyRate(ctx);
-    case 'classes': return classes(ctx);
     case 'settings': return settings(ctx);
     case 'backup': return backup(ctx);
     default: return hub(ctx);
@@ -49,7 +48,6 @@ export function title(sub) {
     tax: 'Налог на проценты',
     history: 'История капитала',
     keyrate: 'Ключевая ставка ЦБ',
-    classes: 'Классы по тикерам',
     settings: 'Настройки',
     backup: 'Резервная копия',
   }[sub] || 'Ещё';
@@ -76,10 +74,6 @@ function hub(ctx) {
       }),
     ]),
     U.card([
-      U.row('Классы по тикерам', String(Object.keys(state.settings.classByTicker || {}).length), {
-        sub: 'к какому классу относится бумага',
-        onClick: () => ctx.go('more/classes'),
-      }),
       U.row('Настройки', '', { onClick: () => ctx.go('more/settings') }),
       U.row('Резервная копия', backupAge == null ? 'ни разу' : `${F.days(backupAge)} назад`, {
         sub: 'данные живут только в этом телефоне',
@@ -344,59 +338,6 @@ function keyRateSheet(ctx) {
   });
 }
 
-// --------------------------------------------------------------------------
-
-function classes(ctx) {
-  const { state, refresh } = ctx;
-  const map = state.settings.classByTicker || {};
-  const tickers = [...new Set(state.assets.filter((a) => a.ticker).map((a) => a.ticker))];
-
-  const edit = (ticker) => {
-    U.sheet(ticker || 'Новое соответствие', (api) => {
-      const t = U.input({ type: 'text', value: ticker || '', placeholder: 'GMKN' });
-      const cls = U.input({ type: 'text', value: map[ticker] || '', placeholder: 'Акции' });
-      api.setFooter([
-        ticker
-          ? U.button('Удалить', async () => {
-              await store.mutate((draft) => {
-                delete draft.settings.classByTicker[ticker];
-              });
-              api.close();
-              refresh();
-            }, { kind: 'danger' })
-          : U.button('Отмена', () => api.close()),
-        U.button('Сохранить', async () => {
-          const key = t.value.trim().toUpperCase();
-          if (!key || !cls.value.trim()) return U.toast('Заполните оба поля', 'error');
-          await store.mutate((draft) => {
-            if (ticker && ticker !== key) delete draft.settings.classByTicker[ticker];
-            draft.settings.classByTicker[key] = cls.value.trim();
-          });
-          api.close();
-          refresh();
-        }, { kind: 'primary' }),
-      ]);
-      return [U.field('Тикер', t), U.field('Класс актива', cls)];
-    });
-  };
-
-  const unmapped = tickers.filter((t) => !map[t]);
-
-  return [
-    U.card([
-      U.sectionTitle('Классы по тикерам', U.button('Добавить', () => edit(null), { kind: 'primary' })),
-      ...Object.entries(map).map(([ticker, cls]) =>
-        U.row(ticker, cls, { onClick: () => edit(ticker) }),
-      ),
-      Object.keys(map).length ? null : U.emptyState('Соответствий нет.'),
-    ]),
-    unmapped.length
-      ? U.card([
-          U.callout(`Без класса: ${unmapped.join(', ')}. Эти бумаги попадут в «${state.settings.classFallback}».`, 'warn'),
-        ])
-      : null,
-  ];
-}
 
 // --------------------------------------------------------------------------
 

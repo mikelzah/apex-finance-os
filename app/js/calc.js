@@ -25,6 +25,20 @@ export const OP_EXPENSE = 'Расход';
 export const SOURCE_MANUAL = 'Вручную';
 export const SOURCE_COMPUTED = 'Расчёт';
 
+/**
+ * Классы портфеля. Список закрытый и задаётся у каждого актива вручную.
+ *
+ * Раньше класс выводился из тикера через таблицу соответствий, и это давало
+ * две беды сразу. Актив без тикера — вклад, накопительный счёт — в портфель
+ * попасть не мог вовсе, хотя это такие же денежные активы. А актив с типом
+ * «Инвестиции», но без тикера — машина, квартира — наоборот проваливался
+ * в запасной класс «Прочее» и перекашивал доли на миллионы.
+ *
+ * Пустой класс означает «не входит в расчёт долей». Это и есть место
+ * для машины: она часть капитала, но не часть портфеля.
+ */
+export const ASSET_CLASSES = ['Акции', 'Фонды', 'Облигации', 'Вклады'];
+
 export const GOAL_ACTIVE = 'Активна';
 export const GOAL_PAUSED = 'На паузе';
 export const GOAL_DONE = 'Достигнута';
@@ -69,22 +83,20 @@ export function netWorth(assets, operations) {
 }
 
 /**
- * Доли считаются только по активным инвестициям.
+ * Доли по классам. В базу входит только то, чему класс задан явно.
  *
- * Замороженные исключены намеренно: GMKN не продаётся и не докупается,
- * и если включить его в базу расчёта, портфель навсегда останется
- * «на 100% в акциях», а колонка «Действие» превратится в бесполезное
- * «докупить» по всем остальным классам.
+ * Замороженные не в счёт намеренно: актив, который не продаётся и не
+ * докупается, перекосил бы доли навсегда, а колонка «Действие» превратилась
+ * бы в бесполезное «докупить» по всем остальным классам.
  */
-export function portfolioShares(assets, operations, settings) {
-  const map = settings.classByTicker || {};
-  const fallback = settings.classFallback || 'Прочее';
+export function portfolioShares(assets, operations) {
   const byClass = new Map();
+  for (const name of ASSET_CLASSES) byClass.set(name, 0);
 
   for (const a of assets) {
-    if (a.type !== TYPE_INVESTMENT || a.status !== STATUS_ACTIVE) continue;
-    const name = (a.ticker && map[a.ticker]) || fallback;
-    byClass.set(name, (byClass.get(name) || 0) + assetValue(a, operations));
+    if (a.status !== STATUS_ACTIVE) continue;
+    if (!ASSET_CLASSES.includes(a.assetClass)) continue;
+    byClass.set(a.assetClass, byClass.get(a.assetClass) + assetValue(a, operations));
   }
 
   let total = 0;
@@ -93,31 +105,29 @@ export function portfolioShares(assets, operations, settings) {
 }
 
 /**
- * Строки портфеля с текущей долей и действием.
- * Классы, которых нет в целевой структуре, добавляются в конец без цели —
- * иначе деньги в них молча исчезли бы из таблицы.
+ * Строки портфеля: по одной на каждый класс, всегда все четыре.
+ *
+ * Класс без денег не прячется: нулевая строка с целевой долей — это и есть
+ * сообщение «сюда ничего не вложено», и оно нужнее пустого места.
  */
-export function portfolioRows(assets, operations, portfolio, settings) {
-  const { total, byClass } = portfolioShares(assets, operations, settings);
-  const rows = portfolio.map((row) => {
-    const value = byClass.get(row.class) || 0;
+export function portfolioRows(assets, operations, portfolio) {
+  const { total, byClass } = portfolioShares(assets, operations);
+  const targets = new Map((portfolio || []).map((r) => [r.class, r]));
+
+  const rows = ASSET_CLASSES.map((name) => {
+    const row = targets.get(name);
+    const value = byClass.get(name) || 0;
     const share = total > 0 ? (value / total) * 100 : null;
-    return { ...row, value, share, action: action(row.targetShare, share) };
+    return {
+      id: row?.id || `cls-${name}`,
+      class: name,
+      targetShare: row?.targetShare ?? null,
+      value,
+      share,
+      action: action(row?.targetShare ?? null, share),
+    };
   });
 
-  const known = new Set(portfolio.map((r) => r.class));
-  for (const [name, value] of byClass) {
-    if (known.has(name)) continue;
-    rows.push({
-      id: `unmapped-${name}`,
-      class: name,
-      targetShare: null,
-      value,
-      share: total > 0 ? (value / total) * 100 : null,
-      action: 'цель не задана',
-      unmapped: true,
-    });
-  }
   return { rows, total };
 }
 

@@ -118,6 +118,7 @@ export function assetSheet(existing, options = {}) {
     reconciledAt: null,
     goalIds: [],
     notes: '',
+    assetClass: null,
   };
 
   U.sheet(isNew ? 'Новый актив' : a.name, (api) => {
@@ -125,6 +126,12 @@ export function assetSheet(existing, options = {}) {
     const type = U.select([C.TYPE_MONEY, C.TYPE_INVESTMENT, 'Транспорт', 'Недвижимость'], a.type);
     const status = U.select([C.STATUS_ACTIVE, C.STATUS_FROZEN, C.STATUS_SOLD, C.STATUS_PLANNED], a.status);
     const liquidity = U.select([C.LIQUIDITY_INSTANT, 'T+1', 'Низкая'], a.liquidity);
+    // Пустое значение — «не входит в расчёт долей». Так из портфеля выпадают
+    // машина и квартира: они часть капитала, но не часть портфеля.
+    const assetClass = U.select(
+      [{ value: '', label: '— не входит в портфель —' }, ...C.ASSET_CLASSES.map((v) => ({ value: v, label: v }))],
+      a.assetClass || '',
+    );
 
     const ticker = U.input({ type: 'text', value: a.ticker || '', placeholder: 'пусто для активов без котировок' });
     const board = U.input({ type: 'text', value: a.board || '', placeholder: 'TQBR, TQTF' });
@@ -177,6 +184,7 @@ export function assetSheet(existing, options = {}) {
           type: type.value,
           status: status.value,
           liquidity: liquidity.value,
+          assetClass: assetClass.value || null,
           ticker: ticker.value.trim().toUpperCase() || null,
           board: board.value.trim().toUpperCase() || null,
           quantity: U.parseNumber(quantity.value),
@@ -208,6 +216,7 @@ export function assetSheet(existing, options = {}) {
       U.field('Тип', type),
       U.field('Статус', status),
       U.field('Ликвидность', liquidity, 'Мгновенная — попадает в «Доступно сегодня».'),
+      U.field('Класс в портфеле', assetClass, 'Определяет, в какую долю попадёт актив. Пусто — в расчёт долей не входит.'),
 
       // Раскрыта та половина полей, которая относится к этому активу:
       // у вклада нет режима торгов, у акции — дня капитализации.
@@ -320,41 +329,27 @@ export function goalSheet(existing, options = {}) {
 // Класс портфеля
 // --------------------------------------------------------------------------
 
-export function portfolioSheet(existing, options = {}) {
-  const isNew = !existing;
-  const p = existing || { id: null, class: '', targetShare: null };
-
-  U.sheet(isNew ? 'Новый класс' : p.class, (api) => {
-    const name = U.input({ type: 'text', value: p.class, 'data-autofocus': isNew ? 'yes' : 'no' });
-    const target = U.numberInput(p.targetShare);
+export function portfolioSheet(row, options = {}) {
+  U.sheet(row.class, (api) => {
+    const target = U.numberInput(row.targetShare, { 'data-autofocus': 'yes' });
 
     api.setFooter([
-      !isNew
-        ? U.button('Удалить', async () => {
-            await store.mutate((draft) => store.remove(draft.portfolio, p.id));
-            api.close();
-            U.toast('Класс удалён');
-            options.onDone?.();
-          }, { kind: 'danger' })
-        : U.button('Отмена', () => api.close()),
+      U.button('Отмена', () => api.close()),
       U.button('Сохранить', async () => {
-        if (!name.value.trim()) return U.toast('Название класса обязательно', 'error');
-        await store.mutate((draft) =>
-          store.upsert(draft.portfolio, {
-            id: p.id || store.newId('cls'),
-            class: name.value.trim(),
-            targetShare: U.parseNumber(target.value),
-          }),
-        );
+        await store.mutate((draft) => {
+          const existing = draft.portfolio.find((r) => r.class === row.class);
+          const value = U.parseNumber(target.value);
+          if (existing) existing.targetShare = value;
+          else draft.portfolio.push({ id: store.newId('cls'), class: row.class, targetShare: value });
+        });
         api.close();
         options.onDone?.();
       }, { kind: 'primary' }),
     ]);
 
-    return [
-      U.field('Класс актива', name),
-      U.field('Целевая доля, %', target),
-      U.callout('Актив попадает в класс по тикеру. Соответствие настраивается в разделе «Ещё → Классы по тикерам».', 'info'),
-    ];
+    // Названия классов не редактируются: список закрытый, и он же предлагается
+    // в карточке актива. Разъехавшиеся названия означали бы деньги, потерянные
+    // между классом актива и строкой целевой структуры.
+    return [U.field('Целевая доля, %', target, 'Пусто — доля не задана, действие по классу не считается.')];
   });
 }

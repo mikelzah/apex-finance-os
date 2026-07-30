@@ -5,6 +5,10 @@
 // не бывает состояния, где операция уже сохранилась, а остаток актива ещё нет.
 // Разносить по отдельным хранилищам имело бы смысл на десятках тысяч записей.
 
+// Список классов живёт в расчётном ядре — там же, где им пользуются.
+// Дублировать его здесь значило бы однажды разойтись.
+import { ASSET_CLASSES } from './calc.js';
+
 const DB_NAME = 'apex-finance-os';
 const DB_VERSION = 1;
 const STORE = 'kv';
@@ -99,8 +103,6 @@ function emptyState() {
       quickGoalId: null,
       backupReminderDays: 14,
       taxLimitBase: 1000000,
-      classByTicker: {},
-      classFallback: 'Прочее',
       autoQuotes: true,
       // Скрытые сигналы: [{ key, text }]. Формулировка хранится рядом с
       // ключом, чтобы изменившийся сигнал показался заново.
@@ -126,11 +128,55 @@ function migrate(loaded) {
   const next = { ...base, ...loaded };
   next.settings = { ...base.settings, ...(loaded.settings || {}) };
   if (!Array.isArray(next.settings.mutedSignals)) next.settings.mutedSignals = [];
+  migrateClasses(next, loaded.settings || {});
   next.meta = { ...base.meta, ...(loaded.meta || {}) };
   for (const key of ['assets', 'goals', 'operations', 'portfolio', 'tax', 'netWorth', 'keyRate', 'priceHistory']) {
     if (!Array.isArray(next[key])) next[key] = [];
   }
   return next;
+}
+
+/**
+ * Класс портфеля переехал из таблицы «тикер → класс» в поле самого актива.
+ *
+ * Разбираем старое соответствие по смыслу, а не по совпадению строки:
+ * «Денежный рынок» — это фонды, «ОФЗ» — облигации. Что не разобралось,
+ * остаётся пустым: пустой класс значит «не входит в расчёт долей», и это
+ * честнее, чем угадать и молча перекосить портфель. Машина и квартира
+ * попадают сюда же — им класс задавать и не нужно.
+ */
+function guessClass(text) {
+  const t = String(text || '').toLowerCase();
+  if (!t) return null;
+  if (t.includes('облигац') || t.includes('офз') || t.includes('бонд')) return 'Облигации';
+  if (t.includes('фонд') || t.includes('денежн') || t.includes('etf') || t.includes('бпиф')) return 'Фонды';
+  if (t.includes('акц')) return 'Акции';
+  if (t.includes('вклад') || t.includes('депозит') || t.includes('счёт') || t.includes('счет')) return 'Вклады';
+  return null;
+}
+
+function migrateClasses(next, oldSettings) {
+  const byTicker = oldSettings.classByTicker || {};
+
+  for (const a of next.assets) {
+    if (a.assetClass !== undefined && a.assetClass !== null) continue;
+    a.assetClass = a.ticker ? guessClass(byTicker[a.ticker]) : null;
+    // Вклад и накопительный счёт тикера не имеют, но в портфель входят:
+    // раньше попасть туда они не могли вовсе.
+    if (!a.assetClass && !a.ticker && a.rate) a.assetClass = 'Вклады';
+  }
+
+  // Целевые доли: оставляем только те, что относятся к нынешним классам.
+  const known = new Map();
+  for (const row of next.portfolio) {
+    const cls = ASSET_CLASSES.includes(row.class) ? row.class : guessClass(row.class);
+    if (!cls || known.has(cls)) continue;
+    known.set(cls, { ...row, class: cls });
+  }
+  next.portfolio = [...known.values()];
+
+  delete next.settings.classByTicker;
+  delete next.settings.classFallback;
 }
 
 /**
