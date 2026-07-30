@@ -1,0 +1,59 @@
+name: pages
+
+# Каждый пуш в main пересобирает сайт и выкладывает его. Собранная копия
+# в репозитории не хранится: иначе она неизбежно разошлась бы с исходником,
+# и однажды опубликовалась бы старая версия.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Одновременно выкладывается только одна сборка. Уже идущую не обрываем:
+# прерванный деплой оставляет сайт в непонятном состоянии.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Сборка
+        run: ./scripts/build-pages.sh
+
+      - name: Проверка, что личных данных нет
+        # Последний рубеж перед публикацией. Ищем признак выгрузки из
+        # приложения, а не конкретные суммы: проверка, перечисляющая настоящие
+        # цифры, сама их и публикует — она лежит в открытом репозитории.
+        #
+        # exportedAt и app проставляет только резервная копия. У демо-данных
+        # их нет, поэтому ложных срабатываний не будет.
+        run: |
+          if grep -rl '"exportedAt"' deploy/ || grep -rl '"app": "APEX Finance OS"' deploy/ ; then
+            echo "В сборку попала резервная копия с настоящими данными — публикация остановлена" >&2
+            exit 1
+          fi
+          echo "Признаков личных данных нет"
+
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: deploy
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

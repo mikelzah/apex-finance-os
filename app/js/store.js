@@ -5,8 +5,6 @@
 // не бывает состояния, где операция уже сохранилась, а остаток актива ещё нет.
 // Разносить по отдельным хранилищам имело бы смысл на десятках тысяч записей.
 
-import { HAS_SEED } from './config.js';
-
 const DB_NAME = 'apex-finance-os';
 const DB_VERSION = 1;
 const STORE = 'kv';
@@ -172,17 +170,6 @@ export async function loadDemo() {
   notify();
 }
 
-/** Личный слепок из Notion. Отдельно от демо и намеренно не по умолчанию. */
-export async function loadSeed() {
-  state = await loadFile('./data/seed.json');
-  await writeRaw(state);
-  notify();
-}
-
-/** Есть ли рядом личный слепок — решается флагом сборки, а не запросом. */
-export function hasSeed() {
-  return HAS_SEED;
-}
 
 export function getState() {
   if (!state) throw new Error('Хранилище не инициализировано');
