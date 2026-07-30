@@ -89,16 +89,19 @@ export function line(points, options = {}) {
   });
 
   // Сетка — сплошные волосяные линии на шаг от поверхности, без пунктира.
+  //
+  // Подписи стоят над своей линией, и только нижняя — под ней: над нижней
+  // линией проходит сама кривая, и подпись оказывалась перечёркнутой. Место
+  // под ней есть — там нижнее поле, ось дат нарисована уже вне SVG.
   const ticks = [y0, (y0 + y1) / 2, y1];
   for (const t of ticks) {
+    const y = py(t);
+    const bottom = t === y0;
     svg.appendChild(
-      el('line', {
-        x1: PAD.left, x2: W - PAD.right, y1: py(t), y2: py(t),
-        class: 'chart-grid',
-      }),
+      el('line', { x1: PAD.left, x2: W - PAD.right, y1: y, y2: y, class: 'chart-grid' }),
     );
     svg.appendChild(
-      el('text', { x: PAD.left, y: py(t) - 3, class: 'chart-tick' }, [format(t)]),
+      el('text', { x: PAD.left, y: bottom ? y + 8 : y - 3, class: 'chart-tick' }, [format(t)]),
     );
   }
 

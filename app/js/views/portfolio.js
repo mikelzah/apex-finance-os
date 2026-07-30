@@ -1,8 +1,9 @@
-// Портфель: что лежит, и только потом — как это соотносится с планом.
+// Портфель: сколько всего, что лежит, и только потом — доли.
 //
-// Порядок именно такой. Открывая портфель, человек спрашивает «что у меня
-// есть», а не «на сколько процентов я отклонился от целевой структуры».
-// Доли — это проверка плана, она нужна реже и потому идёт ниже.
+// Порядок именно такой. Первый вопрос при открытии портфеля — «сколько
+// у меня», второй — «в чём это лежит», и лишь третий — «насколько я отклонился
+// от целевой структуры». Доли это проверка плана: она нужна реже, чем сумма,
+// и потому идёт последней.
 //
 // В расчёт долей входит только то, чему класс задан явно в карточке актива.
 // Всё остальное — машина, квартира — перечислено отдельным списком: это
@@ -49,8 +50,13 @@ function overview(ctx) {
   const noClass = state.assets.filter(
     (a) => a.status === C.STATUS_ACTIVE && !C.ASSET_CLASSES.includes(a.assetClass),
   );
+  const held = state.assets.filter(
+    (a) => C.ASSET_CLASSES.includes(a.assetClass) && a.status !== C.STATUS_SOLD,
+  );
 
   return [
+    total_(total, held.length),
+
     ...holdings(ctx, total),
 
     noClass.length
@@ -69,25 +75,53 @@ function overview(ctx) {
       : null,
 
     U.card([
-      U.stat('В расчёте долей', F.money(total), { big: true, hint: 'активы с заданным классом' }),
+      U.sectionTitle('Доли'),
       charts.allocation(rows, (row) => forms.portfolioSheet(row, { onDone: refresh })),
     ]),
   ];
 }
 
 /**
- * Бумаги по классам — первое, что видно на экране.
+ * Сумма портфеля — первое на экране.
+ *
+ * Раньше она стояла в самом низу, над долями, и увидеть её можно было только
+ * прокрутив весь список бумаг. Главное число экрана не должно требовать
+ * прокрутки. Здесь же снята и вторая проблема того размещения: подпись
+ * «В расчёте долей» объясняла сумму через механику расчёта, хотя человек
+ * читает её как «сколько у меня в портфеле».
+ */
+function total_(total, count) {
+  return h('section', { class: 'hero' }, [
+    h('p', { class: 'hero-label', text: 'Портфель' }),
+    h('p', { class: 'hero-value', text: F.money(total) }),
+    h('p', {
+      class: 'hero-delta is-quiet',
+      text: count
+        ? `${count} ${F.plural(count, 'бумага', 'бумаги', 'бумаг')} с заданным классом`
+        : 'ни одной бумаги с заданным классом',
+    }),
+  ]);
+}
+
+/**
+ * Бумаги по классам — сразу под суммой.
+ *
+ * Все классы лежат в одной карточке группами, а не в четырёх карточках подряд.
+ * Отдельная карточка на класс раздувала экран: на класс из одной бумаги
+ * уходило втрое больше места, чем на саму строку, и список из четырёх бумаг
+ * не помещался в экран. Группы внутри одной карточки читаются как один
+ * список — чем он, по сути, и является.
  *
  * Пустые классы здесь не показываются: строка «Облигации: ничего» в списке
  * того, что у меня есть, сообщала бы ровно обратное своему смыслу. О недоборе
  * говорят доли ниже — там пустой класс на месте.
  */
 function holdings(ctx, total) {
-  const { state, refresh } = ctx;
+  const { state } = ctx;
   const ops = state.operations;
   const withTickers = state.assets.filter((a) => a.ticker && a.status !== C.STATUS_SOLD);
 
-  const cards = [];
+  const groups = [];
   for (const cls of C.ASSET_CLASSES) {
     const own = state.assets
       .filter((a) => a.assetClass === cls && a.status !== C.STATUS_SOLD)
@@ -96,7 +130,7 @@ function holdings(ctx, total) {
     if (!own.length) continue;
 
     const sum = own.reduce((s, r) => s + r.value, 0);
-    cards.push(U.card([
+    groups.push(h('div', { class: 'group' }, [
       U.sectionTitle(cls, h('span', { class: 'section-sum', text: F.money(sum) })),
       ...own.map((r) =>
         U.row(r.asset.name, F.money(r.value), {
@@ -109,19 +143,34 @@ function holdings(ctx, total) {
     ]));
   }
 
-  if (!cards.length) {
-    cards.push(U.card([U.emptyState('Бумаг пока нет. Заведите первую — она появится здесь.')]));
-  }
+  return [
+    U.card(groups.length
+      ? groups
+      : [U.emptyState('Бумаг пока нет. Заведите первую — она появится здесь.')]),
+    actions(ctx, withTickers),
+  ];
+}
 
-  cards.push(h('div', { class: 'act' }, [
+/**
+ * Два действия портфеля стоят в строку, а не одно под другим.
+ *
+ * Стопкой они читались как один сплошной блок: две одинаковые капсулы во всю
+ * ширину, вплотную, без всякого признака, что это разные вещи. В строке
+ * разница видна сразу — и по месту, и по весу: завести бумагу это основное
+ * действие, обновить котировки — служебное.
+ */
+function actions(ctx, withTickers) {
+  const { refresh } = ctx;
+  const status = h('p', { class: 'quotes-status' });
+
+  return h('div', { class: 'act act-row' }, [
     U.button('Добавить бумагу', () => forms.assetSheet(null, {
       onDone: refresh,
       preset: { type: C.TYPE_INVESTMENT, liquidity: 'T+1', assetClass: 'Акции' },
-    }), { class: 'btn-wide' }),
-    withTickers.length ? quotesButton(ctx, withTickers) : null,
-  ]));
-
-  return cards;
+    }), { kind: 'primary', class: 'btn-wide' }),
+    withTickers.length ? U.button('Обновить котировки', () => updateQuotes(ctx, withTickers, status), { class: 'btn-wide' }) : null,
+    withTickers.length ? status : null,
+  ]);
 }
 
 function holdingSub(asset, total, value) {
@@ -135,30 +184,24 @@ function holdingSub(asset, total, value) {
 }
 
 /** Обновление котировок сразу по всем бумагам с тикером. */
-function quotesButton(ctx, tickers) {
+async function updateQuotes(ctx, tickers, status) {
   const { today, refresh } = ctx;
-  const status = h('span', { class: 'quotes-status' });
+  status.textContent = 'Запрашиваю Мосбиржу…';
+  const results = await moex.prices(tickers.map((a) => ({ ticker: a.ticker, board: a.board })));
+  const ok = results.filter((r) => r.ok);
+  if (ok.length) await saveQuotes(ok, today);
 
-  const update = async () => {
-    status.textContent = 'Запрашиваю Мосбиржу…';
-    const results = await moex.prices(tickers.map((a) => ({ ticker: a.ticker, board: a.board })));
-    const ok = results.filter((r) => r.ok);
-    if (ok.length) await saveQuotes(ok, today);
-
-    const failed = results.filter((r) => !r.ok).map((r) => r.ticker);
-    if (!ok.length) {
-      status.textContent = 'Мосбиржа не ответила. Цену можно ввести руками в карточке бумаги.';
-      U.toast('Котировки не обновились', 'error');
-    } else if (failed.length) {
-      status.textContent = `Обновлено: ${ok.length}. Без цены: ${failed.join(', ')}.`;
-      refresh();
-    } else {
-      U.toast('Котировки обновлены');
-      refresh();
-    }
-  };
-
-  return h('div', {}, [U.button('Обновить котировки', update, { class: 'btn-wide' }), status]);
+  const failed = results.filter((r) => !r.ok).map((r) => r.ticker);
+  if (!ok.length) {
+    status.textContent = 'Мосбиржа не ответила. Цену можно ввести руками в карточке бумаги.';
+    U.toast('Котировки не обновились', 'error');
+  } else if (failed.length) {
+    status.textContent = `Обновлено: ${ok.length}. Без цены: ${failed.join(', ')}.`;
+    refresh();
+  } else {
+    U.toast('Котировки обновлены');
+    refresh();
+  }
 }
 
 async function saveQuotes(ok, today) {
@@ -201,7 +244,7 @@ function instrument(ctx) {
         U.stat('Класс', asset.assetClass || 'не задан'),
         U.stat('Статус', asset.status),
       ]),
-      asset.ticker ? h('div', { class: 'act' }, [singleQuote(ctx, asset)]) : null,
+      asset.ticker ? singleQuote(ctx, asset) : null,
     ]),
 
     priceCard(state, asset),
@@ -235,9 +278,9 @@ function valueHint(asset) {
 /** Обновление цены одной бумаги — с её же страницы. */
 function singleQuote(ctx, asset) {
   const { today, refresh } = ctx;
-  const status = h('span', { class: 'quotes-status' });
+  const status = h('p', { class: 'quotes-status' });
 
-  return h('div', {}, [
+  return h('div', { class: 'act' }, [
     U.button('Обновить цену', async () => {
       status.textContent = 'Запрашиваю Мосбиржу…';
       const [r] = await moex.prices([{ ticker: asset.ticker, board: asset.board }]);

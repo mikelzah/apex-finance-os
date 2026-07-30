@@ -301,7 +301,29 @@ body.is-locked .screen { overflow: hidden; }
 /* Действие                                                                   */
 /* -------------------------------------------------------------------------- */
 
-.act { margin: var(--space-5) 0; }
+/* Блок действий. Расстояние задаётся здесь, а не отступами у кнопок: кнопки
+   встречаются и поодиночке, и в паре, и в строке — с margin у каждой пришлось
+   бы гасить лишний отступ на краях. Раньше его не было вовсе, и две кнопки
+   во всю ширину стояли вплотную, читаясь как одна деталь. */
+.act {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin: var(--space-5) 0;
+}
+
+/* Внутри карточки внешние отступы блока не нужны: расстояние до соседей
+   задаёт сама карточка, а нижний отступ оставлял под кнопкой пустую полосу. */
+.card > .act { margin: 0; }
+
+/* Два равных действия рядом. Перенос разрешён: длинные подписи на узком
+   экране должны сложиться в столбец, а не ужаться до нечитаемого. */
+.act-row { flex-flow: row wrap; align-items: stretch; }
+/* 11rem — не «на глаз»: подпись у кнопок не переносится, и при более узкой
+   основе строка сохранялась там, где текст уже не помещается в капсулу.
+   С этой основой пара переходит в столбец раньше, чем что-то обрежется. */
+.act-row > .btn { flex: 1 1 11rem; min-width: 0; }
+.act-row > .quotes-status { flex-basis: 100%; }
 
 .quick {
   display: flex;
@@ -327,7 +349,6 @@ body.is-locked .screen { overflow: hidden; }
 .quick-alt {
   display: block;
   width: 100%;
-  margin-top: var(--space-2);
   padding: var(--space-3);
   border: 0;
   background: none;
@@ -355,6 +376,15 @@ body.is-locked .screen { overflow: hidden; }
 }
 
 .card > * + * { margin-top: var(--space-3); }
+
+/* Группа внутри карточки: заголовок и относящиеся к нему строки. Соседние
+   группы разделены линией во всю ширину — без неё заголовок следующей группы
+   прилипал к последней строке предыдущей и читался как её продолжение. */
+.group + .group {
+  margin-top: var(--space-4);
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--line);
+}
 .card-goal { border-color: var(--line); }
 .card-accrual { border-color: color-mix(in srgb, var(--accent) 40%, var(--line-soft)); }
 .card-signals { padding: var(--space-2) var(--space-3); }
@@ -1361,7 +1391,10 @@ body.has-mascot .header { padding-top: calc(var(--safe-top) + var(--space-6)); }
 
 .toast-error { border-color: color-mix(in srgb, var(--critical) 45%, transparent); }
 
-.quotes-status { display: block; font-size: var(--text-xs); color: var(--ink-4); }
+/* Пустая строка состояния не должна занимать место: до нажатия сообщать
+   нечего, а высота строки уже создавала бы просвет непонятного происхождения. */
+.quotes-status { display: block; margin: 0; font-size: var(--text-xs); color: var(--ink-4); }
+.quotes-status:empty { display: none; }
 
 /* -------------------------------------------------------------------------- */
 
