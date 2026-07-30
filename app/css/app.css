@@ -76,10 +76,11 @@ body.is-locked { overflow: hidden; }
   /* Непрозрачный фон, а не размытие. backdrop-filter на position: fixed —
      самый частый источник залипшего слоя в Safari: DOM обновлён, а
      скомпонованные пиксели остаются прежними, и провоцирует это тяжёлый
-     жест вроде свайпа назад. Фон приложения плоский, размывать под
-     панелью нечего, так что визуально не потеряли ничего. */
-  background: var(--bg);
-  border-bottom: 1px solid var(--line-soft);
+     жест вроде свайпа назад.
+     Своя поверхность, а не фон страницы: полоса одного цвета со страницей
+     не читается как панель, и её границы становится не видно. */
+  background: var(--surface);
+  border-bottom: 1px solid var(--line);
 }
 
 /* Атрибут hidden сам по себе бессилен против явного display в правиле:
@@ -144,8 +145,8 @@ body.is-locked { overflow: hidden; }
   display: grid;
   grid-template-columns: repeat(5, 1fr);
   padding: 0 var(--safe-right) var(--safe-bottom) var(--safe-left);
-  background: var(--bg);
-  border-top: 1px solid var(--line-soft);
+  background: var(--surface);
+  border-top: 1px solid var(--line);
 }
 
 .tabbar[hidden] { display: none; }
