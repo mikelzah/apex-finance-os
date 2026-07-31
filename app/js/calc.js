@@ -805,6 +805,85 @@ export function returnOf(assets, operations, day) {
 }
 
 // --------------------------------------------------------------------------
+// Вложено и наросло
+// --------------------------------------------------------------------------
+
+/**
+ * Сколько своих денег вложено к этому дню.
+ *
+ * Капитал растёт по двум причинам, и это принципиально разные вещи: одну
+ * я сделал сам, вторая случилась. Пока они смешаны в одной сумме, нельзя
+ * понять ни насколько хорошо копится, ни насколько удачно вложено.
+ *
+ * Вложенное — то, что пришло извне: взносы на счета, покупки бумаг, за которые
+ * не списано с внутреннего счёта. Внутренние переводы не считаются: покупка
+ * со своего же счёта не добавляет ни рубля, она перекладывает. Проценты
+ * и дивиденды тоже не вложение — это как раз то, что наросло.
+ */
+export function investedAt(assets, operations, day) {
+  const ids = new Set(assets.map((a) => a.id));
+  let sum = 0;
+
+  for (const a of assets) {
+    // Начальный остаток — деньги, которые уже лежали на момент заведения.
+    if (!a.ticker && a.opening && D.isValid(a.openingDate) && D.diffDays(day, a.openingDate) >= 0) {
+      sum += a.opening;
+    }
+  }
+
+  // Внутренний перевод состоит из двух половин: операции по бумаге и списания
+  // со счёта. Выбросить надо обе. Выбросишь одну — и покупка со своего же
+  // счёта запишется как вложение новых денег, которых не было.
+  const paired = new Set();
+  for (const op of operations) {
+    if (op.linkedTo && ids.has(op.assetId)) paired.add(op.linkedTo);
+  }
+
+  for (const op of operations) {
+    if (!ids.has(op.assetId) || !D.isValid(op.date)) continue;
+    if (D.diffDays(day, op.date) < 0) continue;
+    if (op.linkedTo || paired.has(op.id)) continue;
+    if (op.type === OP_CONTRIBUTION || op.type === OP_BUY) sum += op.amount || 0;
+    else if (op.type === OP_EXPENSE || op.type === OP_SELL || isPayout(op)) sum -= op.amount || 0;
+  }
+  return sum;
+}
+
+/**
+ * Разложение истории капитала на вложенное и наросшее.
+ *
+ * Капитал берётся из снимков — пересчитать его задним числом нельзя: цены
+ * бумаг за прошлые месяцы известны не всегда, а придумывать их значило бы
+ * рисовать историю, которой не было. Вложенное, наоборот, считается точно:
+ * операции записаны с датами.
+ */
+export function growthSeries(assets, operations, snapshots, day, liveTotal) {
+  const rows = [...(snapshots || [])]
+    .filter((r) => D.isValid(r.date))
+    .sort((a, b) => (a.date < b.date ? -1 : 1))
+    .map((r) => ({
+      date: r.date,
+      month: r.month,
+      total: r.total || 0,
+      invested: round2(investedAt(assets, operations, r.date)),
+    }));
+
+  // Сегодняшний день дописывается живым значением: снимок за текущий месяц
+  // мог быть сделан первого числа, а с тех пор всё изменилось.
+  if (liveTotal != null && (!rows.length || rows[rows.length - 1].date !== day)) {
+    rows.push({
+      date: day,
+      month: D.month(day),
+      total: liveTotal,
+      invested: round2(investedAt(assets, operations, day)),
+    });
+  }
+
+  for (const r of rows) r.growth = round2(r.total - r.invested);
+  return rows;
+}
+
+// --------------------------------------------------------------------------
 // Цели
 // --------------------------------------------------------------------------
 

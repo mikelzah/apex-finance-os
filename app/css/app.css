@@ -933,6 +933,24 @@ h3 {
 }
 
 .chart-end { fill: var(--accent-mark); }
+
+/* Вторая линия и полоса между ними. Полоса и есть ответ на вопрос экрана:
+   насколько капитал ушёл вперёд от вложенного. Краска у неё та же, что
+   у прибыли в остальном приложении, — чтобы не заводить второго языка. */
+.chart-line-second {
+  fill: none;
+  stroke: var(--ink-4);
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  stroke-dasharray: 4 3;
+}
+
+.chart-band { fill: var(--good); opacity: 0.14; }
+
+.chart-legend { display: flex; gap: var(--space-4); justify-content: center; margin-top: var(--space-1); }
+.chart-key { font-size: var(--text-micro); color: var(--ink-3); display: flex; align-items: center; gap: var(--space-1); }
+.chart-key::before { content: ''; width: 0.75rem; height: 2px; border-radius: 2px; background: var(--accent-mark); }
+.chart-key.is-second::before { background: var(--ink-4); }
 .chart-cursor { transition: opacity var(--dur-instant) var(--ease-out); pointer-events: none; }
 .chart-cursor-line { stroke: var(--ink-4); stroke-width: 0.5; }
 .chart-cursor-dot { fill: var(--ink); stroke: var(--surface); stroke-width: 1.5; }

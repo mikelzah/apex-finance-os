@@ -333,6 +333,48 @@ export function linkedCashAsset(operations, id) {
 }
 
 // --------------------------------------------------------------------------
+// Снимки капитала
+// --------------------------------------------------------------------------
+
+/**
+ * Снимок капитала за текущий месяц.
+ *
+ * Одна строка на месяц, она же и перезаписывается: к концу месяца в ней
+ * последнее известное состояние, а база не разрастается на 250 строк в год.
+ *
+ * Вызывается и кнопкой, и сама при запуске. Само по себе это важнее кнопки:
+ * история, которую надо помнить записывать, не набирается никогда, а без неё
+ * нечего и раскладывать на вложенное и наросшее.
+ */
+export async function snapshotWorth(day) {
+  const worth = C.netWorth(state.assets, state.operations);
+  const month = day.slice(0, 7);
+  const existing = state.netWorth.find((r) => r.month === month);
+
+  // Ничего не изменилось — не пишем: запись дёргает подписчиков и заставляет
+  // приложение перерисоваться на ровном месте.
+  if (existing
+      && existing.date === day
+      && Math.abs((existing.total || 0) - C.round2(worth.total)) < 0.01) {
+    return false;
+  }
+
+  await mutate((draft) => {
+    const payload = {
+      month,
+      date: day,
+      total: C.round2(worth.total),
+      liquid: C.round2(worth.liquid),
+      invested: C.round2(worth.invested),
+    };
+    const row = draft.netWorth.find((r) => r.month === month);
+    if (row) Object.assign(row, payload);
+    else draft.netWorth.push(payload);
+  });
+  return true;
+}
+
+// --------------------------------------------------------------------------
 // Резервная копия
 // --------------------------------------------------------------------------
 

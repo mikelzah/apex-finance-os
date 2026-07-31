@@ -155,6 +155,86 @@ export function line(points, options = {}) {
 }
 
 /**
+ * Две линии в одних осях: капитал и вложенное.
+ *
+ * Отдельный график, а не два рядом, именно потому, что вопрос в разнице между
+ * ними. Два графика бок о бок с разными шкалами эту разницу прячут: линии
+ * выглядят одинаково, а расстояние между ними и есть весь ответ.
+ *
+ * Заливка между линиями — не украшение: это и есть прирост, и краска у неё
+ * та же, что у прибыли и убытка в остальном приложении.
+ */
+export function lines(main, second, options = {}) {
+  const { format = F.money, label = 'Значение', hint = 'Нужно минимум два измерения' } = options;
+  if (!main || main.length < 2) return empty(hint);
+
+  const data = [...main].sort((a, b) => (a.x < b.x ? -1 : 1));
+  const other = [...(second || [])].sort((a, b) => (a.x < b.x ? -1 : 1));
+  const all = [...data, ...other];
+
+  const xs = all.map((p) => D.toDays(p.x));
+  const ys = all.map((p) => p.y);
+  const x0 = Math.min(...xs);
+  const x1 = Math.max(...xs);
+  let y0 = Math.min(...ys, 0);
+  let y1 = Math.max(...ys);
+  if (y1 === y0) { y1 += Math.abs(y0 * 0.02) || 1; }
+  const spanX = x1 - x0 || 1;
+
+  const px = (v) => PAD.left + ((v - x0) / spanX) * (W - PAD.left - PAD.right);
+  const py = (v) => H - PAD.bottom - ((v - y0) / (y1 - y0)) * (H - PAD.top - PAD.bottom);
+  const path = (list) => list
+    .map((p, i) => `${i ? 'L' : 'M'}${px(D.toDays(p.x)).toFixed(1)} ${py(p.y).toFixed(1)}`)
+    .join(' ');
+
+  const svg = el('svg', {
+    viewBox: `0 0 ${W} ${H}`,
+    class: 'chart',
+    preserveAspectRatio: 'xMidYMid meet',
+    role: 'img',
+    'aria-label': `${label}: с ${F.date(data[0].x)} по ${F.date(data[data.length - 1].x)}`,
+  });
+
+  for (const t of [y0, (y0 + y1) / 2, y1]) {
+    const y = py(t);
+    const bottom = t === y0;
+    svg.appendChild(el('line', { x1: PAD.left, x2: W - PAD.right, y1: y, y2: y, class: 'chart-grid' }));
+    svg.appendChild(el('text', { x: PAD.left, y: bottom ? y + 8 : y - 3, class: 'chart-tick' }, [format(t)]));
+  }
+
+  // Полоса между линиями: сверху капитал, снизу вложенное, обратно по нижней.
+  if (other.length > 1) {
+    const back = [...other].reverse();
+    svg.appendChild(el('path', {
+      d: `${path(data)} L${px(D.toDays(back[0].x)).toFixed(1)} ${py(back[0].y).toFixed(1)} ${path(back).slice(1)} Z`,
+      class: 'chart-band',
+    }));
+    svg.appendChild(el('path', { d: path(other), class: 'chart-line-second' }));
+  }
+  svg.appendChild(el('path', { d: path(data), class: 'chart-line' }));
+
+  const lastPoint = data[data.length - 1];
+  svg.appendChild(el('circle', {
+    cx: px(D.toDays(lastPoint.x)), cy: py(lastPoint.y), r: 3, class: 'chart-end',
+  }));
+
+  const wrap = div('chart-wrap');
+  wrap.appendChild(svg);
+
+  const legend = div('chart-legend');
+  legend.appendChild(div('chart-key is-main', options.mainLabel || 'Капитал'));
+  if (other.length > 1) legend.appendChild(div('chart-key is-second', options.secondLabel || 'Вложено'));
+  wrap.appendChild(legend);
+
+  const axis = div('chart-axis');
+  axis.appendChild(div('', F.dateShort(data[0].x)));
+  axis.appendChild(div('', F.dateShort(lastPoint.x)));
+  wrap.appendChild(axis);
+
+  return wrap;
+}
+
+/**
  * Чтение значения в точке.
  *
  * Основной способ — тап: он однозначен и не спорит с прокруткой. Протяжка

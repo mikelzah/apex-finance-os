@@ -237,41 +237,50 @@ function history(ctx) {
   const { state, today, refresh } = ctx;
   const worth = C.netWorth(state.assets, state.operations);
   const rows = [...state.netWorth].sort((a, b) => (a.month < b.month ? 1 : -1));
+  const series = C.growthSeries(state.assets, state.operations, state.netWorth, today, worth.total);
+  const now = series[series.length - 1];
 
   /**
    * Один снимок на месяц, строка перезаписывается. К концу месяца в ней
    * последнее известное состояние, а база не разрастается на 250 строк в год.
    */
   const snapshot = async () => {
-    const month = D.month(today);
-    await store.mutate((draft) => {
-      const payload = {
-        month,
-        date: today,
-        total: C.round2(worth.total),
-        liquid: C.round2(worth.liquid),
-        invested: C.round2(worth.invested),
-      };
-      const existing = draft.netWorth.find((r) => r.month === month);
-      if (existing) Object.assign(existing, payload);
-      else draft.netWorth.push(payload);
-    });
+    await store.snapshotWorth(today);
     U.toast('Снимок записан');
     refresh();
   };
 
   return [
+    // Главный вопрос экрана — не «сколько всего», а «сколько из этого моё
+    // и сколько наросло само». Поэтому разложение стоит выше графика.
+    now
+      ? U.card([
+          U.stat('Капитал', F.money(now.total), { big: true }),
+          h('div', { class: 'grid-2' }, [
+            U.stat('Вложено своих', F.money(now.invested), { hint: 'взносы и покупки извне' }),
+            U.stat(now.growth >= 0 ? 'Наросло' : 'Просело', F.signedMoney(now.growth), {
+              class: now.growth >= 0 ? 'is-good' : 'is-bad',
+              hint: now.invested > 0 ? `${F.percent((now.growth / now.invested) * 100)} к вложенному` : 'проценты и переоценка',
+            }),
+          ]),
+        ])
+      : null,
+
     U.card([
       U.sectionTitle('История капитала', U.button('Снимок за месяц', snapshot, { kind: 'primary' })),
-      charts.line(
-        rows.map((r) => ({ x: r.date, y: r.total })).reverse(),
-        { label: 'Капитал', hint: 'Нужно минимум два снимка' },
-      ),
+      series.length > 1
+        ? charts.lines(
+            series.map((r) => ({ x: r.date, y: r.total })),
+            series.map((r) => ({ x: r.date, y: r.invested })),
+            { label: 'Капитал', mainLabel: 'Капитал', secondLabel: 'Вложено' },
+          )
+        : charts.line([], { hint: 'Нужно минимум два снимка' }),
     ]),
+
     U.card([
-      ...rows.map((r) =>
+      ...[...series].reverse().map((r) =>
         U.row(F.monthName(r.month), F.money(r.total), {
-          sub: `доступно ${F.money(r.liquid)} · инвестиции ${F.money(r.invested)}`,
+          sub: `вложено ${F.money(r.invested)} · ${r.growth >= 0 ? 'наросло' : 'просело'} ${F.signedMoney(r.growth)}`,
         }),
       ),
       rows.length ? null : U.emptyState('Снимков ещё нет.'),
