@@ -305,7 +305,11 @@ function instrument(ctx) {
 
   return [
     U.card([
-      U.stat('Стоимость', F.money(value), { big: true, hint: valueHint(asset, held) }),
+      // У счёта копейки на месте: именно эту цифру сверяют с банком.
+      // У бумаги их нет — стоимость там произведение цены на количество,
+      // и копейка в ней означает не деньги, а погрешность округления цены.
+      U.stat('Стоимость', asset.ticker ? F.money(value) : F.moneyExact(value),
+        { big: true, hint: valueHint(asset, held) }),
       h('div', { class: 'grid-2' }, [
         U.stat('Класс', asset.assetClass || 'не задан'),
         U.stat('Статус', asset.status),
@@ -342,7 +346,9 @@ function instrument(ctx) {
 
 /** У операции по бумаге показываем её сумму, у денежной — знак движения. */
 function opValue(op) {
-  return C.isPaperOp(op) ? F.money(C.paperAmount(op)) : F.signedMoney(C.signed(op));
+  // Точные копейки: начисленные проценты — это 3,97 ₽, а не «+4 ₽»,
+  // и сверить округлённое с выпиской банка нельзя.
+  return C.isPaperOp(op) ? F.moneyExact(C.paperAmount(op)) : F.signedMoneyExact(C.signed(op));
 }
 
 function opSub(op) {

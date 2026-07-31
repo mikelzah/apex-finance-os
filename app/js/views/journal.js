@@ -56,9 +56,11 @@ export function render(ctx) {
     all.length
       ? U.card([
           h('div', { class: 'grid-3' }, [
-            U.stat('Внесено', F.money(sum(C.OP_CONTRIBUTION)), { hint: 'за месяц' }),
-            U.stat('Начислено', F.money(sum(C.OP_INCOME)), { hint: 'проценты' }),
-            U.stat('Потрачено', F.money(sum(C.OP_EXPENSE)), { hint: 'расходы' }),
+            // Копейки и здесь: это суммы операций, а не оценка активов,
+            // и «начислено 8 ₽» вместо 8,29 не сойдётся с выпиской банка.
+            U.stat('Внесено', F.moneyExact(sum(C.OP_CONTRIBUTION)), { hint: 'за месяц' }),
+            U.stat('Начислено', F.moneyExact(sum(C.OP_INCOME)), { hint: 'проценты' }),
+            U.stat('Потрачено', F.moneyExact(sum(C.OP_EXPENSE)), { hint: 'расходы' }),
           ]),
           h('div', { class: 'chips' }, [
             ...FILTERS.map((f) =>
@@ -135,9 +137,9 @@ function tableView(operations, state, refresh) {
           // и не расход, а обмен. В итог столбца она поэтому и не входит —
           // деньги по ней двигает отдельная операция по счёту оплаты.
           value: (op) => (C.isPaperOp(op) ? C.paperAmount(op) : C.signed(op)),
-          render: (op) => (C.isPaperOp(op) ? F.money(C.paperAmount(op)) : F.signedMoney(C.signed(op))),
+          render: (op) => (C.isPaperOp(op) ? F.moneyExact(C.paperAmount(op)) : F.signedMoneyExact(C.signed(op))),
           cellClass: (op) => (C.isPaperOp(op) ? 'dt-neutral' : C.signed(op) >= 0 ? 'dt-plus' : 'dt-minus'),
-          total: (rows) => F.signedMoney(rows.reduce((s, op) => s + C.signed(op), 0)),
+          total: (rows) => F.signedMoneyExact(rows.reduce((s, op) => s + C.signed(op), 0)),
         },
       ],
     }),
@@ -160,7 +162,7 @@ function groups(operations, state, today, refresh) {
     return U.card([
       h('div', { class: 'month-head' }, [
         h('h2', { text: F.monthName(month) }),
-        h('span', { class: `month-total ${total >= 0 ? 'is-plus' : 'is-minus'}`, text: F.signedMoney(total) }),
+        h('span', { class: `month-total ${total >= 0 ? 'is-plus' : 'is-minus'}`, text: F.signedMoneyExact(total) }),
       ]),
       ...list.map((op) => {
         const goal = goalName(op.goalId);
@@ -189,10 +191,10 @@ function groups(operations, state, today, refresh) {
             }),
           ]),
           C.isPaperOp(op)
-            ? h('span', { class: 'op-amount is-neutral', text: F.money(C.paperAmount(op)) })
+            ? h('span', { class: 'op-amount is-neutral', text: F.moneyExact(C.paperAmount(op)) })
             : h('span', {
                 class: `op-amount ${C.signed(op) >= 0 ? 'is-plus' : 'is-minus'}`,
-                text: F.signedMoney(C.signed(op)),
+                text: F.signedMoneyExact(C.signed(op)),
               }),
         ]);
       }),

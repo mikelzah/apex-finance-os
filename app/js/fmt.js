@@ -58,6 +58,35 @@ export function signedMoney(x) {
   return `${sign}${nf0.format(Math.round(x))} ₽`;
 }
 
+/**
+ * Рубли с копейками там, где они есть, и без них там, где их нет.
+ *
+ * Отдельная функция, потому что обе крайности плохи. Округление до рубля
+ * съедает начисленные проценты: доход 3,97 ₽ показывается как «+4 ₽»,
+ * и сверить его с выпиской банка нельзя. Постоянные же копейки засоряют
+ * ровные суммы — «1 250,00 ₽» вместо «1 250 ₽» на каждом взносе.
+ *
+ * Применяется к отдельным операциям и остаткам счетов — там, где число
+ * сверяют с банком. Сводные суммы вроде капитала остаются округлёнными:
+ * копейки в них ничего не решают, а разряды делают нечитаемыми.
+ */
+export function moneyExact(x) {
+  if (x == null || Number.isNaN(x)) return '—';
+  if (hidden()) return MASK;
+  return `${(hasKopecks(x) ? nf2 : nf0).format(hasKopecks(x) ? x : Math.round(x))} ₽`;
+}
+
+export function signedMoneyExact(x) {
+  if (x == null || Number.isNaN(x)) return '—';
+  if (hidden()) return MASK;
+  const sign = x > 0 ? '+' : '';
+  return `${sign}${(hasKopecks(x) ? nf2 : nf0).format(hasKopecks(x) ? x : Math.round(x))} ₽`;
+}
+
+function hasKopecks(x) {
+  return Math.abs(x - Math.round(x)) > 0.005;
+}
+
 export function num(x, digits = 2) {
   if (x == null || Number.isNaN(x)) return '—';
   return new Intl.NumberFormat('ru-RU', { maximumFractionDigits: digits }).format(x);
