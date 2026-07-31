@@ -137,6 +137,122 @@ export function paperAmount(op) {
 // Стоимость и капитал
 // --------------------------------------------------------------------------
 
+// --------------------------------------------------------------------------
+// Облигации
+// --------------------------------------------------------------------------
+
+/**
+ * Облигация — это номинал.
+ *
+ * Признак не «класс = Облигации», а заполненный номинал, и это не придирка.
+ * От номинала зависит, как читать цену: у облигации биржа котирует её
+ * в процентах от номинала, а не в рублях. Пока номинал не задан, приложение
+ * не имеет права толковать 98,4 как 984 рубля — с тем же успехом это могли
+ * бы быть 98 рублей 40 копеек. Заполненный номинал и есть то самое разрешение.
+ */
+export function isBond(asset) {
+  return Boolean(asset && asset.faceValue);
+}
+
+/** Сколько платят за одну бумагу в один купон. */
+export function couponAmount(asset) {
+  if (!isBond(asset) || !asset.couponRate) return 0;
+  const perYear = asset.couponsPerYear || 2;
+  return (asset.faceValue * asset.couponRate) / 100 / perYear;
+}
+
+/** Купон до и купон после указанного дня. */
+export function couponAround(asset, day) {
+  if (!isBond(asset) || !D.isValid(asset.nextCoupon)) return { prev: null, next: null };
+  const step = 12 / (asset.couponsPerYear || 2);
+  let next = asset.nextCoupon;
+  let prev = D.addMonths(next, -step);
+
+  // Отматываем вперёд, пока купон не окажется в будущем: дата в карточке
+  // могла быть заполнена год назад и с тех пор не трогалась.
+  //
+  // Сам день выплаты считается уже прошедшим: купон в этот день выплачен,
+  // и накопленный доход начинает копиться заново с нуля. Оставь здесь строгое
+  // сравнение — и в день купона приложение показало бы полный НКД, то есть
+  // деньги, которые только что ушли на счёт, вторым разом внутри бумаги.
+  let guard = 0;
+  while (D.diffDays(next, day) <= 0 && guard < 400) {
+    prev = next;
+    next = D.addMonths(next, step);
+    guard += 1;
+  }
+  while (D.diffDays(prev, day) > 0 && guard < 400) {
+    next = prev;
+    prev = D.addMonths(prev, -step);
+    guard += 1;
+  }
+  if (D.isValid(asset.maturityDate) && D.diffDays(next, asset.maturityDate) > 0) {
+    next = asset.maturityDate;
+  }
+  return { prev, next };
+}
+
+/**
+ * Накопленный купонный доход на одну бумагу.
+ *
+ * Купон капает каждый день, а платится раз в квартал или полугодие. НКД —
+ * то, что уже накопилось, но ещё не выплачено: покупатель платит его продавцу
+ * сверх цены, и в стоимости бумаги он лежит на равных с самой ценой.
+ */
+export function accruedCoupon(asset, day) {
+  const { prev, next } = couponAround(asset, day);
+  if (!prev || !next) return 0;
+  const span = D.diffDays(next, prev);
+  if (span <= 0) return 0;
+  const passed = Math.min(span, Math.max(0, D.diffDays(day, prev)));
+  return (couponAmount(asset) * passed) / span;
+}
+
+/** Чистая цена одной облигации в рублях: котировка в процентах от номинала. */
+export function bondClean(asset) {
+  return ((asset.price || 0) / 100) * (asset.faceValue || 0);
+}
+
+/** Полная цена одной бумаги — с накопленным купоном. */
+export function bondFull(asset, day) {
+  return bondClean(asset) + accruedCoupon(asset, day);
+}
+
+/**
+ * Ближайшие выплаты по всем облигациям набора.
+ *
+ * Сколько и когда придёт — единственное, ради чего облигацию и держат.
+ * Без этого списка дата ближайшего купона лежит в карточке актива и никем
+ * не читается.
+ */
+export function couponCalendar(assets, operations, day, horizonDays = 400) {
+  const out = [];
+  for (const a of assets) {
+    if (!isBond(a) || a.status === STATUS_SOLD) continue;
+    const qty = assetQuantity(a, operations);
+    if (qty <= 0) continue;
+    const step = 12 / (a.couponsPerYear || 2);
+    let date = couponAround(a, day).next;
+    const per = couponAmount(a);
+    let guard = 0;
+    while (date && D.diffDays(date, day) >= 0 && D.diffDays(date, day) <= horizonDays && guard < 40) {
+      const last = D.isValid(a.maturityDate) && D.diffDays(date, a.maturityDate) >= 0;
+      out.push({
+        asset: a,
+        date,
+        amount: per * qty,
+        // В день погашения вместе с купоном возвращается номинал —
+        // и это самая крупная выплата за всю жизнь бумаги.
+        redemption: last ? a.faceValue * qty : 0,
+      });
+      if (last) break;
+      date = D.addMonths(date, step);
+      guard += 1;
+    }
+  }
+  return out.sort((x, y) => (x.date < y.date ? -1 : x.date > y.date ? 1 : 0));
+}
+
 /**
  * Сколько бумаг на руках: начальное количество плюс сделки.
  *
@@ -158,9 +274,14 @@ export function assetQuantity(asset, operations) {
  * Повторяет формулу «Стоимость» из Notion: актив с тикером стоит
  * Количество × Цена, остальные — начальный остаток плюс движение по операциям.
  */
-export function assetValue(asset, operations) {
+export function assetValue(asset, operations, day = null) {
   if (asset.ticker) {
-    return assetQuantity(asset, operations) * (asset.price || 0);
+    const qty = assetQuantity(asset, operations);
+    // У облигации котировка идёт в процентах от номинала, и к цене
+    // добавляется накопленный купон: он уже заработан и при продаже
+    // достанется владельцу вместе с ценой.
+    if (isBond(asset)) return qty * bondFull(asset, day || D.today());
+    return qty * (asset.price || 0);
   }
   let movement = 0;
   for (const op of operations) {
@@ -826,6 +947,15 @@ export function signals(assets, operations, day) {
 
     if (a.maturityDate && D.diffDays(a.maturityDate, day) >= 0 && D.diffDays(a.maturityDate, day) <= 30) {
       push(a, 'maturity', `погашение через ${D.diffDays(a.maturityDate, day)} дн.`, 'info');
+    }
+
+    // Погашенная облигация не исчезает со счёта сама: деньги пришли, бумаги
+    // больше нет, а в приложении она так и висит по последней котировке
+    // и продолжает считаться капиталом. Пока продажа по номиналу не записана,
+    // капитал завышен ровно на её стоимость.
+    if (isBond(a) && D.isValid(a.maturityDate) && D.diffDays(day, a.maturityDate) > 0
+        && assetQuantity(a, operations) > 0) {
+      push(a, 'matured', `погашена ${F.date(a.maturityDate)} — запишите продажу по номиналу, иначе капитал завышен`, 'error');
     }
   }
   return out;

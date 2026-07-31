@@ -165,8 +165,15 @@ export function tradeSheet(existing, options = {}) {
       op.quantity != null ? op.quantity / lotOf(op.assetId) : null,
       { 'data-autofocus': isNew ? 'yes' : 'no' },
     );
-    const unitPrice = U.numberInput(op.unitPrice ?? (isNew ? assetOf(op.assetId)?.price : null));
+    const unitPrice = U.numberInput(
+      op.quoted ?? op.unitPrice ?? (isNew ? assetOf(op.assetId)?.price : null),
+    );
     const fee = U.numberInput(op.fee);
+    // НКД по сделке с облигацией: покупатель платит его продавцу сверх цены,
+    // и в отчёте брокера он стоит отдельной строкой. Считать его самим
+    // приложением нельзя — брокер берёт свою дату расчётов, и копейки
+    // разошлись бы с отчётом.
+    const nkd = U.numberInput(op.nkd);
     // Выплата приходит суммой: делить её обратно на бумаги незачем, в отчёте
     // брокера она и стоит одной строкой.
     const gross = U.numberInput(C.isPayout(op) ? (op.amount || 0) + (op.tax || 0) : null);
@@ -194,14 +201,25 @@ export function tradeSheet(existing, options = {}) {
         const t = U.parseNumber(tax.value) || 0;
         return { type: type.value, gross: g, tax: t, amount: Math.max(0, g - t) };
       }
+      const target = assetOf(asset.value);
+      const isBond = C.isBond(target);
       const lotSize = lotOf(asset.value);
       const qty = (U.parseNumber(lots.value) || 0) * lotSize;
+      const quoted = U.parseNumber(unitPrice.value) || 0;
+      const perBond = U.parseNumber(nkd.value) || 0;
+      // У облигации котировка в процентах от номинала, и деньги считаются
+      // от рублёвой цены: проценты сами по себе не складываются с комиссией.
+      const price = isBond ? (quoted / 100) * (target.faceValue || 0) + perBond : quoted;
       const d = {
         type: type.value,
         quantity: qty,
-        unitPrice: U.parseNumber(unitPrice.value) || 0,
+        unitPrice: price,
+        quoted,
+        nkd: isBond ? perBond : null,
         fee: U.parseNumber(fee.value) || 0,
         lotSize,
+        isBond,
+        face: target?.faceValue || 0,
       };
       return { ...d, amount: C.tradeAmount(d) };
     };
@@ -215,7 +233,9 @@ export function tradeSheet(existing, options = {}) {
     // до трёхлетия, положено заранее, а не в отчёте за год.
     const outcome = h('p', { class: 'callout callout-warn', hidden: true });
     const rowLots = U.field('Количество, лотов', lots);
-    const rowPrice = U.field('Цена за штуку, ₽', unitPrice);
+    const priceLabel = h('span', { class: 'field-label' });
+    const rowPrice = h('label', { class: 'field' }, [priceLabel, unitPrice]);
+    const rowNkd = U.field('НКД на бумагу, ₽', nkd, 'Накопленный купон, который платится сверх цены. Как в отчёте брокера.');
     const rowFee = U.field('Комиссия, ₽', fee, 'Как в отчёте брокера. Покупку удорожает, из выручки вычитается.');
     const rowGross = U.field('Начислено, ₽', gross, 'Сумма до удержания налога — как в отчёте брокера.');
     const rowTax = U.field('Удержан налог, ₽', tax, 'Брокер удерживает его сам. В лимит по вкладам этот налог не входит.');
@@ -223,14 +243,19 @@ export function tradeSheet(existing, options = {}) {
     const recount = () => {
       const d = draft();
       const isTrade = trade();
-      for (const [node, on] of [[rowLots, isTrade], [rowPrice, isTrade], [rowFee, isTrade],
+      const bond = isTrade && d.isBond;
+      for (const [node, on] of [[rowLots, isTrade], [rowPrice, isTrade], [rowNkd, bond], [rowFee, isTrade],
         [rowGross, !isTrade], [rowTax, !isTrade]]) node.hidden = !on;
+      priceLabel.textContent = bond ? 'Цена, % от номинала' : 'Цена за штуку, ₽';
 
       showOutcome(d, isTrade);
       totalValue.textContent = F.money2(d.amount);
       totalNote.textContent = isTrade
         ? [
-            `${F.num(d.quantity, 0)} шт × ${F.num(d.unitPrice, 4)} ₽`,
+            bond
+              ? `${F.num(d.quantity, 0)} шт × ${F.num(d.quoted, 3)}% от ${F.money(d.face)}`
+              : `${F.num(d.quantity, 0)} шт × ${F.num(d.unitPrice, 4)} ₽`,
+            bond && d.nkd ? `НКД ${F.money2(d.nkd)}` : null,
             d.fee ? `комиссия ${F.money2(d.fee)}` : null,
             d.lotSize > 1 ? `в лоте ${F.num(d.lotSize, 0)}` : null,
           ].filter(Boolean).join(' · ')
@@ -274,11 +299,12 @@ export function tradeSheet(existing, options = {}) {
       outcome.hidden = parts.length === 0;
     };
 
-    for (const node of [lots, unitPrice, fee, gross, tax]) node.addEventListener('input', recount);
+    for (const node of [lots, unitPrice, nkd, fee, gross, tax]) node.addEventListener('input', recount);
     date.addEventListener('change', recount);
     for (const node of [type, asset]) {
       node.addEventListener('change', () => {
         if (node === asset && isNew) unitPrice.value = String(assetOf(asset.value)?.price ?? '').replace('.', ',');
+        if (node === asset && isNew) nkd.value = '';
         recount();
       });
     }
@@ -321,6 +347,10 @@ export function tradeSheet(existing, options = {}) {
           type: d.type,
           quantity: trade() ? d.quantity : null,
           unitPrice: trade() ? d.unitPrice : null,
+          // Котировка сохраняется рядом с рублёвой ценой: по ней форма
+          // откроется обратно такой же, какой её заполняли.
+          quoted: trade() && d.isBond ? d.quoted : null,
+          nkd: trade() && d.isBond ? d.nkd || null : null,
           fee: trade() ? d.fee || null : null,
           tax: trade() ? null : d.tax || null,
           amount: d.amount,
@@ -345,6 +375,7 @@ export function tradeSheet(existing, options = {}) {
       U.field('Бумага', asset),
       rowLots,
       rowPrice,
+      rowNkd,
       rowFee,
       rowGross,
       rowTax,
@@ -385,6 +416,10 @@ export function assetSheet(existing, options = {}) {
     quantity: null,
     lotSize: 1,
     price: null,
+    faceValue: null,
+    couponRate: null,
+    couponsPerYear: 2,
+    nextCoupon: null,
     updated: null,
     opening: 0,
     openingDate: D.today(),
@@ -420,6 +455,15 @@ export function assetSheet(existing, options = {}) {
     const lotSize = U.numberInput(a.lotSize ?? 1);
     const price = U.numberInput(a.price);
 
+    const faceValue = U.numberInput(a.faceValue);
+    const couponRate = U.numberInput(a.couponRate);
+    const couponsPerYear = U.select(
+      [{ value: '1', label: 'раз в год' }, { value: '2', label: 'дважды в год' },
+       { value: '4', label: 'ежеквартально' }, { value: '12', label: 'ежемесячно' }],
+      String(a.couponsPerYear || 2),
+    );
+    const nextCoupon = U.input({ type: 'date', value: a.nextCoupon || '' });
+
     const opening = U.numberInput(a.opening);
     const openingDate = U.input({ type: 'date', value: a.openingDate || '' });
 
@@ -433,6 +477,10 @@ export function assetSheet(existing, options = {}) {
     const bankBalance = U.numberInput(a.bankBalance);
     const reconciledAt = U.input({ type: 'date', value: a.reconciledAt || '' });
     const notes = U.textarea(a.notes);
+
+    // Облигация ли это — решаем один раз: от ответа зависит и раскрытая
+    // группа, и то, где окажется поле даты погашения.
+    const bond = C.isBond(a) || (isNew && a.assetClass === 'Облигации');
 
     const goalBoxes = state.goals.map((g) => {
       const c = U.checkbox(g.name, (a.goalIds || []).includes(g.id));
@@ -472,6 +520,10 @@ export function assetSheet(existing, options = {}) {
           quantity: U.parseNumber(quantity.value),
           lotSize: U.parseNumber(lotSize.value) || 1,
           price: U.parseNumber(price.value),
+          faceValue: U.parseNumber(faceValue.value),
+          couponRate: U.parseNumber(couponRate.value),
+          couponsPerYear: Number(couponsPerYear.value) || 2,
+          nextCoupon: nextCoupon.value || null,
           updated: a.updated,
           opening: U.parseNumber(opening.value) || 0,
           openingDate: openingDate.value || null,
@@ -513,6 +565,21 @@ export function assetSheet(existing, options = {}) {
         U.field('Цена, ₽', price, a.updated ? `Обновлена ${F.date(a.updated)}` : 'Обновляется с Мосбиржи или вручную'),
       ]),
 
+      // Раскрыта у облигации и у той, что ею собирается стать. Заполненный
+      // номинал переключает толкование цены: биржа котирует облигацию
+      // в процентах от номинала, а не в рублях.
+      U.group('Облигация', bond, [
+        U.field('Номинал, ₽', faceValue, 'Обычно 1000. Пока он не задан, цена читается как рубли за штуку, а не как проценты.'),
+        U.field('Ставка купона, % годовых', couponRate),
+        U.field('Периодичность', couponsPerYear),
+        U.field('Ближайший купон', nextCoupon, 'Дату можно поставить один раз: дальше расчёт сам догоняет её до сегодняшнего дня.'),
+        // Дата погашения одна на вклад и на облигацию, и узел поля тоже один:
+        // положить его в обе группы нельзя — он просто переедет в последнюю.
+        // Поэтому он стоит там, где его будут искать: у облигации здесь,
+        // у вклада — среди процентов.
+        bond ? U.field('Погашение', maturityDate) : null,
+      ]),
+
       U.group('Остаток', !a.ticker && !(isNew && a.type === C.TYPE_INVESTMENT), [
         U.field('Начальный остаток, ₽', opening, 'Баланс на момент заведения актива, а не текущий. Иначе сегодняшний взнос посчитается дважды.'),
         U.field('Дата начального остатка', openingDate),
@@ -524,7 +591,7 @@ export function assetSheet(existing, options = {}) {
         capDaily.node,
         U.field('Последняя капитализация', lastCap, 'Отсчёт процентов идёт с этой даты. Поставьте один раз, дальше ведётся само.'),
         maturitySum.node,
-        U.field('Дата погашения', maturityDate),
+        bond ? null : U.field('Дата погашения', maturityDate),
         U.callout('«Сумма на выходе» отключает начисление: проценты уже заложены в остаток, начислять их второй раз значило бы посчитать доход дважды.', 'info'),
       ]),
 

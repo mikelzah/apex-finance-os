@@ -51,6 +51,18 @@ export function lastDayOfMonth(y, m) {
 }
 
 /**
+ * Та же дата через n месяцев. 31-е в коротком месяце становится последним
+ * числом: 31 января плюс месяц — это 28 февраля, а не 3 марта.
+ */
+export function addMonths(s, n) {
+  const { y, m, d } = parts(s);
+  const total = (y * 12 + (m - 1)) + Math.round(n);
+  const ny = Math.floor(total / 12);
+  const nm = (total % 12) + 1;
+  return iso(ny, nm, Math.min(d, lastDayOfMonth(ny, nm)));
+}
+
+/**
  * Та же дата через n лет.
  *
  * 29 февраля переносится на 28-е: 29 февраля 2027 года не существует, а срок

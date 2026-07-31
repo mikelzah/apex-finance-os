@@ -74,6 +74,8 @@ function overview(ctx) {
         ])
       : null,
 
+    payoutsCard(state, ctx.today),
+
     U.card([
       U.sectionTitle('Доли'),
       charts.allocation(rows, (row) => forms.portfolioSheet(row, { onDone: refresh })),
@@ -101,6 +103,31 @@ function total_(total, rate) {
       h('span', { text: `${rate >= 0 ? '+' : ''}${F.percent(rate)}` }),
       h('span', { class: 'hero-delta-word', text: 'годовых' }),
     ]),
+  ]);
+}
+
+/**
+ * Ближайшие выплаты по облигациям.
+ *
+ * Сколько и когда придёт — единственное, ради чего облигацию и держат.
+ * Без этого списка дата купона лежит в карточке актива и никем не читается,
+ * а деньги приходят неожиданно.
+ */
+function payoutsCard(state, today) {
+  const soon = C.couponCalendar(state.assets, state.operations, today, 180);
+  if (!soon.length) return null;
+
+  const total = soon.reduce((s, x) => s + x.amount + x.redemption, 0);
+  return U.card([
+    U.sectionTitle('Ближайшие выплаты', h('span', { class: 'section-sum', text: F.money(total) })),
+    ...soon.slice(0, 6).map((x) =>
+      U.row(x.asset.name, F.money(x.amount + x.redemption), {
+        sub: [F.relativeDate(x.date, today), x.redemption ? 'купон и погашение' : 'купон']
+          .filter(Boolean).join(' · '),
+        tag: x.redemption ? 'погашение' : null,
+        tagClass: 'ok',
+      }),
+    ),
   ]);
 }
 
@@ -186,7 +213,8 @@ function actions(ctx, withTickers) {
 
 function holdingSub(asset, total, value, ops) {
   const parts = [];
-  if (asset.ticker) parts.push(`${F.num(C.assetQuantity(asset, ops), 0)} × ${F.num(asset.price, 4)} ₽`);
+  if (C.isBond(asset)) parts.push(`${F.num(C.assetQuantity(asset, ops), 0)} × ${F.num(asset.price, 3)}%`);
+  else if (asset.ticker) parts.push(`${F.num(C.assetQuantity(asset, ops), 0)} × ${F.num(asset.price, 4)} ₽`);
   else if (asset.rate) parts.push(`${F.percent(asset.rate)} годовых`);
   if (total > 0 && C.ASSET_CLASSES.includes(asset.assetClass)) {
     parts.push(`${F.percent((value / total) * 100)} портфеля`);
@@ -262,6 +290,8 @@ function instrument(ctx) {
     // Средняя цена есть только там, где сделки записаны. У бумаги, заведённой
     // одним начальным количеством, её взять неоткуда — и придумывать нечего.
     asset.ticker ? averageCard(asset, state.operations, value, held, today) : null,
+
+    C.isBond(asset) ? bondCard(asset, state.operations, today) : null,
 
     asset.ticker ? lotsCard(asset, state.operations, today) : null,
 
@@ -340,7 +370,13 @@ function averageCard(asset, operations, value, held, today) {
     U.sectionTitle('Позиция'),
     h('div', { class: 'grid-2' }, [
       U.stat('Средняя цена', `${F.num(average, 4)} ₽`, { hint: `куплено ${F.num(bought, 0)} шт` }),
-      U.stat('Сейчас', `${F.num(asset.price, 4)} ₽`),
+      // У облигации в price лежит котировка в процентах, а средняя цена —
+      // в рублях. Поставить их рядом как есть значило бы сравнивать проценты
+      // с рублями и подписать обоих значком рубля.
+      U.stat('Сейчас', C.isBond(asset)
+        ? `${F.num(C.bondFull(asset, today), 2)} ₽`
+        : `${F.num(asset.price, 4)} ₽`,
+      C.isBond(asset) ? { hint: `${F.num(asset.price, 3)}% с купоном` } : {}),
     ]),
     payouts ? U.stat('Выплачено', F.money(payouts), { hint: 'дивиденды и купоны на руках' }) : null,
     (() => {
@@ -411,7 +447,48 @@ function lotsCard(asset, operations, today) {
   ]);
 }
 
+/**
+ * Облигация: из чего сложена стоимость и когда следующая выплата.
+ *
+ * Цена в процентах и накопленный купон — две разные величины, и сумма без
+ * них читается как случайная. Здесь они разложены, а рядом стоит ближайшая
+ * выплата: это то, ради чего бумагу держат.
+ */
+function bondCard(asset, operations, today) {
+  const qty = C.assetQuantity(asset, operations);
+  const nkd = C.accruedCoupon(asset, today);
+  const { next } = C.couponAround(asset, today);
+  const per = C.couponAmount(asset);
+
+  return U.card([
+    U.sectionTitle('Облигация'),
+    h('div', { class: 'grid-2' }, [
+      U.stat('Номинал', F.money(asset.faceValue), { hint: `котировка ${F.num(asset.price, 3)}%` }),
+      U.stat('Чистая цена', `${F.num(C.bondClean(asset), 2)} ₽`, { hint: 'за бумагу, без купона' }),
+      U.stat('Накоплен купон', `${F.num(nkd, 2)} ₽`, { hint: qty ? `всего ${F.money(nkd * qty)}` : 'за бумагу' }),
+      U.stat('Купон', F.money(per), { hint: `${F.percent(asset.couponRate)} годовых, ${timesPerYear(asset.couponsPerYear)}` }),
+    ]),
+    next
+      ? U.row('Ближайшая выплата', F.money(per * qty), {
+          sub: `${F.date(next)} · ${F.relativeDate(next, today)}`,
+        })
+      : null,
+    D.isValid(asset.maturityDate)
+      ? U.row('Погашение', F.money((asset.faceValue || 0) * qty), {
+          sub: `${F.date(asset.maturityDate)} · ${F.relativeDate(asset.maturityDate, today)}`,
+        })
+      : null,
+  ]);
+}
+
+function timesPerYear(n) {
+  return { 1: 'раз в год', 2: 'дважды в год', 4: 'ежеквартально', 12: 'ежемесячно' }[n || 2] || 'дважды в год';
+}
+
 function valueHint(asset, held) {
+  if (C.isBond(asset)) {
+    return `${F.num(held, 0)} шт × ${F.num(asset.price, 3)}% от ${F.money(asset.faceValue)} с купоном`;
+  }
   if (asset.ticker) {
     const price = `${F.num(held, 0)} шт × ${F.num(asset.price, 4)} ₽`;
     return asset.updated ? `${price} · цена от ${F.date(asset.updated)}` : `${price} · цена не обновлялась`;
