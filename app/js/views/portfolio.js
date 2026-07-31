@@ -370,15 +370,20 @@ function opSub(op) {
  */
 function averageCard(asset, operations, value, held, today) {
   let spent = 0;
+  let clean = 0;
+  let fees = 0;
   let bought = 0;
   for (const op of operations) {
     if (op.assetId !== asset.id || op.type !== C.OP_BUY) continue;
     spent += C.tradeAmount(op);
+    clean += (op.quantity || 0) * (op.unitPrice || 0);
+    fees += op.fee || 0;
     bought += op.quantity || 0;
   }
   if (!bought) return null;
 
   const average = spent / bought;
+  const cleanAverage = clean / bought;
   const opening = asset.quantity || 0;
   const invested = average * held;
   const result = value - invested;
@@ -395,7 +400,16 @@ function averageCard(asset, operations, value, held, today) {
   return U.card([
     U.sectionTitle('Позиция'),
     h('div', { class: 'grid-2' }, [
-      U.stat('Средняя цена', `${F.num(average, 4)} ₽`, { hint: `куплено ${F.num(bought, 0)} шт` }),
+      // Средняя считается по заплаченному, комиссия внутри: это и есть цена
+      // входа — и по смыслу, и для налога, где комиссия уменьшает прибыль.
+      // У брокера в приложении та же строка показывает цену самой бумаги,
+      // без комиссии, и числа расходятся. Чтобы это не было загадкой, вторая
+      // цена стоит рядом, а не остаётся на догадку.
+      U.stat('Средняя цена', `${F.num(average, 4)} ₽`, {
+        hint: fees > 0
+          ? `с комиссией · сама бумага ${F.num(cleanAverage, 4)} ₽`
+          : `куплено ${F.num(bought, 0)} шт`,
+      }),
       // У облигации в price лежит котировка в процентах, а средняя цена —
       // в рублях. Поставить их рядом как есть значило бы сравнивать проценты
       // с рублями и подписать обоих значком рубля.
@@ -404,6 +418,9 @@ function averageCard(asset, operations, value, held, today) {
         : `${F.num(asset.price, 4)} ₽`,
       C.isBond(asset) ? { hint: `${F.num(asset.price, 3)}% с купоном` } : {}),
     ]),
+    fees > 0
+      ? U.stat('Комиссия', F.money2(fees), { hint: 'уплачена при покупке, входит в цену входа' })
+      : null,
     payouts ? U.stat('Выплачено', F.money(payouts), { hint: 'дивиденды и купоны на руках' }) : null,
     (() => {
       // Доходность отвечает на «стоило ли», прибыль — только на «сколько».
