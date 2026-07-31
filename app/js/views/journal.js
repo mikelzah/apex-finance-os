@@ -20,6 +20,7 @@ const FILTERS = [
   { value: C.OP_INCOME, label: 'Доходы' },
   { value: C.OP_EXPENSE, label: 'Расходы' },
   { value: 'trades', label: 'Сделки' },
+  { value: 'payouts', label: 'Выплаты' },
 ];
 
 // Выбор переживает перерисовку, но не перезапуск: это вид, а не настройка.
@@ -35,7 +36,11 @@ export function render(ctx) {
 
   // «Сделки» — один фильтр на покупки и продажи: разводить их по двум чипам
   // значило бы занять всю полосу ради разделения, которое видно в самой строке.
-  const match = (op) => (filter === 'trades' ? C.isTrade(op) : op.type === filter);
+  const match = (op) => {
+    if (filter === 'trades') return C.isTrade(op);
+    if (filter === 'payouts') return C.isPayout(op);
+    return op.type === filter;
+  };
   const visible = filter === 'all' ? all : all.filter(match);
 
   const month = D.month(today);
@@ -129,9 +134,9 @@ function tableView(operations, state, refresh) {
           // Сделка показывается своей суммой без знака: это не приход
           // и не расход, а обмен. В итог столбца она поэтому и не входит —
           // деньги по ней двигает отдельная операция по счёту оплаты.
-          value: (op) => (C.isTrade(op) ? C.tradeAmount(op) : C.signed(op)),
-          render: (op) => (C.isTrade(op) ? F.money(C.tradeAmount(op)) : F.signedMoney(C.signed(op))),
-          cellClass: (op) => (C.isTrade(op) ? 'dt-neutral' : C.signed(op) >= 0 ? 'dt-plus' : 'dt-minus'),
+          value: (op) => (C.isPaperOp(op) ? C.paperAmount(op) : C.signed(op)),
+          render: (op) => (C.isPaperOp(op) ? F.money(C.paperAmount(op)) : F.signedMoney(C.signed(op))),
+          cellClass: (op) => (C.isPaperOp(op) ? 'dt-neutral' : C.signed(op) >= 0 ? 'dt-plus' : 'dt-minus'),
           total: (rows) => F.signedMoney(rows.reduce((s, op) => s + C.signed(op), 0)),
         },
       ],
@@ -174,6 +179,7 @@ function groups(operations, state, today, refresh) {
                 // У сделки на месте пояснения стоит её суть: сколько бумаг
                 // и по какой цене. Это то, что перечитывают в отчёте брокера.
                 C.isTrade(op) ? `${F.num(op.quantity, 0)} шт × ${F.num(op.unitPrice, 4)} ₽` : null,
+                C.isPayout(op) && op.tax ? `налог ${F.money2(op.tax)}` : null,
                 goal,
                 op.source === C.SOURCE_COMPUTED ? 'расчёт' : null,
                 op.comment,
@@ -182,8 +188,8 @@ function groups(operations, state, today, refresh) {
                 .join(' · '),
             }),
           ]),
-          C.isTrade(op)
-            ? h('span', { class: 'op-amount is-neutral', text: F.money(C.tradeAmount(op)) })
+          C.isPaperOp(op)
+            ? h('span', { class: 'op-amount is-neutral', text: F.money(C.paperAmount(op)) })
             : h('span', {
                 class: `op-amount ${C.signed(op) >= 0 ? 'is-plus' : 'is-minus'}`,
                 text: F.signedMoney(C.signed(op)),
@@ -198,5 +204,6 @@ function kind(type) {
   if (type === C.OP_INCOME) return 'income';
   if (type === C.OP_EXPENSE) return 'expense';
   if (type === C.OP_BUY || type === C.OP_SELL) return 'trade';
+  if (type === C.OP_DIVIDEND || type === C.OP_COUPON) return 'payout';
   return 'contribution';
 }

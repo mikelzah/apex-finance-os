@@ -22,7 +22,7 @@ const { h } = U;
  */
 export function operationSheet(existing, options = {}) {
   const state = store.getState();
-  if (C.isTrade(existing)) return tradeSheet(existing, options);
+  if (C.isPaperOp(existing)) return tradeSheet(existing, options);
   if (!existing) {
     const target = state.assets.find((a) => a.id === options.assetId);
     if (target && target.ticker) return tradeSheet(null, options);
@@ -119,15 +119,21 @@ function moneySheet(existing, options = {}) {
 // --------------------------------------------------------------------------
 
 /**
- * Покупка и продажа бумаги — так, как это выглядит у брокера.
+ * Операция по бумаге: покупка, продажа, дивиденд, купон.
  *
- * Спрашивается ровно то, что известно из отчёта: сколько лотов, по какой цене,
- * какая комиссия. Сумма не вводится, а считается — вводить её отдельно значит
- * иметь два источника одной величины и однажды их рассогласовать.
+ * Одна шторка на четыре вида, а не четыре шторки: половина полей у них общая —
+ * бумага, дата, счёт, комментарий, — и разводить их по отдельным формам
+ * значило бы четырежды повторить одно и то же. Меняется набор полей, а не
+ * форма: у сделки спрашивается количество и цена, у выплаты — сумма
+ * и удержанный налог.
  *
- * Отдельно спрашивается счёт оплаты. Без него покупка увеличивала бы капитал
- * на стоимость бумаги: бумаг прибавилось, а деньги ниоткуда не ушли. Поле
- * можно оставить пустым — если платили не с того счёта, который здесь ведётся.
+ * Сумма сделки не вводится, а считается — вводить её отдельно значит иметь
+ * два источника одной величины и однажды их рассогласовать.
+ *
+ * Отдельно спрашивается счёт. Без него покупка увеличивала бы капитал
+ * на стоимость бумаги, а дивиденд не увеличивал бы его вовсе: деньги пришли
+ * бы ниоткуда и осели нигде. Поле можно оставить пустым — если счёт, через
+ * который прошли деньги, здесь не ведётся.
  */
 export function tradeSheet(existing, options = {}) {
   const state = store.getState();
@@ -137,11 +143,12 @@ export function tradeSheet(existing, options = {}) {
   const op = existing || {
     id: null,
     date: D.today(),
-    type: C.OP_BUY,
+    type: options.type || C.OP_BUY,
     assetId: options.assetId ?? assets[0]?.id ?? null,
     quantity: null,
     unitPrice: null,
     fee: null,
+    tax: null,
     goalId: options.goalId ?? null,
     source: C.SOURCE_MANUAL,
     comment: null,
@@ -150,8 +157,8 @@ export function tradeSheet(existing, options = {}) {
   const assetOf = (id) => state.assets.find((a) => a.id === id) || null;
   const lotOf = (id) => assetOf(id)?.lotSize || 1;
 
-  U.sheet(isNew ? 'Новая сделка' : `${op.type}`, (api) => {
-    const type = U.select([C.OP_BUY, C.OP_SELL], op.type);
+  U.sheet(isNew ? 'Операция по бумаге' : op.type, (api) => {
+    const type = U.select([C.OP_BUY, C.OP_SELL, C.OP_DIVIDEND, C.OP_COUPON], op.type);
     const asset = U.select(assets.map((a) => ({ value: a.id, label: a.name })), op.assetId);
     // В лотах — как в заявке у брокера. Штуки показываются рядом сами.
     const lots = U.numberInput(
@@ -160,6 +167,10 @@ export function tradeSheet(existing, options = {}) {
     );
     const unitPrice = U.numberInput(op.unitPrice ?? (isNew ? assetOf(op.assetId)?.price : null));
     const fee = U.numberInput(op.fee);
+    // Выплата приходит суммой: делить её обратно на бумаги незачем, в отчёте
+    // брокера она и стоит одной строкой.
+    const gross = U.numberInput(C.isPayout(op) ? (op.amount || 0) + (op.tax || 0) : null);
+    const tax = U.numberInput(op.tax);
     const date = U.input({ type: 'date', value: op.date });
     const cash = U.select(
       [
@@ -167,7 +178,7 @@ export function tradeSheet(existing, options = {}) {
         ...state.assets.filter((a) => !a.ticker && a.type === C.TYPE_MONEY)
           .map((a) => ({ value: a.id, label: a.name })),
       ],
-      isNew ? '' : store.tradeCashAsset(state.operations, op.id),
+      isNew ? '' : store.linkedCashAsset(state.operations, op.id),
     );
     const goal = U.select(
       [{ value: '', label: '— без цели —' }, ...state.goals.map((g) => ({ value: g.id, label: g.name }))],
@@ -175,31 +186,54 @@ export function tradeSheet(existing, options = {}) {
     );
     const comment = U.input({ type: 'text', value: op.comment || '', placeholder: 'необязательно' });
 
-    // Итог сделки пересчитывается на каждом нажатии клавиши: у брокера
-    // человек привык видеть сумму до того, как подтвердит заявку.
-    const totalValue = h('span', { class: 'total-value' });
-    const totalNote = h('span', { class: 'total-note' });
+    const trade = () => C.isTrade({ type: type.value });
+
     const draft = () => {
+      if (!trade()) {
+        const g = U.parseNumber(gross.value) || 0;
+        const t = U.parseNumber(tax.value) || 0;
+        return { type: type.value, gross: g, tax: t, amount: Math.max(0, g - t) };
+      }
       const lotSize = lotOf(asset.value);
       const qty = (U.parseNumber(lots.value) || 0) * lotSize;
-      return {
+      const d = {
         type: type.value,
         quantity: qty,
         unitPrice: U.parseNumber(unitPrice.value) || 0,
         fee: U.parseNumber(fee.value) || 0,
         lotSize,
       };
+      return { ...d, amount: C.tradeAmount(d) };
     };
+
+    // Итог пересчитывается на каждом нажатии клавиши: у брокера человек
+    // привык видеть сумму до того, как подтвердит заявку.
+    const totalValue = h('span', { class: 'total-value' });
+    const totalNote = h('span', { class: 'total-note' });
+    const rowLots = U.field('Количество, лотов', lots);
+    const rowPrice = U.field('Цена за штуку, ₽', unitPrice);
+    const rowFee = U.field('Комиссия, ₽', fee, 'Как в отчёте брокера. Покупку удорожает, из выручки вычитается.');
+    const rowGross = U.field('Начислено, ₽', gross, 'Сумма до удержания налога — как в отчёте брокера.');
+    const rowTax = U.field('Удержан налог, ₽', tax, 'Брокер удерживает его сам. В лимит по вкладам этот налог не входит.');
+
     const recount = () => {
       const d = draft();
-      totalValue.textContent = F.money2(C.tradeAmount(d));
-      totalNote.textContent = [
-        `${F.num(d.quantity, 0)} шт × ${F.num(d.unitPrice, 4)} ₽`,
-        d.fee ? `комиссия ${F.money2(d.fee)}` : null,
-        d.lotSize > 1 ? `в лоте ${F.num(d.lotSize, 0)}` : null,
-      ].filter(Boolean).join(' · ');
+      const isTrade = trade();
+      for (const [node, on] of [[rowLots, isTrade], [rowPrice, isTrade], [rowFee, isTrade],
+        [rowGross, !isTrade], [rowTax, !isTrade]]) node.hidden = !on;
+
+      totalValue.textContent = F.money2(d.amount);
+      totalNote.textContent = isTrade
+        ? [
+            `${F.num(d.quantity, 0)} шт × ${F.num(d.unitPrice, 4)} ₽`,
+            d.fee ? `комиссия ${F.money2(d.fee)}` : null,
+            d.lotSize > 1 ? `в лоте ${F.num(d.lotSize, 0)}` : null,
+          ].filter(Boolean).join(' · ')
+        : d.tax
+          ? `начислено ${F.money2(d.gross)}, налог ${F.money2(d.tax)}`
+          : 'налог не удерживался';
     };
-    for (const node of [lots, unitPrice, fee]) node.addEventListener('input', recount);
+    for (const node of [lots, unitPrice, fee, gross, tax]) node.addEventListener('input', recount);
     for (const node of [type, asset]) {
       node.addEventListener('change', () => {
         if (node === asset && isNew) unitPrice.value = String(assetOf(asset.value)?.price ?? '').replace('.', ',');
@@ -211,64 +245,74 @@ export function tradeSheet(existing, options = {}) {
     api.setFooter([
       !isNew
         ? U.button('Удалить', () => {
-            U.confirmSheet('Удалить сделку?', 'Количество бумаг и списание со счёта откатятся.', 'Удалить', async () => {
-              await store.mutate((d) => store.removeTrade(d, op.id));
-              U.toast('Сделка удалена');
-              options.onDone?.();
-            });
+            U.confirmSheet(`Удалить: ${op.type.toLowerCase()}?`,
+              'Количество бумаг и движение денег по счёту откатятся.', 'Удалить', async () => {
+                await store.mutate((d) => store.removePaperOp(d, op.id));
+                U.toast('Операция удалена');
+                options.onDone?.();
+              });
           }, { kind: 'danger' })
         : U.button('Отмена', () => api.close()),
       U.button('Сохранить', async () => {
         const d = draft();
         if (!asset.value) return U.toast('Выберите бумагу', 'error');
-        if (!d.quantity || d.quantity <= 0) return U.toast('Количество должно быть больше нуля', 'error');
-        if (!d.unitPrice || d.unitPrice <= 0) return U.toast('Цена должна быть больше нуля', 'error');
         if (!D.isValid(date.value)) return U.toast('Проверьте дату', 'error');
 
-        // Продать больше, чем есть, нельзя: это не строгость ради строгости,
-        // а защита от минусового количества, которое дальше пошло бы
-        // в стоимость и в доли отрицательным числом.
-        if (d.type === C.OP_SELL) {
-          const others = state.operations.filter((x) => x.id !== op.id);
-          const have = C.assetQuantity(assetOf(asset.value), others);
-          if (d.quantity > have) return U.toast(`В наличии ${F.num(have, 0)} шт — продать больше нельзя`, 'error');
+        if (trade()) {
+          if (!d.quantity || d.quantity <= 0) return U.toast('Количество должно быть больше нуля', 'error');
+          if (!d.unitPrice || d.unitPrice <= 0) return U.toast('Цена должна быть больше нуля', 'error');
+          // Продать больше, чем есть, нельзя: это не строгость ради строгости,
+          // а защита от минусового количества, которое дальше пошло бы
+          // в стоимость и в доли отрицательным числом.
+          if (d.type === C.OP_SELL) {
+            const others = state.operations.filter((x) => x.id !== op.id);
+            const have = C.assetQuantity(assetOf(asset.value), others);
+            if (d.quantity > have) return U.toast(`В наличии ${F.num(have, 0)} шт — продать больше нельзя`, 'error');
+          }
+        } else if (!d.amount || d.amount <= 0) {
+          return U.toast('Сумма выплаты должна быть больше нуля', 'error');
         }
 
         const payload = {
           id: op.id || store.newId('op'),
           date: date.value,
           type: d.type,
-          quantity: d.quantity,
-          unitPrice: d.unitPrice,
-          fee: d.fee || null,
-          amount: C.tradeAmount(d),
+          quantity: trade() ? d.quantity : null,
+          unitPrice: trade() ? d.unitPrice : null,
+          fee: trade() ? d.fee || null : null,
+          tax: trade() ? null : d.tax || null,
+          amount: d.amount,
           assetId: asset.value,
           ticker: assetOf(asset.value)?.ticker || null,
           goalId: goal.value || null,
           source: op.source || C.SOURCE_MANUAL,
           comment: comment.value.trim() || null,
         };
-        await store.mutate((dr) => store.saveTrade(dr, payload, cash.value || null));
+        await store.mutate((dr) => store.savePaperOp(dr, payload, cash.value || null));
         api.close();
         U.tap();
-        U.toast(`${d.type}: ${F.num(d.quantity, 0)} шт на ${F.money(payload.amount)}`);
+        U.toast(trade()
+          ? `${d.type}: ${F.num(d.quantity, 0)} шт на ${F.money(payload.amount)}`
+          : `${d.type}: ${F.money(payload.amount)}`);
         options.onDone?.();
       }, { kind: 'primary' }),
     ]);
 
     return [
-      U.field('Тип сделки', type),
+      U.field('Тип операции', type),
       U.field('Бумага', asset),
-      U.field('Количество, лотов', lots),
-      U.field('Цена за штуку, ₽', unitPrice),
-      U.field('Комиссия, ₽', fee, 'Как в отчёте брокера. Покупку удорожает, из выручки вычитается.'),
+      rowLots,
+      rowPrice,
+      rowFee,
+      rowGross,
+      rowTax,
       h('div', { class: 'total' }, [
         h('span', { class: 'total-label', text: 'Итого' }),
         totalValue,
         totalNote,
       ]),
       U.field('Дата', date),
-      U.field('Оплата со счёта', cash, 'Отсюда спишутся деньги (при продаже — сюда зачислятся). Пусто — движение денег не записывать.'),
+      U.field('Счёт', cash, 'Отсюда спишутся деньги при покупке; при продаже и выплате — сюда зачислятся. Пусто — движение денег не записывать.'),
       U.field('Цель', goal),
       U.field('Комментарий', comment),
     ];

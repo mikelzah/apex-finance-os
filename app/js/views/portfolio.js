@@ -245,7 +245,7 @@ function instrument(ctx) {
     priceCard(state, asset),
 
     U.card([
-      U.sectionTitle(asset.ticker ? 'Сделки' : 'Операции', U.button(asset.ticker ? 'Сделка' : 'Добавить', () => forms.operationSheet(null, {
+      U.sectionTitle(asset.ticker ? 'Сделки и выплаты' : 'Операции', U.button('Добавить', () => forms.operationSheet(null, {
         assetId: asset.id,
         goalId: (asset.goalIds || [])[0] || null,
         onDone: refresh,
@@ -256,20 +256,23 @@ function instrument(ctx) {
           onClick: () => forms.operationSheet(op, { onDone: refresh }),
         }),
       ),
-      own.length ? null : U.emptyState(asset.ticker ? 'Сделок по этой бумаге ещё не было.' : 'Операций по этой бумаге ещё нет.'),
+      own.length ? null : U.emptyState(asset.ticker ? 'Сделок и выплат по этой бумаге ещё не было.' : 'Операций по этой бумаге ещё нет.'),
     ]),
   ];
 }
 
-/** У сделки показываем сумму сделки, у денежной операции — знак движения. */
+/** У операции по бумаге показываем её сумму, у денежной — знак движения. */
 function opValue(op) {
-  return C.isTrade(op) ? F.money(C.tradeAmount(op)) : F.signedMoney(C.signed(op));
+  return C.isPaperOp(op) ? F.money(C.paperAmount(op)) : F.signedMoney(C.signed(op));
 }
 
 function opSub(op) {
   if (C.isTrade(op)) {
     return [`${F.num(op.quantity, 0)} шт × ${F.num(op.unitPrice, 4)} ₽`, op.fee ? `комиссия ${F.money2(op.fee)}` : null, op.comment]
       .filter(Boolean).join(' · ');
+  }
+  if (C.isPayout(op)) {
+    return [op.tax ? `налог ${F.money2(op.tax)}` : 'без налога', op.comment].filter(Boolean).join(' · ');
   }
   return [op.source === C.SOURCE_COMPUTED ? 'расчёт' : null, op.comment].filter(Boolean).join(' · ') || null;
 }
@@ -301,12 +304,22 @@ function averageCard(asset, operations, value, held) {
   const invested = average * held;
   const result = value - invested;
 
+  // Выплаты — деньги, которые бумага уже принесла и которые больше в ней
+  // не лежат. В стоимость они не входят и в «прибыль» тоже: та считается
+  // от цены. Поэтому отдельной строкой, а не прибавкой к результату.
+  let payouts = 0;
+  for (const op of operations) {
+    if (op.assetId !== asset.id || !C.isPayout(op)) continue;
+    payouts += C.paperAmount(op);
+  }
+
   return U.card([
     U.sectionTitle('Позиция'),
     h('div', { class: 'grid-2' }, [
       U.stat('Средняя цена', `${F.num(average, 4)} ₽`, { hint: `куплено ${F.num(bought, 0)} шт` }),
       U.stat('Сейчас', `${F.num(asset.price, 4)} ₽`),
     ]),
+    payouts ? U.stat('Выплачено', F.money(payouts), { hint: 'дивиденды и купоны на руках' }) : null,
     opening
       ? U.stat('Цена входа известна не для всей позиции', `${F.num(opening, 0)} шт`, {
           hint: 'начальное количество заведено без сделки — результат по позиции не посчитать',

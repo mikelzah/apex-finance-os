@@ -283,7 +283,7 @@ export function remove(list, id) {
 // --------------------------------------------------------------------------
 
 /**
- * Сделка и списание с денежного счёта записываются одной правкой.
+ * Операция по бумаге и движение денег записываются одной правкой.
  *
  * Двойной записи в приложении нет — операция принадлежит одному активу.
  * Поэтому денежная сторона сделки это обычная операция по счёту, привязанная
@@ -292,44 +292,44 @@ export function remove(list, id) {
  *
  * Вид денежной операции выбран не произвольно. Покупка — расход: он уменьшает
  * базу начисления процентов ровно так, как уменьшил её реальный платёж.
- * Продажа — взнос без цели: доходом её записать нельзя, доходы читает расчёт
- * процентов и налог, и выручка от продажи испортила бы оба. Пустая цель
- * оставляет в стороне и дисциплину: план по цели считает только взносы,
- * относящиеся к ней.
+ * Всё остальное — продажа, дивиденд, купон — взнос без цели: доходом их
+ * записать нельзя, доходы читает расчёт процентов и налоговый лимит по
+ * вкладам, и выручка с выплатами испортили бы оба. Пустая цель оставляет
+ * в стороне и дисциплину: план по цели считает только взносы, относящиеся
+ * к ней.
  */
-export function saveTrade(draft, trade, cashAssetId) {
-  upsert(draft.operations, trade);
+export function savePaperOp(draft, op, cashAssetId) {
+  upsert(draft.operations, op);
 
-  const legs = draft.operations.filter((op) => op.linkedTo === trade.id);
+  const legs = draft.operations.filter((x) => x.linkedTo === op.id);
   for (const leg of legs) remove(draft.operations, leg.id);
-  if (!cashAssetId) return trade;
+  if (!cashAssetId) return op;
 
-  const isBuy = trade.type === C.OP_BUY;
   upsert(draft.operations, {
     id: legs[0]?.id || newId('op'),
-    date: trade.date,
-    type: isBuy ? C.OP_EXPENSE : C.OP_CONTRIBUTION,
-    amount: trade.amount,
+    date: op.date,
+    type: op.type === C.OP_BUY ? C.OP_EXPENSE : C.OP_CONTRIBUTION,
+    amount: op.amount,
     assetId: cashAssetId,
     goalId: null,
     source: C.SOURCE_MANUAL,
-    comment: `${trade.type}: ${trade.ticker || ''}`.trim(),
-    linkedTo: trade.id,
+    comment: `${op.type}: ${op.ticker || ''}`.trim(),
+    linkedTo: op.id,
   });
-  return trade;
+  return op;
 }
 
-/** Сделка уходит вместе со своим списанием: одна без другой — перекос. */
-export function removeTrade(draft, tradeId) {
-  for (const leg of draft.operations.filter((op) => op.linkedTo === tradeId)) {
+/** Операция по бумаге уходит вместе со своим движением денег. */
+export function removePaperOp(draft, id) {
+  for (const leg of draft.operations.filter((op) => op.linkedTo === id)) {
     remove(draft.operations, leg.id);
   }
-  remove(draft.operations, tradeId);
+  remove(draft.operations, id);
 }
 
-/** Денежный счёт, с которого оплачена сделка, — чтобы форма открылась как есть. */
-export function tradeCashAsset(operations, tradeId) {
-  return operations.find((op) => op.linkedTo === tradeId)?.assetId || '';
+/** Счёт, через который прошли деньги, — чтобы форма открылась как есть. */
+export function linkedCashAsset(operations, id) {
+  return operations.find((op) => op.linkedTo === id)?.assetId || '';
 }
 
 // --------------------------------------------------------------------------

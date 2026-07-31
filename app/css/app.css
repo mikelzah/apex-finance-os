@@ -1133,6 +1133,9 @@ body.is-reordering .screen { overflow: hidden; }
 /* Сделка не приход и не расход — обмен. Поэтому и точка нейтральная,
    и сумма без знака: знак здесь означал бы движение денег, которого нет. */
 .op-trade { background: var(--ink-4); }
+/* Выплата — единственное движение по бумаге, которое действительно приносит
+   деньги, поэтому точка у неё цвета прибыли, а не нейтральная. */
+.op-payout { background: var(--good); }
 
 .op-main { flex: 1; min-width: 0; }
 .op-title { display: block; font-size: var(--text-base); }

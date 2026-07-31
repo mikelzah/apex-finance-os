@@ -34,10 +34,33 @@ export const OP_EXPENSE = 'Расход';
 export const OP_BUY = 'Покупка';
 export const OP_SELL = 'Продажа';
 
-export const OP_TYPES = [OP_CONTRIBUTION, OP_INCOME, OP_EXPENSE, OP_BUY, OP_SELL];
+/**
+ * Выплаты по бумаге. Тоже отдельно, и по той же причине, что сделки.
+ *
+ * Дивиденд не «доход» в смысле этого приложения. «Доход» здесь — проценты
+ * банка: они входят в необлагаемый лимит по вкладам и вычитаются из
+ * начисления, чтобы не посчитаться дважды. Дивиденд не делает ни того,
+ * ни другого: налог с него удерживает брокер, и к вкладу он отношения
+ * не имеет. Назвать его доходом значило бы испортить оба расчёта разом.
+ */
+export const OP_DIVIDEND = 'Дивиденд';
+export const OP_COUPON = 'Купон';
+
+export const OP_TYPES = [
+  OP_CONTRIBUTION, OP_INCOME, OP_EXPENSE, OP_BUY, OP_SELL, OP_DIVIDEND, OP_COUPON,
+];
 
 export function isTrade(op) {
   return Boolean(op) && (op.type === OP_BUY || op.type === OP_SELL);
+}
+
+export function isPayout(op) {
+  return Boolean(op) && (op.type === OP_DIVIDEND || op.type === OP_COUPON);
+}
+
+/** Всё, что записывается на бумагу, а не на счёт. */
+export function isPaperOp(op) {
+  return isTrade(op) || isPayout(op);
 }
 
 export const SOURCE_MANUAL = 'Вручную';
@@ -80,13 +103,14 @@ export function orderedGoals(goals) {
 /**
  * Взнос и доход прибавляют, расход отнимает.
  *
- * Сделка не даёт ноль по недосмотру, а по существу: это обмен, а не движение
- * денег. Бумаг стало больше, денег на счёте меньше — и списание записывается
- * отдельной операцией по самому счёту. Если бы сделка тоже считалась деньгами,
- * одна покупка уменьшила бы капитал дважды.
+ * Операции по бумаге дают ноль не по недосмотру, а по существу. Сделка —
+ * обмен: бумаг стало больше, денег на счёте меньше. Выплата — приход, но
+ * приходит он на счёт, а не в бумагу. И в том, и в другом случае деньги
+ * двигает отдельная операция по самому счёту, привязанная к этой. Считай
+ * приложение деньгами обе — и одна покупка уменьшила бы капитал дважды.
  */
 export function signed(op) {
-  if (isTrade(op)) return 0;
+  if (isPaperOp(op)) return 0;
   const amount = op.amount || 0;
   return op.type === OP_EXPENSE ? -amount : amount;
 }
@@ -96,6 +120,17 @@ export function tradeAmount(op) {
   const gross = (op.quantity || 0) * (op.unitPrice || 0);
   const fee = op.fee || 0;
   return op.type === OP_SELL ? gross - fee : gross + fee;
+}
+
+/**
+ * Сколько денег прошло по операции с бумагой.
+ *
+ * У сделки считается из количества и цены — так исправление цены сразу
+ * меняет сумму. У выплаты сумма и есть исходные данные: делить её обратно
+ * на бумаги незачем, в отчёте брокера она стоит одной строкой.
+ */
+export function paperAmount(op) {
+  return isTrade(op) ? tradeAmount(op) : op.amount || 0;
 }
 
 // --------------------------------------------------------------------------
