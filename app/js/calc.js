@@ -861,10 +861,15 @@ export function investedAt(assets, operations, day) {
   let sum = 0;
 
   for (const a of assets) {
+    if (a.ticker || !a.opening) continue;
     // Начальный остаток — деньги, которые уже лежали на момент заведения.
-    if (!a.ticker && a.opening && D.isValid(a.openingDate) && D.diffDays(day, a.openingDate) >= 0) {
-      sum += a.opening;
-    }
+    //
+    // Дата тут нужна только для того, чтобы разложить вложения по времени.
+    // Требовать её для самого зачёта было ошибкой: у вклада на 1 800 000
+    // с незаполненной датой сумма известна прекрасно, а расчёт делал вид,
+    // что этих денег не вкладывали вовсе, и записывал их в прирост.
+    if (D.isValid(a.openingDate) && D.diffDays(day, a.openingDate) < 0) continue;
+    sum += a.opening;
   }
 
   // Внутренний перевод состоит из двух половин: операции по бумаге и списания
@@ -893,7 +898,21 @@ export function investedAt(assets, operations, day) {
  * рисовать историю, которой не было. Вложенное, наоборот, считается точно:
  * операции записаны с датами.
  */
+export function investedKnown(assets) {
+  return returnKnown(assets);
+}
+
 export function growthSeries(assets, operations, snapshots, day, liveTotal) {
+  // Бумага с начальным количеством ломает весь расчёт: сколько за неё
+  // заплатили, неизвестно, а посчитать её вложением по нынешней цене значит
+  // объявить прирост нулевым. Не посчитать вовсе — ещё хуже: тогда вся её
+  // стоимость уезжает в «наросло», и приложение сообщает 29 283% прироста.
+  //
+  // Правило то же, что у прибыли и доходности: где входа не знаем, там
+  // молчим. Число, которое нельзя посчитать, не заменяется числом, которое
+  // можно.
+  if (!investedKnown(assets)) return null;
+
   const rows = [...(snapshots || [])]
     .filter((r) => D.isValid(r.date))
     .sort((a, b) => (a.date < b.date ? -1 : 1))

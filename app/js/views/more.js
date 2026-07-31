@@ -69,7 +69,7 @@ function hub(ctx) {
     U.card([
       U.row('Активы', String(state.assets.length), { sub: F.money(worth.total), onClick: () => ctx.go('more/assets') }),
       U.row('Налог на проценты', F.money(t.received), { sub: `лимит ${F.money(t.limit)}`, onClick: () => ctx.go('more/tax') }),
-      U.row('История капитала', `${state.netWorth.length}`, { sub: 'снимков по месяцам', onClick: () => ctx.go('more/history') }),
+      U.row('История капитала', `${state.netWorth.length}`, { sub: 'снимков по дням', onClick: () => ctx.go('more/history') }),
       (() => {
         const found = C.dataHealth(state, today);
         const errors = found.filter((x) => x.level === 'error').length;
@@ -329,23 +329,21 @@ function tax(ctx) {
 function history(ctx) {
   const { state, today, refresh } = ctx;
   const worth = C.netWorth(state.assets, state.operations);
-  const rows = [...state.netWorth].sort((a, b) => (a.month < b.month ? 1 : -1));
   const series = C.growthSeries(state.assets, state.operations, state.netWorth, today, worth.total);
-  const now = series[series.length - 1];
+  const snaps = [...state.netWorth].filter((r) => D.isValid(r.date)).sort((a, b) => (a.date < b.date ? -1 : 1));
+  const now = series && series[series.length - 1];
 
-  /**
-   * Один снимок на месяц, строка перезаписывается. К концу месяца в ней
-   * последнее известное состояние, а база не разрастается на 250 строк в год.
-   */
   const snapshot = async () => {
-    await store.snapshotWorth(today);
-    U.toast('Снимок записан');
+    const written = await store.snapshotWorth(today);
+    U.toast(written ? `Снимок за ${F.date(today)} записан` : 'Капитал не менялся — снимок уже такой');
     refresh();
   };
 
+  // Сколько бумаг мешает посчитать вложенное. Названы поимённо: «где-то
+  // что-то не заполнено» отправляет искать вслепую.
+  const blocking = state.assets.filter((a) => a.ticker && (a.quantity || 0) > 0);
+
   return [
-    // Главный вопрос экрана — не «сколько всего», а «сколько из этого моё
-    // и сколько наросло само». Поэтому разложение стоит выше графика.
     now
       ? U.card([
           U.stat('Капитал', F.money(now.total), { big: true }),
@@ -357,27 +355,44 @@ function history(ctx) {
             }),
           ]),
         ])
-      : null,
+      : U.card([
+          U.stat('Капитал', F.money(worth.total), { big: true }),
+          // Прирост здесь не показывается не из осторожности, а потому что
+          // его нельзя посчитать: у бумаги, заведённой количеством, цена
+          // покупки неизвестна, и вся её стоимость уехала бы в «наросло».
+          U.callout(
+            `Прирост не посчитать: ${blocking.map((a) => a.name).join(', ')} — заведены количеством, `
+            + 'без сделки. Сколько за них заплачено, приложение не знает, и приняло бы всю их стоимость '
+            + 'за прирост. Запишите покупку — и разложение появится.',
+            'warn',
+          ),
+        ]),
 
     U.card([
-      U.sectionTitle('История капитала', U.button('Снимок за месяц', snapshot, { kind: 'primary' })),
-      series.length > 1
+      U.sectionTitle('История капитала', U.button('Снимок', snapshot, { kind: 'primary' })),
+      snaps.length > 1
         ? charts.lines(
-            series.map((r) => ({ x: r.date, y: r.total })),
-            series.map((r) => ({ x: r.date, y: r.invested })),
+            snaps.map((r) => ({ x: r.date, y: r.total })),
+            series ? series.map((r) => ({ x: r.date, y: r.invested })) : [],
             { label: 'Капитал', mainLabel: 'Капитал', secondLabel: 'Вложено' },
           )
-        : charts.line([], { hint: 'Нужно минимум два снимка' }),
+        // Снимок пишется сам раз в день, поэтому «нужно ещё один» — это
+        // не задача человеку, а честный срок: линия начнётся завтра.
+        : U.emptyState(snaps.length
+          ? 'Первая точка есть. Линия начнётся со второго дня — снимок записывается сам при каждом открытии.'
+          : 'Снимков ещё нет.'),
     ]),
 
-    U.card([
-      ...[...series].reverse().map((r) =>
-        U.row(F.monthName(r.month), F.money(r.total), {
-          sub: `вложено ${F.money(r.invested)} · ${r.growth >= 0 ? 'наросло' : 'просело'} ${F.signedMoney(r.growth)}`,
-        }),
-      ),
-      rows.length ? null : U.emptyState('Снимков ещё нет.'),
-    ]),
+    snaps.length
+      ? U.card([...[...snaps].reverse().slice(0, 40).map((r) => {
+          const row = series && series.find((x) => x.date === r.date);
+          return U.row(F.date(r.date), F.money(r.total), {
+            sub: row
+              ? `вложено ${F.money(row.invested)} · ${row.growth >= 0 ? 'наросло' : 'просело'} ${F.signedMoney(row.growth)}`
+              : `доступно ${F.money(r.liquid)} · инвестиции ${F.money(r.invested)}`,
+          });
+        })])
+      : null,
   ];
 }
 

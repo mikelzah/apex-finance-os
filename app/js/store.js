@@ -337,37 +337,37 @@ export function linkedCashAsset(operations, id) {
 // --------------------------------------------------------------------------
 
 /**
- * Снимок капитала за текущий месяц.
+ * Снимок капитала за сегодня.
  *
- * Одна строка на месяц, она же и перезаписывается: к концу месяца в ней
- * последнее известное состояние, а база не разрастается на 250 строк в год.
+ * Одна строка на день, она же и перезаписывается в течение дня. Раньше было
+ * по строке на месяц, и это оказалось плохим выбором: график требует двух
+ * точек, а вторая при таком шаге появлялась только в следующем месяце.
+ * Человек нажимал «Снимок», ничего не происходило, и понять, работает ли
+ * кнопка вообще, было нельзя.
+ *
+ * Цена дневного шага — 365 строк в год по несколько десятков байт: единицы
+ * килобайт. Ради работающего с первой недели графика это не жалко.
  *
  * Вызывается и кнопкой, и сама при запуске. Само по себе это важнее кнопки:
- * история, которую надо помнить записывать, не набирается никогда, а без неё
- * нечего и раскладывать на вложенное и наросшее.
+ * история, которую надо помнить записывать, не набирается никогда.
  */
 export async function snapshotWorth(day) {
   const worth = C.netWorth(state.assets, state.operations);
-  const month = day.slice(0, 7);
-  const existing = state.netWorth.find((r) => r.month === month);
+  const existing = state.netWorth.find((r) => r.date === day);
 
   // Ничего не изменилось — не пишем: запись дёргает подписчиков и заставляет
   // приложение перерисоваться на ровном месте.
-  if (existing
-      && existing.date === day
-      && Math.abs((existing.total || 0) - C.round2(worth.total)) < 0.01) {
-    return false;
-  }
+  if (existing && Math.abs((existing.total || 0) - C.round2(worth.total)) < 0.01) return false;
 
   await mutate((draft) => {
     const payload = {
-      month,
+      month: day.slice(0, 7),
       date: day,
       total: C.round2(worth.total),
       liquid: C.round2(worth.liquid),
       invested: C.round2(worth.invested),
     };
-    const row = draft.netWorth.find((r) => r.month === month);
+    const row = draft.netWorth.find((r) => r.date === day);
     if (row) Object.assign(row, payload);
     else draft.netWorth.push(payload);
   });
