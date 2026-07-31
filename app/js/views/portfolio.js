@@ -263,6 +263,8 @@ function instrument(ctx) {
     // одним начальным количеством, её взять неоткуда — и придумывать нечего.
     asset.ticker ? averageCard(asset, state.operations, value, held, today) : null,
 
+    asset.ticker ? lotsCard(asset, state.operations, today) : null,
+
     priceCard(state, asset),
 
     U.card([
@@ -359,6 +361,53 @@ function averageCard(asset, operations, value, held, today) {
           class: result >= 0 ? 'is-good' : 'is-bad',
           hint: invested ? `${F.percent((result / invested) * 100)} к вложенному` : null,
         }),
+  ]);
+}
+
+/**
+ * Лоты и льгота за долгое владение.
+ *
+ * Бумага на счету — не однородная куча: каждая покупка живёт своим сроком,
+ * и от него зависят настоящие деньги. Три полных года владения освобождают
+ * прибыль от налога, три миллиона за каждый год. Продать за месяц до срока —
+ * значит подарить государству то, что можно было не платить, и узнать об этом
+ * человек должен заранее, а не в отчёте за год.
+ */
+function lotsCard(asset, operations, today) {
+  const lots = C.lotsOf(asset, operations);
+  if (!lots.length) return null;
+
+  const rows = lots.map((lot) => {
+    const st = C.ldvStatus(lot, today);
+    const value = `${F.num(lot.quantity, 0)} шт`;
+    if (lot.unknown) {
+      return U.row('Начальный блок', value, {
+        sub: 'заведён без сделки — цена входа и срок владения неизвестны',
+        tag: 'без цены',
+        tagClass: 'muted',
+      });
+    }
+    return U.row(F.date(lot.date), value, {
+      sub: `по ${F.num(lot.unitCost, 4)} ₽ · ${F.money(lot.quantity * lot.unitCost)}`,
+      tag: st.eligible
+        ? 'льгота'
+        : st.daysLeft > 0 ? `через ${F.days(st.daysLeft)}` : null,
+      tagClass: st.eligible ? 'ok' : 'muted',
+    });
+  });
+
+  const soon = lots
+    .filter((lot) => !lot.unknown)
+    .map((lot) => C.ldvStatus(lot, today))
+    .filter((st) => st.known && !st.eligible && st.daysLeft > 0 && st.daysLeft <= 180)
+    .sort((a, b) => a.daysLeft - b.daysLeft)[0];
+
+  return U.card([
+    U.sectionTitle('Лоты', h('span', { class: 'section-sum', text: `${F.num(C.assetQuantity(asset, operations), 0)} шт` })),
+    ...rows,
+    soon
+      ? U.callout(`Ближайший лот выходит на льготу ${F.date(soon.ready)} — через ${F.days(soon.daysLeft)}. Продажа до этого дня лишает освобождения от налога.`, 'warn')
+      : null,
   ]);
 }
 

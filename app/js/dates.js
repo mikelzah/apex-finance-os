@@ -50,6 +50,17 @@ export function lastDayOfMonth(y, m) {
   return new Date(Date.UTC(y, m, 0)).getUTCDate();
 }
 
+/**
+ * Та же дата через n лет.
+ *
+ * 29 февраля переносится на 28-е: 29 февраля 2027 года не существует, а срок
+ * владения от него всё равно надо от чего-то отсчитывать.
+ */
+export function addYears(s, n) {
+  const { y, m, d } = parts(s);
+  return iso(y + n, m, Math.min(d, lastDayOfMonth(y + n, m)));
+}
+
 export function month(s) {
   return s.slice(0, 7);
 }

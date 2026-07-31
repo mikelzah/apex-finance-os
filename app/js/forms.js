@@ -210,6 +210,10 @@ export function tradeSheet(existing, options = {}) {
     // привык видеть сумму до того, как подтвердит заявку.
     const totalValue = h('span', { class: 'total-value' });
     const totalNote = h('span', { class: 'total-note' });
+    // Последствия продажи — там же, до нажатия «Сохранить». Узнать, что
+    // подарил государству тринадцать процентов, потому что продал за месяц
+    // до трёхлетия, положено заранее, а не в отчёте за год.
+    const outcome = h('p', { class: 'callout callout-warn', hidden: true });
     const rowLots = U.field('Количество, лотов', lots);
     const rowPrice = U.field('Цена за штуку, ₽', unitPrice);
     const rowFee = U.field('Комиссия, ₽', fee, 'Как в отчёте брокера. Покупку удорожает, из выручки вычитается.');
@@ -222,6 +226,7 @@ export function tradeSheet(existing, options = {}) {
       for (const [node, on] of [[rowLots, isTrade], [rowPrice, isTrade], [rowFee, isTrade],
         [rowGross, !isTrade], [rowTax, !isTrade]]) node.hidden = !on;
 
+      showOutcome(d, isTrade);
       totalValue.textContent = F.money2(d.amount);
       totalNote.textContent = isTrade
         ? [
@@ -233,7 +238,44 @@ export function tradeSheet(existing, options = {}) {
           ? `начислено ${F.money2(d.gross)}, налог ${F.money2(d.tax)}`
           : 'налог не удерживался';
     };
+    /** Что случится с налогом, если продать столько по такой цене. */
+    const showOutcome = (d, isTrade) => {
+      const target = assetOf(asset.value);
+      if (!isTrade || d.type !== C.OP_SELL || !target || !d.quantity || !d.unitPrice) {
+        outcome.hidden = true;
+        return;
+      }
+      const rate = C.taxRow(state.tax, state.operations, state.keyRate, D.today(), state.settings).ndflRate || 13;
+      const others = state.operations.filter((x) => x.id !== op.id);
+      const r = C.saleOutcome(target, others, d.quantity, d.unitPrice, date.value || D.today(), rate);
+
+      const parts = [];
+      if (r.profit > 0) {
+        parts.push(r.tax > 0
+          ? `Прибыль ${F.money(r.profit)}, налог ${F.money(r.tax)}.`
+          : `Прибыль ${F.money(r.profit)}, налога нет — льгота за долгое владение.`);
+      } else if (r.profit < 0) {
+        parts.push(`Убыток ${F.money(Math.abs(r.profit))} — налога не будет.`);
+      }
+      if (r.exempt > 0 && r.tax > 0) parts.push(`Льготой закрыто ${F.money(r.exempt)}.`);
+
+      // Главное предупреждение: гасится лот, которому до льготы рукой подать.
+      const waiting = r.lots
+        .filter((lot) => !lot.unknown)
+        .map((lot) => ({ lot, st: C.ldvStatus(lot, date.value || D.today()) }))
+        .filter((x) => x.st.known && !x.st.eligible && x.st.daysLeft > 0)
+        .sort((a, b) => a.st.daysLeft - b.st.daysLeft)[0];
+      if (waiting) {
+        parts.push(`Затрагивается лот от ${F.date(waiting.lot.date)} — до льготы ${F.days(waiting.st.daysLeft)}.`);
+      }
+      if (r.unknownQty) parts.push(`${F.num(r.unknownQty, 0)} шт из начального блока — прибыль по ним неизвестна.`);
+
+      outcome.textContent = parts.join(' ');
+      outcome.hidden = parts.length === 0;
+    };
+
     for (const node of [lots, unitPrice, fee, gross, tax]) node.addEventListener('input', recount);
+    date.addEventListener('change', recount);
     for (const node of [type, asset]) {
       node.addEventListener('change', () => {
         if (node === asset && isNew) unitPrice.value = String(assetOf(asset.value)?.price ?? '').replace('.', ',');
@@ -311,6 +353,7 @@ export function tradeSheet(existing, options = {}) {
         totalValue,
         totalNote,
       ]),
+      outcome,
       U.field('Дата', date),
       U.field('Счёт', cash, 'Отсюда спишутся деньги при покупке; при продаже и выплате — сюда зачислятся. Пусто — движение денег не записывать.'),
       U.field('Цель', goal),

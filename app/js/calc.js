@@ -427,6 +427,143 @@ export function taxRow(tax, operations, keyRate, day, settings) {
 }
 
 // --------------------------------------------------------------------------
+// Лоты и льгота за долгое владение
+// --------------------------------------------------------------------------
+
+/** Полных лет между датами — как их считает налоговая, а не делением на 365. */
+export function fullYears(from, to) {
+  if (!D.isValid(from) || !D.isValid(to)) return 0;
+  const a = D.parts(from);
+  const b = D.parts(to);
+  let years = b.y - a.y;
+  if (b.m < a.m || (b.m === a.m && b.d < a.d)) years -= 1;
+  return Math.max(0, years);
+}
+
+// Льгота за долгое владение: три полных года, 3 миллиона за каждый год.
+export const LDV_YEARS = 3;
+export const LDV_PER_YEAR = 3000000;
+
+/**
+ * Открытые лоты по бумаге, в порядке покупки.
+ *
+ * Продажи гасят самые старые покупки — так же, как считает налоговая, и так же,
+ * как это делает брокер в отчёте. Порядок здесь не техническая деталь: от него
+ * зависит и цена входа оставшегося, и срок владения, а значит и льгота.
+ *
+ * Начальное количество, заведённое без сделки, попадает в отдельный лот
+ * с неизвестной ценой: выбросить его нельзя — бумаги-то есть, — а придумать
+ * ему цену значило бы соврать про прибыль при продаже.
+ */
+export function lotsOf(asset, operations) {
+  const own = operations
+    .filter((op) => op.assetId === asset.id && isTrade(op) && D.isValid(op.date))
+    .sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
+
+  const open = [];
+  if (asset.quantity) {
+    open.push({
+      date: asset.openingDate || null,
+      quantity: asset.quantity,
+      unitCost: null,
+      unknown: true,
+    });
+  }
+
+  for (const op of own) {
+    if (op.type === OP_BUY) {
+      const qty = op.quantity || 0;
+      if (!qty) continue;
+      open.push({
+        date: op.date,
+        quantity: qty,
+        // Комиссия — часть цены входа: она уплачена за то, чтобы бумага
+        // оказалась на счету, и при продаже уменьшает прибыль.
+        unitCost: tradeAmount(op) / qty,
+        unknown: false,
+      });
+      continue;
+    }
+    let left = op.quantity || 0;
+    for (const lot of open) {
+      if (left <= 0) break;
+      const take = Math.min(lot.quantity, left);
+      lot.quantity -= take;
+      left -= take;
+    }
+  }
+
+  return open.filter((lot) => lot.quantity > 0.0000001);
+}
+
+/** Дошёл ли лот до льготы, и сколько осталось. */
+export function ldvStatus(lot, day) {
+  if (!lot.date || !D.isValid(lot.date)) return { known: false, eligible: false, daysLeft: null, years: 0 };
+  const years = fullYears(lot.date, day);
+  const target = D.addYears(lot.date, LDV_YEARS);
+  const daysLeft = Math.max(0, D.diffDays(target, day));
+  return { known: true, eligible: years >= LDV_YEARS, daysLeft, years, ready: target };
+}
+
+/**
+ * Что будет, если продать столько-то бумаг по такой-то цене.
+ *
+ * Гасятся старые лоты, из выручки вычитается их цена входа, к прибыли
+ * применяется льгота — три миллиона за каждый полный год владения, но только
+ * к тем лотам, которые до трёх лет дожили. Лот с неизвестной ценой входа
+ * считается отдельно: прибыль по нему неизвестна, и вид, будто она нулевая,
+ * занизил бы налог.
+ */
+export function saleOutcome(asset, operations, quantity, unitPrice, day, ndflRate = 13) {
+  const lots = lotsOf(asset, operations).map((lot) => ({ ...lot }));
+  const proceeds = (quantity || 0) * (unitPrice || 0);
+
+  let left = quantity || 0;
+  let cost = 0;
+  let profit = 0;
+  let exemptLimit = 0;
+  let exemptProfit = 0;
+  let unknownQty = 0;
+  const touched = [];
+
+  for (const lot of lots) {
+    if (left <= 0) break;
+    const take = Math.min(lot.quantity, left);
+    left -= take;
+    touched.push({ ...lot, taken: take });
+
+    if (lot.unknown) {
+      unknownQty += take;
+      continue;
+    }
+    const lotCost = lot.unitCost * take;
+    const lotProfit = take * (unitPrice || 0) - lotCost;
+    cost += lotCost;
+    profit += lotProfit;
+
+    const st = ldvStatus(lot, day);
+    if (st.eligible && lotProfit > 0) {
+      exemptProfit += lotProfit;
+      exemptLimit += LDV_PER_YEAR * st.years;
+    }
+  }
+
+  const exempt = Math.min(exemptProfit, exemptLimit);
+  const taxable = Math.max(0, profit - exempt);
+  return {
+    proceeds,
+    cost,
+    profit,
+    exempt,
+    taxable,
+    tax: (taxable * (ndflRate || 0)) / 100,
+    unknownQty,
+    short: left,
+    lots: touched,
+  };
+}
+
+// --------------------------------------------------------------------------
 // Доходность
 // --------------------------------------------------------------------------
 
