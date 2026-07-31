@@ -393,7 +393,12 @@ export function allocation(rows, onEdit) {
         ? F.percent(row.share, 2)
         : `${F.percent(row.share, 2)} из ${F.percent(row.targetShare, 0)}`),
     );
-    foot.appendChild(div(`tag tag-${actionClass(row.action)}`, row.action));
+    // В ярлыке — сумма, а не только направление: «продать» это диагноз,
+    // «продать на 45 000 ₽» — назначение, которое можно выполнить.
+    const money = row.gap != null && Math.abs(row.gap) >= 1 && row.action !== 'в норме'
+      ? ` на ${F.money(Math.abs(row.gap))}`
+      : '';
+    foot.appendChild(div(`tag tag-${actionClass(row.action)}`, `${row.action}${money}`));
     item.appendChild(foot);
 
     wrap.appendChild(item);

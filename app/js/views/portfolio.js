@@ -79,6 +79,7 @@ function overview(ctx) {
     U.card([
       U.sectionTitle('Доли'),
       charts.allocation(rows, (row) => forms.portfolioSheet(row, { onDone: refresh })),
+      addingCard(rows),
     ]),
   ];
 }
@@ -103,6 +104,31 @@ function total_(total, rate) {
       h('span', { text: `${rate >= 0 ? '+' : ''}${F.percent(rate)}` }),
       h('span', { class: 'hero-delta-word', text: 'годовых' }),
     ]),
+  ]);
+}
+
+/**
+ * Как выправить доли, ничего не продавая.
+ *
+ * «Продать» — плохой совет по умолчанию: продажа тянет за собой налог
+ * и обнуляет срок владения ради льготы, а докупка не делает ни того,
+ * ни другого. Если деньги на взносы есть, перекос лечится ими — и тогда
+ * единственный вопрос в том, сколько и куда.
+ */
+function addingCard(rows) {
+  const plan = C.rebalanceByAdding(rows);
+  if (!plan) return null;
+  return h('div', { class: 'plan' }, [
+    h('div', { class: 'plan-head' }, [
+      h('span', { class: 'plan-title', text: 'Выправить довложением' }),
+      h('span', { class: 'plan-total', text: F.money(plan.total) }),
+    ]),
+    ...plan.items.map((x) =>
+      h('div', { class: 'plan-row' }, [
+        h('span', { text: x.class }),
+        h('span', { class: 'plan-amount', text: F.money(x.add) }),
+      ]),
+    ),
   ]);
 }
 

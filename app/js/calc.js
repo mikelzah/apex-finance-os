@@ -340,13 +340,17 @@ export function portfolioRows(assets, operations, portfolio) {
     const row = targets.get(name);
     const value = byClass.get(name) || 0;
     const share = total > 0 ? (value / total) * 100 : null;
+    const targetShare = row?.targetShare ?? null;
     return {
       id: row?.id || `cls-${name}`,
       class: name,
-      targetShare: row?.targetShare ?? null,
+      targetShare,
       value,
       share,
-      action: action(row?.targetShare ?? null, share),
+      // Отклонение в рублях, а не в процентах: «33,49% из 30%» — это диагноз,
+      // а «продать на 45 000 ₽» — назначение. Второе можно выполнить.
+      gap: targetShare == null || total <= 0 ? null : round2((targetShare / 100) * total - value),
+      action: action(targetShare, share),
     };
   });
 
@@ -359,6 +363,38 @@ function action(target, share) {
   const gap = share - target;
   if (Math.abs(gap) < 1) return 'в норме';
   return gap > 0 ? 'продать' : 'докупить';
+}
+
+/**
+ * Ребалансировка довложением: сколько докупить, ничего не продавая.
+ *
+ * «Продать» — плохой совет по умолчанию. Продажа тянет за собой налог
+ * и обнуляет срок владения, а докупка не делает ни того, ни другого. Если
+ * деньги на взносы есть, перекос лечится ими, и вопрос только в том, сколько
+ * и куда.
+ *
+ * Считается так: перевес есть у того класса, у которого отношение нынешней
+ * стоимости к целевой доле самое большое, — им и определяется будущий размер
+ * портфеля, потому что уменьшать его нельзя, не продавая. Остальные классы
+ * добираются до своих долей от этого размера.
+ */
+export function rebalanceByAdding(rows) {
+  const known = rows.filter((r) => r.targetShare != null && r.targetShare > 0);
+  if (!known.length) return null;
+
+  // Размер портфеля, при котором ни один класс не окажется выше своей доли.
+  let futureTotal = 0;
+  for (const r of known) {
+    futureTotal = Math.max(futureTotal, (r.value / r.targetShare) * 100);
+  }
+
+  const items = known
+    .map((r) => ({ class: r.class, add: round2((r.targetShare / 100) * futureTotal - r.value) }))
+    .filter((x) => x.add >= 1)
+    .sort((x, y) => y.add - x.add);
+
+  const total = round2(items.reduce((s, x) => s + x.add, 0));
+  return total >= 1 ? { total, items, futureTotal: round2(futureTotal) } : null;
 }
 
 // --------------------------------------------------------------------------
@@ -1038,6 +1074,72 @@ export function signals(assets, operations, day) {
     }
   }
   return out;
+}
+
+/**
+ * Проверка данных: что посчитано не так и почему.
+ *
+ * Отличие от сигналов в том, на что они отвечают. Сигнал говорит «пора
+ * что-то сделать»: сверить счёт, обновить цену. Проверка говорит «цифры,
+ * которые ты видишь, неверны» — и это тише и опаснее. Актив, привязанный
+ * к двум целям, не подаёт никаких признаков: обе цели просто показывают
+ * прогресс, которого нет, а сумма по ним больше капитала.
+ *
+ * Каждая находка знает, куда идти чинить: проверка без адреса заставляет
+ * искать виноватого руками.
+ */
+export function dataHealth(state, day) {
+  const out = [];
+  const add = (level, title, detail, go) => out.push({ level, title, detail, go });
+  const alive = state.assets.filter((a) => a.status !== STATUS_SOLD);
+
+  for (const a of alive) {
+    const goals = (a.goalIds || []).filter((id) => state.goals.some((g) => g.id === id));
+    if (goals.length > 1) {
+      add('error', a.name,
+        `привязан к ${goals.length} целям — его деньги засчитаны каждой, и сумма целей больше капитала`,
+        `more/assets`);
+    }
+    if (a.type === TYPE_INVESTMENT && a.ticker && !ASSET_CLASSES.includes(a.assetClass)) {
+      add('warn', a.name, 'бумага без класса — не входит в доли портфеля', `portfolio/${a.id}`);
+    }
+    if (a.ticker && (a.quantity || 0) > 0) {
+      add('warn', a.name,
+        'количество заведено без сделки — цена входа неизвестна, прибыль и доходность по ней не считаются',
+        `portfolio/${a.id}`);
+    }
+    if (a.assetClass === 'Облигации' && !isBond(a)) {
+      add('warn', a.name, 'облигация без номинала — цена считается рублями, а биржа даёт проценты', `portfolio/${a.id}`);
+    }
+    if (isBond(a) && !D.isValid(a.nextCoupon)) {
+      add('warn', a.name, 'не задана дата купона — накопленный доход не считается', `portfolio/${a.id}`);
+    }
+    if (a.ticker && a.updated && D.diffDays(day, a.updated) > 14) {
+      add('warn', a.name, `цена от ${F.date(a.updated)} — стоимость показана по устаревшей`, `portfolio/${a.id}`);
+    }
+    if (a.type === TYPE_MONEY && !a.rate) {
+      add('info', a.name, 'ставка не заполнена — проценты по счёту не начисляются', 'more/assets');
+    }
+  }
+
+  for (const g of state.goals) {
+    if (g.status === GOAL_DONE) continue;
+    if (!goalAssets(g, alive).length) {
+      add('warn', g.name, 'к цели не привязан ни один актив — прогресс всегда нулевой', 'goals');
+    }
+  }
+
+  // Операция без актива нигде не видна: в капитал она не входит, в остатке
+  // не участвует и живёт в журнале как строка ни о чём.
+  const orphans = state.operations.filter(
+    (op) => !op.assetId || !state.assets.some((a) => a.id === op.assetId),
+  );
+  if (orphans.length) {
+    add('error', 'Операции без актива', `${orphans.length} шт — не влияют ни на капитал, ни на цели`, 'journal');
+  }
+
+  const rank = { error: 0, warn: 1, info: 2 };
+  return out.sort((a, b) => rank[a.level] - rank[b.level]);
 }
 
 /**

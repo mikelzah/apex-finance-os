@@ -20,6 +20,7 @@ export function render(ctx) {
     case 'assets': return assets(ctx);
     case 'tax': return tax(ctx);
     case 'history': return history(ctx);
+    case 'health': return health(ctx);
     case 'keyrate': return keyRate(ctx);
     case 'settings': return settings(ctx);
     case 'backup': return backup(ctx);
@@ -46,6 +47,7 @@ export function title(sub) {
     assets: 'Активы',
     tax: 'Налог на проценты',
     history: 'История капитала',
+    health: 'Проверка данных',
     keyrate: 'Ключевая ставка ЦБ',
     settings: 'Настройки',
     backup: 'Резервная копия',
@@ -67,6 +69,16 @@ function hub(ctx) {
       U.row('Активы', String(state.assets.length), { sub: F.money(worth.total), onClick: () => ctx.go('more/assets') }),
       U.row('Налог на проценты', F.money(t.received), { sub: `лимит ${F.money(t.limit)}`, onClick: () => ctx.go('more/tax') }),
       U.row('История капитала', `${state.netWorth.length}`, { sub: 'снимков по месяцам', onClick: () => ctx.go('more/history') }),
+      (() => {
+        const found = C.dataHealth(state, today);
+        const errors = found.filter((x) => x.level === 'error').length;
+        return U.row('Проверка данных', found.length ? String(found.length) : 'чисто', {
+          sub: 'находит то, что молча искажает цифры',
+          onClick: () => ctx.go('more/health'),
+          tag: errors ? 'ошибки' : null,
+          tagClass: 'sell',
+        });
+      })(),
       U.row('Ключевая ставка ЦБ', state.keyRate.length ? F.percent(C.rateOn(state.keyRate, today)) : '—', {
         sub: 'от неё считается налоговый лимит',
         onClick: () => ctx.go('more/keyrate'),
@@ -167,6 +179,50 @@ function assets(ctx) {
         ])
       : null,
   ];
+}
+
+// --------------------------------------------------------------------------
+
+/**
+ * Проверка данных.
+ *
+ * Сигналы на главной говорят «пора что-то сделать». Этот экран говорит
+ * «цифры, которые ты видишь, неверны» — и это тише и опаснее. Актив,
+ * привязанный к двум целям, не подаёт никаких признаков: обе цели показывают
+ * прогресс, которого нет, а сумма по ним больше капитала.
+ */
+function health(ctx) {
+  const { state, today } = ctx;
+  const found = C.dataHealth(state, today);
+
+  if (!found.length) {
+    return [U.card([
+      mascot.portrait('health-mascot'),
+      h('p', { class: 'health-ok', text: 'Всё сходится. Ничего, что искажало бы цифры, не нашлось.' }),
+    ], { class: 'card-quiet' })];
+  }
+
+  const byLevel = [
+    ['error', 'Искажают цифры'],
+    ['warn', 'Считается не полностью'],
+    ['info', 'Стоит заполнить'],
+  ];
+
+  return byLevel.map(([level, title]) => {
+    const list = found.filter((x) => x.level === level);
+    if (!list.length) return null;
+    return U.card([
+      U.sectionTitle(title, h('span', { class: 'section-sum', text: String(list.length) })),
+      ...list.map((x) =>
+        U.row(x.title, '', {
+          sub: x.detail,
+          onClick: () => ctx.go(x.go),
+          tag: level === 'error' ? 'ошибка' : null,
+          tagClass: 'sell',
+        }),
+      ),
+    ]);
+  });
 }
 
 // --------------------------------------------------------------------------
