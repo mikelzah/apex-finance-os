@@ -284,6 +284,25 @@ body.is-locked .screen { overflow: hidden; }
 .hero-delta.is-quiet { color: var(--ink-4); }
 .hero-delta-word { color: var(--ink-3); }
 
+/* Объяснение на месте пропавшего числа. Не тревога и не ошибка — сноска,
+   поэтому краски статуса здесь нет, только приглушённый текст. */
+.hero-note {
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  margin: var(--space-2) auto 0;
+  padding: var(--space-1) var(--space-3);
+  border: 0;
+  border-radius: var(--radius-full);
+  background: var(--card);
+  color: var(--ink-3);
+  font: inherit;
+  font-size: var(--text-xs);
+  text-align: left;
+  cursor: pointer;
+}
+
 .hero-split {
   display: flex;
   justify-content: center;

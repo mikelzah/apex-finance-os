@@ -55,7 +55,7 @@ function overview(ctx) {
   );
 
   return [
-    total_(total, C.returnOf(inPortfolio, state.operations, ctx.today)),
+    total_(total, C.returnOf(inPortfolio, state.operations, ctx.today), inPortfolio, ctx),
 
     ...holdings(ctx, total),
 
@@ -93,17 +93,40 @@ function overview(ctx) {
  * «В расчёте долей» объясняла сумму через механику расчёта, хотя человек
  * читает её как «сколько у меня в портфеле».
  */
-function total_(total, rate) {
+function total_(total, rate, assets, ctx) {
   return h('section', { class: 'hero' }, [
     h('p', { class: 'hero-label', text: 'Портфель' }),
     h('p', { class: 'hero-value', text: F.money(total) }),
     // Доходность годовых — единственное число, которым портфель сравним
-    // с вкладом и сам с собой год назад. Пустоты под суммой на её месте
-    // не остаётся: если посчитать нельзя, строки просто нет.
-    rate == null ? null : h('p', { class: `hero-delta ${rate >= 0 ? 'is-up' : 'is-down'}` }, [
-      h('span', { text: `${rate >= 0 ? '+' : ''}${F.percent(rate)}` }),
-      h('span', { class: 'hero-delta-word', text: 'годовых' }),
-    ]),
+    // с вкладом и сам с собой год назад.
+    rate != null
+      ? h('p', { class: `hero-delta ${rate >= 0 ? 'is-up' : 'is-down'}` }, [
+          h('span', { text: `${rate >= 0 ? '+' : ''}${F.percent(rate)}` }),
+          h('span', { class: 'hero-delta-word', text: 'годовых' }),
+        ])
+      // Молча пропасть числу нельзя. Пустое место на его месте читается как
+      // «сломалось», и вопрос «почему нет зелёного» возникает ровно один раз
+      // — а потом человек перестаёт верить и остальным цифрам. Поэтому здесь
+      // сказано, чего не хватает, и куда идти дозаполнять.
+      : blockerLine(assets, ctx),
+  ]);
+}
+
+function blockerLine(assets, ctx) {
+  const blocked = (assets || [])
+    .map((a) => ({ name: a.name, why: C.returnBlocker(a) }))
+    .filter((x) => x.why);
+  if (!blocked.length) return null;
+
+  const names = blocked.slice(0, 2).map((x) => x.name).join(', ');
+  const rest = blocked.length > 2 ? ` и ещё ${blocked.length - 2}` : '';
+  return h('button', {
+    class: 'hero-note',
+    type: 'button',
+    onclick: () => ctx.go('more/health'),
+  }, [
+    h('span', { text: `Доходность не посчитать: ${names}${rest} — ${blocked[0].why}` }),
+    h('span', { class: 'row-chevron', text: '›' }),
   ]);
 }
 

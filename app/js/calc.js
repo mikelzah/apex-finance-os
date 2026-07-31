@@ -830,7 +830,27 @@ export function flowsOf(assets, operations, day) {
  * из ниоткуда.
  */
 export function returnKnown(assets) {
-  return assets.every((a) => !(a.ticker && (a.quantity || 0) > 0));
+  return assets.every((a) => !returnBlocker(a));
+}
+
+/**
+ * Что именно мешает посчитать доходность этого актива. Null — ничего.
+ *
+ * Причин две, и обе про то, что неизвестен вход.
+ *
+ * Бумага с начальным количеством: цена покупки неизвестна.
+ *
+ * Счёт с начальным остатком без даты: сумма известна, а когда её вложили —
+ * нет. Для «наросло» этого хватает, для «годовых» — нет: доходность
+ * и означает «сколько за год», а год отсчитывать не от чего. Именно из-за
+ * этого вклад на 1 800 000 выпадал из потоков целиком, и приложение видело
+ * возврат в миллион восемьсот на вложенные восемь тысяч — отсюда и брались
+ * то «+205% годовых», то пустота вместо числа.
+ */
+export function returnBlocker(a) {
+  if (a.ticker && (a.quantity || 0) > 0) return 'нет цены покупки';
+  if (!a.ticker && a.opening && !D.isValid(a.openingDate)) return 'нет даты начального остатка';
+  return null;
 }
 
 /** Доходность набора активов, годовых в процентах. Null — посчитать нельзя. */
@@ -898,8 +918,15 @@ export function investedAt(assets, operations, day) {
  * рисовать историю, которой не было. Вложенное, наоборот, считается точно:
  * операции записаны с датами.
  */
+/**
+ * Можно ли посчитать вложенное.
+ *
+ * Требование мягче, чем у доходности: здесь нужна только сумма, а не дата.
+ * Начальный остаток без даты во «вложено» входит прекрасно — неизвестно
+ * лишь, куда его поставить на временной оси, а на итог это не влияет.
+ */
 export function investedKnown(assets) {
-  return returnKnown(assets);
+  return assets.every((a) => !(a.ticker && (a.quantity || 0) > 0));
 }
 
 export function growthSeries(assets, operations, snapshots, day, liveTotal) {
@@ -1138,6 +1165,11 @@ export function dataHealth(state, day) {
     }
     if (a.type === TYPE_MONEY && !a.rate) {
       add('info', a.name, 'ставка не заполнена — проценты по счёту не начисляются', 'more/assets');
+    }
+    if (!a.ticker && a.opening && !D.isValid(a.openingDate)) {
+      add('warn', a.name,
+        'начальный остаток без даты — доходность годовых по нему не посчитать, а без него она врёт по всему портфелю',
+        'more/assets');
     }
   }
 
