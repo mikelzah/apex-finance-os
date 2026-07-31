@@ -6,6 +6,7 @@ import * as C from './calc.js';
 import * as D from './dates.js';
 import * as F from './fmt.js';
 import * as store from './store.js';
+import * as mascot from './mascot.js';
 
 const { h } = U;
 
@@ -363,6 +364,9 @@ export function tradeSheet(existing, options = {}) {
         await store.mutate((dr) => store.savePaperOp(dr, payload, cash.value || null));
         api.close();
         U.tap();
+        // Покупка и полученный купон — такие же поводы, как взнос. Зверёк,
+        // радующийся одному виду операций из шести, выглядит недоделанным.
+        if (d.type !== C.OP_SELL) mascot.celebrate();
         U.toast(trade()
           ? `${d.type}: ${F.num(d.quantity, 0)} шт на ${F.money(payload.amount)}`
           : `${d.type}: ${F.money(payload.amount)}`);

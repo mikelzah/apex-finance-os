@@ -94,8 +94,29 @@ export function button(text, onClick, options = {}) {
   );
 }
 
-export function emptyState(text) {
-  return h('p', { class: 'empty', text });
+/**
+ * Пустое состояние.
+ *
+ * Серая надпись посреди белого поля сообщает «здесь ничего нет» и на этом
+ * заканчивается. Зверёк рядом с той же надписью сообщает то же самое, но
+ * экран перестаёт выглядеть сломанным — а именно так пустой экран и читается,
+ * пока не привыкнешь.
+ *
+ * Зверёк рисуется лениво: ui.js не может импортировать mascot.js напрямую,
+ * потому что mascot.js импортирует shell отсюда — вышел бы круг.
+ */
+let drawMascot = null;
+
+export function useMascot(fn) {
+  drawMascot = fn;
+}
+
+export function emptyState(text, options = {}) {
+  const quiet = options.quiet || !drawMascot;
+  return h('div', { class: `empty-box ${quiet ? 'is-quiet' : ''}`.trim() }, [
+    quiet ? null : drawMascot('empty-mascot'),
+    h('p', { class: 'empty', text }),
+  ]);
 }
 
 // --------------------------------------------------------------------------

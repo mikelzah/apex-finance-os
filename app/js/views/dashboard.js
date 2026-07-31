@@ -25,6 +25,7 @@ export function render(ctx) {
 
   return [
     hero(state, worth, today),
+    advice(ctx),
     quickAdd(ctx),
     accruals(ctx),
     primaryGoal(ctx),
@@ -36,6 +37,77 @@ export function render(ctx) {
 }
 
 // --------------------------------------------------------------------------
+
+/**
+ * Одна фраза по делу от Кубыша.
+ *
+ * Ровно одна, и только когда есть что сказать. Приложение, которое советует
+ * постоянно, перестают читать на третий день; приложение, которое молчит,
+ * пока всё ровно, и говорит одну фразу, когда нет, — читают.
+ *
+ * Порядок правил — это порядок важности: сначала то, что стоит денег, потом
+ * то, что мешает считать, и только потом дисциплина. Первое подошедшее
+ * правило и есть фраза.
+ */
+function advice(ctx) {
+  const { state, today, go } = ctx;
+  const line = adviceText(state, today);
+  if (!line) return null;
+
+  return h('button', {
+    class: 'advice',
+    type: 'button',
+    onclick: () => go(line.go),
+  }, [
+    mascot.portrait('advice-mascot'),
+    h('span', { class: 'advice-text', text: line.text }),
+    h('span', { class: 'row-chevron', text: '›' }),
+  ]);
+}
+
+function adviceText(state, today) {
+  const alive = state.assets.filter((a) => a.status !== C.STATUS_SOLD);
+
+  // Деньги вперёд всего: лот, которому до льготы недолго, стоит реальных
+  // процентов, и узнать о нём надо не в отчёте за год.
+  for (const a of alive) {
+    if (!a.ticker) continue;
+    const soon = C.lotsOf(a, state.operations)
+      .filter((lot) => !lot.unknown)
+      .map((lot) => C.ldvStatus(lot, today))
+      .filter((st) => st.known && !st.eligible && st.daysLeft > 0 && st.daysLeft <= 60)
+      .sort((x, y) => x.daysLeft - y.daysLeft)[0];
+    if (soon) {
+      return { text: `${a.name}: до льготы ${F.days(soon.daysLeft)} — продавать сейчас невыгодно`, go: `portfolio/${a.id}` };
+    }
+  }
+
+  const errors = C.dataHealth(state, today).filter((x) => x.level === 'error');
+  if (errors.length) {
+    return { text: `${errors[0].title}: ${errors[0].detail}`, go: 'more/health' };
+  }
+
+  const soonPay = C.couponCalendar(alive, state.operations, today, 14)[0];
+  if (soonPay) {
+    return { text: `${soonPay.asset.name}: выплата ${F.money(soonPay.amount + soonPay.redemption)} ${F.relativeDate(soonPay.date, today)}`, go: 'portfolio' };
+  }
+
+  // Дисциплина — последней: она про привычку, а не про деньги, и кричать
+  // о ней поверх настоящих потерь неправильно.
+  const goal = C.orderedGoals(state.goals).find((g) => g.status === C.GOAL_ACTIVE && g.planPerDay);
+  if (goal) {
+    const last = state.operations
+      .filter((op) => op.type === C.OP_CONTRIBUTION && D.isValid(op.date))
+      .map((op) => op.date)
+      .sort()
+      .pop();
+    const idle = last ? D.diffDays(today, last) : null;
+    if (idle != null && idle >= 3) {
+      return { text: `${F.days(idle)} без взносов, а нужно ${F.money(goal.planPerDay)} в день`, go: 'goals' };
+    }
+  }
+  return null;
+}
 
 /**
  * Пока активов нет, показывать нечего: капитал ноль, календарь дисциплины —

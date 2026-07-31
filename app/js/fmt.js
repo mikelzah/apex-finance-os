@@ -13,20 +13,47 @@ const MONTHS_SHORT = ['янв', 'фев', 'мар', 'апр', 'мая', 'июн'
 const nf0 = new Intl.NumberFormat('ru-RU', { maximumFractionDigits: 0 });
 const nf2 = new Intl.NumberFormat('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
+/**
+ * Скрытие сумм.
+ *
+ * Заслонка ставится здесь, а не в стилях, и это принципиально. Размытие или
+ * прозрачность оставляют настоящее число в разметке: его видно копированием,
+ * поиском по странице и любым снимком, сделанным до того, как стиль
+ * применился. Здесь суммы не существует вовсе — вместо неё точки, и подсмотреть
+ * нечего.
+ *
+ * Скрываются только деньги. Проценты, доли и количества ничего о человеке
+ * не сообщают: «33,49% портфеля» не выдаёт ни рубля.
+ */
+const HIDE_KEY = 'apex-finance-os:hide-money';
+const MASK = '••• ₽';
+
+export function hidden() {
+  return localStorage.getItem(HIDE_KEY) === 'on';
+}
+
+export function setHidden(on) {
+  if (on) localStorage.setItem(HIDE_KEY, 'on');
+  else localStorage.removeItem(HIDE_KEY);
+}
+
 /** Рубли без копеек — для крупных сумм, где копейки только мешают. */
 export function money(x) {
   if (x == null || Number.isNaN(x)) return '—';
+  if (hidden()) return MASK;
   return `${nf0.format(Math.round(x))} ₽`;
 }
 
 /** Рубли с копейками — там, где важна сверка с банком. */
 export function money2(x) {
   if (x == null || Number.isNaN(x)) return '—';
+  if (hidden()) return MASK;
   return `${nf2.format(x)} ₽`;
 }
 
 export function signedMoney(x) {
   if (x == null || Number.isNaN(x)) return '—';
+  if (hidden()) return MASK;
   const sign = x > 0 ? '+' : '';
   return `${sign}${nf0.format(Math.round(x))} ₽`;
 }

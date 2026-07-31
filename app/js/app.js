@@ -4,10 +4,12 @@ import * as U from './ui.js';
 import * as D from './dates.js';
 import * as F from './fmt.js';
 import * as store from './store.js';
+import * as C from './calc.js';
 import * as theme from './theme.js';
 import * as viewport from './viewport.js';
 import { icon } from './icons.js';
 import * as mascot from './mascot.js';
+import * as lock from './lock.js';
 
 import * as dashboard from './views/dashboard.js';
 import * as goals from './views/goals.js';
@@ -42,9 +44,53 @@ let shownScreen = null;
 // --------------------------------------------------------------------------
 
 function parseHash() {
-  const raw = location.hash.replace(/^#\/?/, '');
+  const raw = location.hash.replace(/^#\/?/, '').split('?')[0];
   const [tab, sub] = raw.split('/');
   return { tab: VIEWS[tab] ? tab : 'dashboard', sub: sub || null };
+}
+
+/**
+ * Быстрый взнос по адресу: #/quick или #/quick?amount=500.
+ *
+ * Виджета у веб-приложения на iOS не будет — это ограничение системы, обойти
+ * нечем. Но «Команды» умеют открыть адрес по голосу или с кнопки действия,
+ * и тогда взнос записывается за одно касание вместо пяти.
+ *
+ * Адрес сразу заменяется на главную: иначе обновление страницы или возврат
+ * по истории записали бы взнос второй раз, и человек узнал бы об этом
+ * из журнала неделю спустя.
+ */
+async function quickFromHash() {
+  const raw = location.hash.replace(/^#\/?/, '');
+  if (!/^quick(\?|$)/.test(raw)) return false;
+
+  const params = new URLSearchParams(raw.split('?')[1] || '');
+  const s = store.getState().settings;
+  const amount = Number(params.get('amount')) || s.quickAmount;
+  const asset = store.getState().assets.find((a) => a.id === s.quickAssetId);
+
+  history.replaceState(null, '', '#/dashboard');
+
+  if (!amount || !asset) {
+    U.toast('Быстрый взнос не настроен — выберите сумму и актив в настройках', 'error');
+    return false;
+  }
+
+  await store.mutate((draft) => {
+    draft.operations.push({
+      id: store.newId('op'),
+      date: D.today(),
+      type: C.OP_CONTRIBUTION,
+      amount,
+      assetId: asset.id,
+      goalId: s.quickGoalId || null,
+      source: C.SOURCE_MANUAL,
+      comment: null,
+    });
+  });
+  mascot.celebrate();
+  U.toast(`Взнос ${F.money(amount)} записан`);
+  return true;
 }
 
 function go(path) {
@@ -232,6 +278,9 @@ function skeleton() {
 }
 
 async function boot() {
+  // Зверёк для пустых экранов. Передаётся, а не импортируется: ui.js не может
+  // тянуть mascot.js напрямую — тот сам берёт оболочку из ui.js, и вышел бы круг.
+  U.useMascot(mascot.portrait);
   theme.apply();
   // До первой отрисовки: от полной высоты считается высота страницы.
   viewport.watch();
@@ -247,9 +296,13 @@ async function boot() {
     // набиралась сама. Кнопка «Снимок за месяц» остаётся, но полагаться
     // на неё нельзя: история, которую надо помнить записывать, не набирается
     // никогда, а без неё нечего раскладывать на вложенное и наросшее.
-    if (!store.needsOnboarding()) await store.snapshotWorth(D.today());
+    if (!store.needsOnboarding()) {
+      await store.snapshotWorth(D.today());
+      await quickFromHash();
+    }
     route = parseHash();
     render();
+    if (lock.enabled()) lock.screen(() => {});
   } catch (err) {
     console.error(err);
     U.clear(screen);
@@ -269,7 +322,18 @@ async function boot() {
   // совпадает, а запись в истории другая, и тогда экран остался бы старым.
   // Сверка с текущим маршрутом не даёт перерисовать дважды: при обычном
   // переходе Safari присылает и popstate, и hashchange.
-  const onNavigate = () => {
+  const onNavigate = async () => {
+    // Адрес быстрого взноса обрабатывается и здесь, а не только при запуске.
+    // Приложение с домашнего экрана обычно уже открыто, и переход на #/quick
+    // тогда не перезагружает страницу — это смена хеша внутри того же
+    // документа. Обработчик только при запуске означал бы, что «Команда»
+    // срабатывает через раз: на холодном старте да, на живом приложении нет.
+    if (await quickFromHash()) {
+      route = parseHash();
+      U.close();
+      render();
+      return;
+    }
     const next = parseHash();
     if (next.tab === route.tab && next.sub === route.sub) return;
     route = next;

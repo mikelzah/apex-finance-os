@@ -11,6 +11,7 @@ import * as forms from '../forms.js';
 import * as theme from '../theme.js';
 import { BUILD } from '../build.js';
 import * as mascot from '../mascot.js';
+import * as lock from '../lock.js';
 import { table } from '../table.js';
 
 const { h } = U;
@@ -179,6 +180,42 @@ function assets(ctx) {
         ])
       : null,
   ];
+}
+
+/**
+ * Включение и выключение замка.
+ *
+ * При включении человек предупреждается о том, чего замок не делает, и о том,
+ * чем он рискует. Данные не шифруются — это штора, а не сейф. Зато обходной
+ * кнопки у неё нет, и потерянный ключ означает потерянный доступ: после
+ * сброса устройства или удаления passkey войти будет нечем, а данные лежат
+ * только в этом телефоне.
+ */
+function toggleLock(refresh) {
+  if (lock.enabled()) {
+    lock.disable();
+    U.toast('Вход открыт');
+    refresh();
+    return;
+  }
+  U.confirmSheet(
+    'Закрыть вход по Face ID?',
+    'Приложение будет спрашивать Face ID при каждом запуске. Обойти это нельзя: '
+    + 'если passkey пропадёт — сброс устройства, удаление ключа, — войти будет нечем, '
+    + 'а данные лежат только в этом телефоне. Сделайте копию, прежде чем включать. '
+    + 'И имейте в виду: сами данные не шифруются, замок закрывает экран, а не базу.',
+    'Включить',
+    async () => {
+      try {
+        await lock.enable();
+        U.toast('Вход закрыт');
+      } catch (err) {
+        U.toast(`Не удалось: ${err.message}`, 'error');
+      }
+      refresh();
+    },
+    'primary',
+  );
 }
 
 // --------------------------------------------------------------------------
@@ -489,6 +526,20 @@ function settings(ctx) {
       }),
       U.row('Напоминание о копии', s.backupReminderDays ? `раз в ${F.days(s.backupReminderDays)}` : 'выключено', {
         onClick: reminder,
+      }),
+      lock.supported()
+        ? U.row('Вход по Face ID', lock.enabled() ? 'включён' : 'выключен', {
+            sub: lock.enabled() ? 'спрашивается при запуске' : 'закрывает приложение от чужих рук',
+            onClick: () => toggleLock(refresh),
+          })
+        : null,
+      U.row('Скрывать суммы', F.hidden() ? 'скрыты' : 'видны', {
+        sub: 'вместо рублей — точки. Проценты и количества остаются',
+        onClick: () => {
+          F.setHidden(!F.hidden());
+          U.tap();
+          refresh();
+        },
       }),
       U.row(`${mascot.NAME} на острове`, mascot.enabled() ? 'висит' : 'выключен', {
         sub: 'висит на Dynamic Island и радуется взносам',

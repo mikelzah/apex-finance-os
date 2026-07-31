@@ -1023,44 +1023,13 @@ h3 {
 
 button.alloc-row { cursor: pointer; }
 
-.alloc-head, /* План довложения: не таблица и не строки списка, а короткая сводка под
-   долями. Отдельной карточкой она оторвалась бы от того, что объясняет. */
-/* Пустое состояние проверки — не серая надпись, а Кубыш: единственный экран,
-   где «ничего не нашлось» это хорошая новость, и выглядеть она должна
-   соответственно. */
-.health-mascot { width: 3.5rem; margin: 0 auto var(--space-3); }
-.health-ok { margin: 0; text-align: center; color: var(--ink-2); font-size: var(--text-base); }
-
-.plan {
-  margin-top: var(--space-4);
-  padding-top: var(--space-4);
-  border-top: 1px solid var(--line);
-}
-
-.plan-head { display: flex; justify-content: space-between; align-items: baseline; gap: var(--space-2); }
-.plan-title { font-size: var(--text-sm); color: var(--ink-3); }
-.plan-total { font-size: var(--text-base); font-weight: var(--weight-semibold); font-variant-numeric: tabular-nums; }
-.plan-row {
-  display: flex;
-  justify-content: space-between;
-  gap: var(--space-2);
-  margin-top: var(--space-2);
-  font-size: var(--text-sm);
-  color: var(--ink-2);
-}
-.plan-amount { font-variant-numeric: tabular-nums; font-weight: var(--weight-medium); }
-
-.alloc-foot { display: flex; justify-content: space-between; align-items: center; gap: var(--space-2); }
+.alloc-head, .alloc-foot { display: flex; justify-content: space-between; align-items: center; gap: var(--space-2); }
 .alloc-name { font-size: var(--text-base); font-weight: var(--weight-medium); }
 .alloc-value { font-size: var(--text-sm); color: var(--ink-2); }
+.alloc-foot { font-size: var(--text-xs); color: var(--ink-4); margin-top: var(--space-2); }
+
 /* План довложения: не таблица и не строки списка, а короткая сводка под
    долями. Отдельной карточкой она оторвалась бы от того, что объясняет. */
-/* Пустое состояние проверки — не серая надпись, а Кубыш: единственный экран,
-   где «ничего не нашлось» это хорошая новость, и выглядеть она должна
-   соответственно. */
-.health-mascot { width: 3.5rem; margin: 0 auto var(--space-3); }
-.health-ok { margin: 0; text-align: center; color: var(--ink-2); font-size: var(--text-base); }
-
 .plan {
   margin-top: var(--space-4);
   padding-top: var(--space-4);
@@ -1080,7 +1049,64 @@ button.alloc-row { cursor: pointer; }
 }
 .plan-amount { font-variant-numeric: tabular-nums; font-weight: var(--weight-medium); }
 
-.alloc-foot { font-size: var(--text-xs); color: var(--ink-4); margin-top: var(--space-2); }
+/* Экран замка. Во весь экран и поверх всего: под ним содержимое уже
+   построено, и полупрозрачная заслонка выдала бы его снимком. */
+.lock {
+  position: absolute;
+  inset: 0;
+  z-index: 300;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-4);
+  padding: 0 var(--space-8);
+  background:
+    radial-gradient(80% 55% at 50% 30%, var(--accent-wash), transparent 70%),
+    var(--bg);
+}
+
+.lock-mascot { width: 4.5rem; }
+.lock-title { margin: 0; font-size: var(--text-2xl); font-weight: var(--weight-bold); letter-spacing: var(--tracking-2xl); }
+.lock .btn { min-width: 12rem; }
+.lock-note { margin: 0; min-height: 1.2em; font-size: var(--text-sm); color: var(--ink-3); text-align: center; }
+
+/* Фраза от Кубыша. Не карточка и не плашка тревоги: это подсказка, а не
+   происшествие, и весить она должна как строка, а не как раздел. */
+.advice {
+  appearance: none;
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  width: 100%;
+  margin-bottom: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--card-edge);
+  border-radius: var(--radius-full);
+  background: var(--card);
+  box-shadow: var(--elev-1), inset 0 1px 0 var(--glass-sheen);
+  color: var(--ink-2);
+  font: inherit;
+  font-size: var(--text-sm);
+  text-align: left;
+  cursor: pointer;
+}
+
+.advice:active { filter: brightness(0.95); }
+.advice-mascot { width: 1.75rem; flex: none; }
+.advice-text { flex: 1; min-width: 0; }
+
+/* Пустое состояние — не серая надпись посреди белого поля. Такая надпись
+   сообщает «здесь ничего нет» и на этом заканчивается, а экран продолжает
+   выглядеть сломанным. Зверёк рядом снимает это ощущение, ничего не добавляя
+   к смыслу. */
+.empty-box { display: flex; flex-direction: column; align-items: center; gap: var(--space-2); padding: var(--space-4) 0; }
+.empty-box.is-quiet { padding: 0; }
+.empty-mascot { width: 2.75rem; opacity: 0.85; }
+
+/* Проверка данных: единственный экран, где пустота — хорошая новость. */
+.health-mascot { width: 3.5rem; margin: 0 auto var(--space-3); }
+.health-ok { margin: 0; text-align: center; color: var(--ink-2); font-size: var(--text-base); }
 
 .alloc-track {
   position: relative;
