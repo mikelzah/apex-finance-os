@@ -50,8 +50,12 @@ function overview(ctx) {
   const noClass = state.assets.filter(
     (a) => a.status === C.STATUS_ACTIVE && !C.ASSET_CLASSES.includes(a.assetClass),
   );
+  const inPortfolio = state.assets.filter(
+    (a) => C.ASSET_CLASSES.includes(a.assetClass) && a.status !== C.STATUS_SOLD,
+  );
+
   return [
-    total_(total),
+    total_(total, C.returnOf(inPortfolio, state.operations, ctx.today)),
 
     ...holdings(ctx, total),
 
@@ -86,10 +90,17 @@ function overview(ctx) {
  * «В расчёте долей» объясняла сумму через механику расчёта, хотя человек
  * читает её как «сколько у меня в портфеле».
  */
-function total_(total) {
+function total_(total, rate) {
   return h('section', { class: 'hero' }, [
     h('p', { class: 'hero-label', text: 'Портфель' }),
     h('p', { class: 'hero-value', text: F.money(total) }),
+    // Доходность годовых — единственное число, которым портфель сравним
+    // с вкладом и сам с собой год назад. Пустоты под суммой на её месте
+    // не остаётся: если посчитать нельзя, строки просто нет.
+    rate == null ? null : h('p', { class: `hero-delta ${rate >= 0 ? 'is-up' : 'is-down'}` }, [
+      h('span', { text: `${rate >= 0 ? '+' : ''}${F.percent(rate)}` }),
+      h('span', { class: 'hero-delta-word', text: 'годовых' }),
+    ]),
   ]);
 }
 
@@ -120,8 +131,18 @@ function holdings(ctx, total) {
     if (!own.length) continue;
 
     const sum = own.reduce((s, r) => s + r.value, 0);
+    // Доходность класса — рядом с его суммой, а не отдельной строкой: это
+    // две характеристики одного и того же, и разносить их значило бы
+    // заставить сверять глазами два места.
+    const rate = C.returnOf(own.map((r) => r.asset), ops, ctx.today);
     groups.push(h('div', { class: 'group' }, [
-      U.sectionTitle(cls, h('span', { class: 'section-sum', text: F.money(sum) })),
+      U.sectionTitle(cls, h('span', { class: 'section-sum' }, [
+        h('span', { text: F.money(sum) }),
+        rate == null ? null : h('span', {
+          class: `section-rate ${rate >= 0 ? 'is-up' : 'is-down'}`,
+          text: `${rate >= 0 ? '+' : ''}${F.percent(rate)}`,
+        }),
+      ])),
       ...own.map((r) =>
         U.row(r.asset.name, F.money(r.value), {
           sub: holdingSub(r.asset, total, r.value, ops),
@@ -240,7 +261,7 @@ function instrument(ctx) {
 
     // Средняя цена есть только там, где сделки записаны. У бумаги, заведённой
     // одним начальным количеством, её взять неоткуда — и придумывать нечего.
-    asset.ticker ? averageCard(asset, state.operations, value, held) : null,
+    asset.ticker ? averageCard(asset, state.operations, value, held, today) : null,
 
     priceCard(state, asset),
 
@@ -289,7 +310,7 @@ function opSub(op) {
  * придуманное число за результат. В этом случае честнее сказать, чего
  * не хватает, чем показать красивую, но выдуманную прибыль.
  */
-function averageCard(asset, operations, value, held) {
+function averageCard(asset, operations, value, held, today) {
   let spent = 0;
   let bought = 0;
   for (const op of operations) {
@@ -320,6 +341,16 @@ function averageCard(asset, operations, value, held) {
       U.stat('Сейчас', `${F.num(asset.price, 4)} ₽`),
     ]),
     payouts ? U.stat('Выплачено', F.money(payouts), { hint: 'дивиденды и купоны на руках' }) : null,
+    (() => {
+      // Доходность отвечает на «стоило ли», прибыль — только на «сколько».
+      // Сто рублей за месяц и сто за пять лет — разные вложения, и различает
+      // их именно эта строка.
+      const rate = C.returnOf([asset], operations, today);
+      return rate == null ? null : U.stat('Доходность', `${rate >= 0 ? '+' : ''}${F.percent(rate)} годовых`, {
+        class: rate >= 0 ? 'is-good' : 'is-bad',
+        hint: 'с учётом дат сделок и выплат',
+      });
+    })(),
     opening
       ? U.stat('Цена входа известна не для всей позиции', `${F.num(opening, 0)} шт`, {
           hint: 'начальное количество заведено без сделки — результат по позиции не посчитать',
