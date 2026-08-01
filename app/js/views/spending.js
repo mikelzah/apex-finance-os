@@ -16,7 +16,6 @@ import * as D from '../dates.js';
 import * as charts from '../charts.js';
 import * as store from '../store.js';
 import * as S from '../statement.js';
-import { table } from '../table.js';
 import { importSheet, screenshotSheet } from '../import.js';
 
 const { h } = U;
@@ -66,7 +65,10 @@ export function render(ctx) {
       ]),
     ]),
 
-    U.card([
+    // Когда доходов в выписке нет, вердикта нет тоже: приложение об этом
+    // уже сказало под словом «Свободно», и повторять это блоком на четыре
+    // строки при каждом заходе значит выпрашивать выписку, а не считать.
+    verdict.level === 'none' ? null : U.card([
       U.callout(`${verdict.title}. ${verdict.text}`, level(verdict.level)),
     ]),
 
@@ -117,48 +119,9 @@ export function render(ctx) {
       : null,
 
     showAll ? U.card([
-      U.sectionTitle('Записи', U.button('Со скриншота', () => screenshotSheet({ onDone: refresh }))),
-      h('p', { class: 'field-hint', text: 'Все записи периода — вместе с доходами и переводами' }),
-      table({
-        rows: [...stats.rows].sort((a, b) => (a.date < b.date ? 1 : -1)).slice(0, 200),
-        sortKey: 'date',
-        dir: 'desc',
-        onRow: (row) => rowSheet(row, refresh),
-        empty: 'За этот период записей нет.',
-        columns: [
-          {
-            key: 'date',
-            title: 'Дата',
-            value: (r) => r.date,
-            render: (r) => F.dateShort(r.date),
-            total: () => 'Итого',
-          },
-          {
-            key: 'category',
-            title: 'Категория',
-            value: (r) => r.category || '',
-            render: (r) => h('span', { class: 'dt-clip', text: r.category || '—' }),
-          },
-          {
-            key: 'description',
-            title: 'Где',
-            value: (r) => r.description || '',
-            render: (r) => h('span', { class: 'dt-clip', text: r.description || '—' }),
-          },
-          {
-            key: 'amount',
-            title: 'Сумма',
-            align: 'right',
-            value: (r) => signedOf(r),
-            render: (r) => (r.kind === C.SPEND_MOVE
-              ? F.moneyExact(r.amount)
-              : F.signedMoneyExact(signedOf(r))),
-            cellClass: (r) => (r.kind === C.SPEND_MOVE ? 'dt-neutral' : signedOf(r) >= 0 ? 'dt-plus' : 'dt-minus'),
-            total: (rows) => F.signedMoneyExact(rows.reduce((s, r) => s + signedOf(r), 0)),
-          },
-        ],
-      }),
-    ], { class: 'card-table' }) : null,
+      U.sectionTitle('Записи'),
+      ...allRows(stats.rows, refresh),
+    ]) : null,
   ];
 }
 
@@ -182,6 +145,41 @@ function sourceSheet(ctx) {
       onClick: () => { api.close(); screenshotSheet({ onDone: ctx.refresh }); },
     }),
   ]);
+}
+
+/**
+ * Все записи периода списком, а не таблицей.
+ *
+ * Таблица на четыре колонки в ширину телефона не помещается, и уезжает
+ * за край именно сумма — то единственное, ради чего в список смотрят.
+ * Строка в две строчки влезает целиком: где и сколько сверху, дата
+ * и категория подписью снизу.
+ */
+function allRows(rows, refresh) {
+  const list = [...rows].sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0));
+  if (!list.length) return [U.emptyState('За этот период записей нет.')];
+
+  const total = list.reduce((sum, r) => sum + signedOf(r), 0);
+  return [
+    ...list.slice(0, 200).map((r) => h('button', {
+      class: 'spend-op',
+      type: 'button',
+      onclick: () => rowSheet(r, refresh),
+    }, [
+      h('span', { class: 'spend-op-main' }, [
+        h('span', { class: 'spend-op-name', text: r.description || '—' }),
+        h('span', { class: 'spend-op-sub', text: `${F.dateShort(r.date)} · ${r.category || 'Прочее'}` }),
+      ]),
+      h('span', {
+        class: `spend-op-sum ${r.kind === C.SPEND_MOVE ? 'is-neutral' : signedOf(r) >= 0 ? 'is-plus' : 'is-minus'}`,
+        text: r.kind === C.SPEND_MOVE ? F.moneyExact(r.amount) : F.signedMoneyExact(signedOf(r)),
+      }),
+    ])),
+    h('div', { class: 'spend-total' }, [
+      h('span', { text: 'Итого' }),
+      h('span', { class: total >= 0 ? 'is-plus' : 'is-minus', text: F.signedMoneyExact(total) }),
+    ]),
+  ];
 }
 
 // --------------------------------------------------------------------------
