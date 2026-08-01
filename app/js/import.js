@@ -256,7 +256,8 @@ export function screenshotSheet(options = {}) {
     const area = U.textarea('', { placeholder: 'Вставьте сюда текст со скриншота' });
     const preview = h('div', { class: 'preview' });
     const summary = h('p', { class: 'sheet-note' });
-    let parsed = { rows: [], dated: false };
+    const checks = h('div', { class: 'checks' });
+    let parsed = { rows: [], dated: false, totals: [] };
 
     function update() {
       parsed = parseScreen(area.value, today);
@@ -275,13 +276,26 @@ export function screenshotSheet(options = {}) {
           + (parsed.dated ? '' : ' Дата в тексте не найдена — всем записям встанет сегодняшнее число.')
         : 'Сумм в тексте не нашлось. Нужны строки вида «Пятёрочка −1 240,50 ₽».';
 
-      for (const row of parsed.rows.slice(0, 8)) {
+      // Сверка с итогом дня. Банк печатает его над списком, и это
+      // единственный способ поймать переехавшую цифру: сумма, прочитанная
+      // неверно, выглядит совершенно правдоподобно, и глазами её не найти.
+      U.clear(checks);
+      for (const line of controlLines(parsed)) {
+        checks.appendChild(h('p', { class: `check ${line.ok ? 'is-ok' : 'is-bad'}`, text: line.text }));
+      }
+
+      for (const row of parsed.rows) {
         preview.appendChild(h('div', { class: 'preview-row' }, [
           h('span', { class: 'preview-date', text: F.dateShort(row.date) }),
           h('span', { class: 'preview-text', text: `${row.category} · ${row.description || '—'}` }),
           h('span', {
             class: `preview-sum ${row.kind === S.KIND_IN ? 'is-plus' : row.kind === S.KIND_MOVE ? 'is-neutral' : 'is-minus'}`,
-            text: row.kind === S.KIND_MOVE ? F.money(row.amount) : F.signedMoney(row.kind === S.KIND_IN ? row.amount : -row.amount),
+            // Копейки здесь показываются полностью: это экран сверки,
+            // и «−1 240 ₽» вместо «−1 240,50 ₽» скрывает ровно то,
+            // ради чего в него смотрят.
+            text: row.kind === S.KIND_MOVE
+              ? F.moneyExact(row.amount)
+              : F.signedMoneyExact(row.kind === S.KIND_IN ? row.amount : -row.amount),
           }),
         ]));
       }
@@ -358,9 +372,44 @@ export function screenshotSheet(options = {}) {
       }, { class: 'btn-wide' }),
       U.field('Текст со снимка', area, 'Заполняется распознаванием, но можно вписать и руками'),
       summary,
+      checks,
       U.sectionTitle('Что получилось'),
       preview,
       U.callout('Без плюса сумма считается тратой. Поправить вид и категорию можно у каждой записи после загрузки.', 'warn'),
     ];
+  });
+}
+
+/**
+ * Сверка с итогами дня, которые банк печатает над списком.
+ *
+ * Расхождение чаще всего значит не ошибку разбора, а обрезанный снимок:
+ * человек снял экран посередине, и часть операций дня в него не попала.
+ * Поэтому недобор и перебор описаны по-разному — это разные поводы.
+ */
+function controlLines(parsed) {
+  return (parsed.totals || []).map((total) => {
+    const mine = parsed.rows
+      .filter((r) => r.date === total.date && r.kind === (total.income ? S.KIND_IN : S.KIND_OUT))
+      .reduce((sum, r) => sum + r.amount, 0);
+    const diff = Math.round((mine - total.amount) * 100) / 100;
+    const day = F.date(total.date);
+    const word = total.income ? 'получено' : 'потрачено';
+
+    if (Math.abs(diff) < 0.01) {
+      return { ok: true, text: `${day}: ${word} ${F.moneyExact(total.amount)} — сходится с банком` };
+    }
+    if (diff < 0) {
+      return {
+        ok: false,
+        text: `${day}: банк насчитал ${F.moneyExact(total.amount)}, а в разборе ${F.moneyExact(mine)}.`
+          + ' Часть операций дня не попала в снимок — снимите список целиком.',
+      };
+    }
+    return {
+      ok: false,
+      text: `${day}: банк насчитал ${F.moneyExact(total.amount)}, а в разборе ${F.moneyExact(mine)}.`
+        + ' Что-то прочиталось неверно — сверьте суммы со снимком.',
+    };
   });
 }

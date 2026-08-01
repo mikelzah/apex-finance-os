@@ -1724,3 +1724,18 @@ body.has-mascot .header { padding-top: calc(var(--safe-top) + var(--space-6)); }
 .preview-sum.is-plus { color: var(--good-ink); }
 .preview-sum.is-minus { color: var(--critical-ink); }
 .preview-sum.is-neutral { color: var(--ink-3); }
+
+/* Сверка разбора с итогом дня из банка. Зелёная строка тут важнее красной:
+   она единственная даёт право не перепроверять суммы глазами. */
+.checks { display: grid; gap: var(--space-1); }
+
+.check {
+  font-size: var(--text-xs);
+  line-height: 1.4;
+  padding: var(--space-2);
+  border-radius: var(--radius-md);
+  border-left: 3px solid var(--line);
+}
+
+.check.is-ok { background: var(--good-wash); border-left-color: var(--good); }
+.check.is-bad { background: var(--warn-wash); border-left-color: var(--warn); }

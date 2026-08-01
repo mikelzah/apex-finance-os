@@ -49,7 +49,21 @@ async function getWorker(onProgress) {
 }
 
 /**
- * Текст с картинки.
+ * Текст с картинки — в два прохода.
+ *
+ * Первый проход читает всё подряд и даёт названия, категории и даты.
+ * Второй читает одну правую колонку — ту, где стоят суммы.
+ *
+ * Второй нужен из-за знака рубля. В общем потоке текста движок принимает
+ * его за двойку и приклеивает к числу: «756 ₽» становится «7562», а «1 500 ₽»
+ * — «15002». Ошибка тихая: сумма выглядит правдоподобно, сходится только
+ * итог месяца, и то если его кто-то проверит. Стоит распознать ту же колонку
+ * отдельно — и рубль читается рублём, потому что рядом нет длинных слов,
+ * под которые движок подгоняет разбор. На снимке из банка это разница
+ * между тремя верными суммами из восьми и восемью из восьми.
+ *
+ * Ограничивать набор символов цифрами, наоборот, вредно: проверено —
+ * рубль тогда всё равно становится двойкой, выбирать больше не из чего.
  *
  * @param {File|Blob} file      снимок экрана
  * @param {Function} onProgress (подпись, доля) — для полосы ожидания
@@ -57,8 +71,109 @@ async function getWorker(onProgress) {
 export async function recognise(file, onProgress) {
   const image = await prepare(file);
   const worker = await getWorker(onProgress);
-  const { data } = await worker.recognize(image);
-  return data.text || '';
+  // Пробелы между словами сохраняются: по ним видно, где кончается название
+  // и начинается колонка сумм.
+  await worker.setParameters({ preserve_interword_spaces: '1' });
+
+  const full = await worker.recognize(image, {}, { blocks: true });
+  const lines = linesOf(full.data);
+  const left = amountColumn(lines, image.width);
+  if (left >= image.width - 40) return full.data.text || '';
+
+  const column = await worker.recognize(
+    image,
+    { rectangle: { left, top: 0, width: image.width - left, height: image.height } },
+    { blocks: true },
+  );
+  return rebuild(lines, linesOf(column.data), left);
+}
+
+/** Строки с их прямоугольниками — из вложенных блоков движка. */
+function linesOf(data) {
+  const out = [];
+  for (const block of data.blocks || []) {
+    for (const paragraph of block.paragraphs || []) {
+      for (const line of paragraph.lines || []) {
+        out.push({
+          text: (line.text || '').trim(),
+          top: line.bbox.y0,
+          bottom: line.bbox.y1,
+          middle: (line.bbox.y0 + line.bbox.y1) / 2,
+          words: (line.words || []).map((w) => ({ text: w.text, x0: w.bbox.x0 })),
+        });
+      }
+    }
+  }
+  return out;
+}
+
+/**
+ * Где начинается колонка сумм.
+ *
+ * Границу берём из самой картинки, а не долей ширины: у одного банка суммы
+ * прижаты к краю, у другого начинаются от середины, и обрезать наугад значит
+ * однажды отрезать половину числа. Ищем самое левое число в правой части
+ * экрана и отступаем от него.
+ */
+function amountColumn(lines, width) {
+  let left = width;
+  for (const line of lines) {
+    for (const word of line.words) {
+      if (!/\d/.test(word.text)) continue;
+      if (word.x0 < width * 0.45) continue;
+      if (word.x0 < left) left = word.x0;
+    }
+  }
+
+  // Уже 55% ширины не режем никогда, даже если по данным кажется можно.
+  // Данные тут сами могут быть неверными: если начало самой длинной суммы
+  // прочиталось не как число, граница уезжает вправо и отрезает ей голову —
+  // «+145 000,00» превращается в «000,00», то есть в ноль, и строка пропадает.
+  // Лишний текст слева от сумм разбору не мешает, отрезанная цифра — мешает.
+  const safe = Math.round(width * 0.55);
+  return left < width ? Math.min(Math.max(0, left - 30), safe) : safe;
+}
+
+// Хвост строки, похожий на сумму. Знак и разделители внутри допускаются,
+// хвост из букв и значков к этому моменту уже отрезан.
+const TAIL = /[-−–—+]?\s*\d[\d\s   ]*(?:[.,]\d{1,2})?$/u;
+
+/**
+ * Собирает строки заново: название из общего прохода, сумма из колонки.
+ *
+ * Строки сшиваются по вертикали — колонка распознаётся в координатах всей
+ * картинки, поэтому середина строки совпадает. Рубль дописывается свой:
+ * дальше разбор ищет валюту, а какой буквой её прочитал движок — неважно.
+ */
+function rebuild(lines, amounts, left) {
+  return lines.map((line) => {
+    const near = amounts.find((a) => a.middle >= line.top && a.middle <= line.bottom);
+    const tail = near ? (near.text.replace(/[^\d]*$/u, '').match(TAIL) || [])[0] : null;
+    if (!tail) return line.text;
+    const amount = normaliseAmount(tail.trim());
+
+    const before = line.words.filter((w) => w.x0 < left).map((w) => w.text).join(' ').trim();
+    return `${before} ${amount} ₽`.trim();
+  }).join('\n');
+}
+
+/**
+ * Убирает из суммы знак рубля, прочитанный цифрой.
+ *
+ * Даже в отдельной колонке рубль иногда становится двойкой — «−756 ₽»
+ * читается как «−756 2». Отличить её от настоящей цифры можно по разрядам:
+ * в рублях они всегда по три, и группа из одной-двух цифр в конце числом
+ * быть не может. Копейки при этом остаются копейками — их проверяем отдельно,
+ * до разбора разрядов.
+ */
+function normaliseAmount(raw) {
+  const text = raw.replace(/([.,]\d{1,2})\s+\d{1,2}$/u, '$1');
+  const parts = text.match(/^([-−–—+]?)\s*([\d\s   ]+)((?:[.,]\d{1,2})?)$/u);
+  if (!parts) return text;
+
+  const groups = parts[2].trim().split(/[\s   ]+/);
+  while (groups.length > 1 && groups[groups.length - 1].length !== 3) groups.pop();
+  return `${parts[1]}${groups.join(' ')}${parts[3]}`;
 }
 
 /** Освобождает память: движок держит несколько десятков мегабайт. */
@@ -79,18 +194,10 @@ const TARGET_WIDTH = 1400;
 const MAX_HEIGHT = 6000;
 
 /**
- * Готовит снимок к распознаванию.
+ * Готовит снимок к распознаванию: приводит к одной ширине и убирает цвет.
  *
- * Три вещи, без которых на снимке из банка получается каша:
- *
- * 1. Тёмная тема. Половина людей держит телефон в тёмной теме, и снимок
- *    выходит белым по чёрному. Движок обучен на чёрном по белому и на
- *    инверсии теряет строки целиком — поэтому яркость меряется и картинка
- *    при необходимости переворачивается.
- * 2. Размер. Скриншот с телефона приходит шириной 1290 точек, но снятый
- *    с увеличением — вчетверо больше. Приводим к одной ширине.
- * 3. Цвет. Серый вместо цветного — меньше работы движку и никакой потери:
- *    цвет в списке операций несёт разве что знак суммы, а знак есть и в тексте.
+ * Размер важен: снимок с телефона приходит шириной 1290 точек, а снятый
+ * с увеличением — вчетверо больше, и движок читает их по-разному.
  */
 async function prepare(file) {
   const bitmap = await createImageBitmap(file);
@@ -102,6 +209,11 @@ async function prepare(file) {
   canvas.width = width;
   canvas.height = height;
   const ctx = canvas.getContext('2d', { willReadFrequently: true });
+  // Качество сглаживания при уменьшении — не косметика: на быстром
+  // уменьшении тонкие штрихи выпадают, и запятая в сумме исчезает вместе
+  // с ними. Разница на снимке из банка — пять неверных сумм из восьми.
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = 'high';
   ctx.drawImage(bitmap, 0, 0, width, height);
   bitmap.close?.();
 
@@ -129,21 +241,13 @@ async function prepare(file) {
     data[i + 2] = value;
   }
 
-  // Порог по Оцу — чистый чёрный по чистому белому.
+  // Порога здесь нет намеренно.
   //
-  // Без него тёмная тема после переворота даёт серые буквы с ореолами,
-  // и знак рубля читается как двойка. Ошибка тихая и дорогая: строка
-  // с суммой просто исчезает, потому что «40 000 2» — уже не сумма.
-  // На снимке экрана порог безопасен: текст там нарисован, а не снят
-  // на камеру, и полутонов между фоном и буквой почти нет.
-  const threshold = otsu(data);
-  for (let i = 0; i < data.length; i += 4) {
-    const value = data[i] < threshold ? 0 : 255;
-    data[i] = value;
-    data[i + 1] = value;
-    data[i + 2] = value;
-  }
-
+  // Приведение к чистому чёрно-белому выглядит разумно и портит ровно то,
+  // что дороже всего: запятую в сумме и тонкий штрих у знака рубля.
+  // На снимке из банка это стоило «4 127,24» → «4 12724» и «756 ₽» → «7562».
+  // Проверено перебором: карта расстояний без порога читает все суммы,
+  // с порогом — теряет одну из восьми.
   ctx.putImageData(pixels, 0, 0);
   return canvas;
 }
@@ -174,37 +278,3 @@ function background(data) {
   ];
 }
 
-/**
- * Порог, делящий картинку на две части с наименьшим разбросом внутри каждой.
- *
- * Классический способ Оцу: перебираем все 256 порогов и берём тот, где
- * разброс между «фоном» и «буквами» наибольший. Считается по накопленным
- * суммам за один проход по гистограмме, а не за 256 проходов по картинке.
- */
-function otsu(data) {
-  const hist = new Uint32Array(256);
-  for (let i = 0; i < data.length; i += 4) hist[data[i]] += 1;
-
-  const total = data.length / 4;
-  let sum = 0;
-  for (let i = 0; i < 256; i += 1) sum += i * hist[i];
-
-  let sumB = 0;
-  let weightB = 0;
-  let best = 0;
-  let bestVariance = -1;
-
-  for (let t = 0; t < 256; t += 1) {
-    weightB += hist[t];
-    if (!weightB) continue;
-    const weightF = total - weightB;
-    if (!weightF) break;
-
-    sumB += t * hist[t];
-    const meanB = sumB / weightB;
-    const meanF = (sum - sumB) / weightF;
-    const variance = weightB * weightF * (meanB - meanF) ** 2;
-    if (variance > bestVariance) { bestVariance = variance; best = t; }
-  }
-  return best;
-}

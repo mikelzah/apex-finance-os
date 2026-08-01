@@ -39,6 +39,19 @@ const BARE = /([+\-−–—])\s*(\d[\d\s   ]*[.,]\d{2})(?!\d)/u;
 const NOISE = /кэшб|кешб|cashback|бонус|балл|начислим|накоплено|доступно|остаток по счёту|остаток по счету/i;
 
 /**
+ * Итог дня — «Вы потратили 4 865,24 ₽» под заголовком с датой.
+ *
+ * Записывать его операцией нельзя: это сумма всех остальных строк, и день
+ * удваивается. Но и выбрасывать жалко — банк тут сам даёт контрольную сумму,
+ * по которой видно, всё ли прочиталось верно. Она и есть единственная защита
+ * от тихо переехавшей цифры.
+ */
+// Граница слова здесь не \b, а явная проверка: \b в JavaScript знает только
+// латиницу, и после «потратили» никакой границы не находит — правило молча
+// не срабатывает ни на одной русской строке.
+const TOTAL = /^(?:вы\s+потратили|вы\s+получили|потрачено|получено|израсходовано|итого|всего)(?![\p{L}])/iu;
+
+/**
  * Разбирает текст, снятый со скриншота.
  *
  * @param {string} text   текст, распознанный телефоном
@@ -51,6 +64,7 @@ export function parseScreen(text, today) {
     .filter(Boolean);
 
   const rows = [];
+  const totals = [];
   let date = null;
   let dated = false;
   let pending = [];
@@ -60,6 +74,13 @@ export function parseScreen(text, today) {
     const asDate = readDate(line, today);
     if (asDate) { date = asDate; dated = true; pending = []; continue; }
     if (NOISE.test(line)) continue;
+
+    if (TOTAL.test(line)) {
+      const sum = readAmount(line);
+      if (sum) totals.push({ date: date || today, amount: sum.amount, income: /получ/i.test(line) });
+      pending = [];
+      continue;
+    }
 
     const money = readAmount(line);
     if (!money) {
@@ -104,13 +125,32 @@ export function parseScreen(text, today) {
       date: date || today,
       amount: money.amount,
       kind: money.kind,
-      description: description.slice(0, 120),
-      bankCategory: bankCategory ? bankCategory.slice(0, 60) : null,
+      description: clean(description).slice(0, 120),
+      bankCategory: bankCategory ? clean(bankCategory).slice(0, 60) || null : null,
     });
     pending = [];
   }
 
-  return { rows, dated };
+  return { rows, dated, totals };
+}
+
+/**
+ * Убирает следы значков из названия.
+ *
+ * Иконка магазина стоит слева от названия, и распознавание превращает её
+ * в одинокий символ: «Ф Пётр Сергеевич К.», «@ Дикси», «|. Перекрёсток».
+ * Справа так же оседают часики неподтверждённой операции — «©», «®».
+ * Ни то ни другое не название, а в правиле категорий такой мусор мешает.
+ */
+function clean(text) {
+  return String(text || '')
+    .replace(/^[^\p{L}\d]+/u, '')
+    // Одинокая буква в начале — почти всегда буква с иконки: настоящие
+    // названия так не начинаются, а «М.Видео» пишется без пробела.
+    .replace(/^[\p{L}]\s+(?=[\p{L}\d])/u, '')
+    .replace(/[\s©®™@|]+$/u, '')
+    .replace(/\s{2,}/g, ' ')
+    .trim();
 }
 
 // --------------------------------------------------------------------------
