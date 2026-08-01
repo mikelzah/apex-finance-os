@@ -321,12 +321,64 @@ const INCOME_RULES = [
 ];
 
 /**
- * Категория строки. Своё правило человека сильнее встроенного, встроенное
- * сильнее категории банка: банк размечает по коду точки продаж и регулярно
- * относит аптеку к «Здоровью», а ту же аптеку в супермаркете — к «Продуктам».
+ * Что уже известно про эти магазины из прежних записей.
+ *
+ * Человек один раз поправил категорию — значит, он ответил на вопрос,
+ * и спрашивать снова тот же вопрос про тот же магазин незачем. Это сильнее
+ * любого встроенного правила: своё знание о своих тратах точнее общего.
+ *
+ * Ключей два. Полное описание — для точного совпадения. Самое длинное слово
+ * из него — для случаев, когда банк дописывает к названию номер точки
+ * или город, и «PYATEROCHKA 4512» с «PYATEROCHKA 7788» перестают совпадать.
  */
-export function categorise(row, userRules = []) {
+export function learnCategories(spending = []) {
+  const learned = new Map();
+  // Идём от старых к новым: последняя правка человека и должна победить.
+  const rows = [...spending].sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
+
+  for (const row of rows) {
+    if (!row.category || row.kind === KIND_MOVE) continue;
+    const full = normalise(row.description);
+    if (full) learned.set(full, row.category);
+    const word = signature(row.description);
+    if (word) learned.set(word, row.category);
+  }
+  return learned;
+}
+
+function normalise(text) {
+  return String(text || '').toLowerCase().replace(/\s+/g, ' ').trim();
+}
+
+/**
+ * Опознавательное слово названия — самое длинное. В «SUPERMARKET PYATEROCHKA
+ * 4512 MOSCOW» это «PYATEROCHKA», а не «MOSCOW» и не номер точки.
+ */
+function signature(text) {
+  const words = normalise(text)
+    .split(/[^\p{L}\p{N}]+/u)
+    .filter((w) => w.length >= 4 && !/^\d+$/.test(w));
+  if (!words.length) return null;
+  return words.sort((a, b) => b.length - a.length)[0];
+}
+
+/**
+ * Категория строки. Порядок такой: прежние записи, потом своё правило,
+ * потом встроенное, и только в конце категория банка. Банк размечает
+ * по коду точки продаж и регулярно относит аптеку к «Здоровью», а ту же
+ * аптеку в супермаркете — к «Продуктам».
+ */
+export function categorise(row, userRules = [], learned = null) {
   const text = `${row.description || ''} ${row.bankCategory || ''}`;
+
+  if (learned && learned.size) {
+    const byFull = learned.get(normalise(row.description));
+    if (byFull) return byFull;
+    const word = signature(row.description);
+    const byWord = word ? learned.get(word) : null;
+    if (byWord) return byWord;
+  }
+
   for (const rule of userRules) {
     if (!rule.match) continue;
     if (text.toLowerCase().includes(String(rule.match).toLowerCase())) return rule.category;
@@ -335,7 +387,10 @@ export function categorise(row, userRules = []) {
   for (const [re, category] of list) {
     if (re.test(text)) return category;
   }
-  if (row.bankCategory) return row.bankCategory;
+  // Категория банка принимается только если это слово, а не огрызок.
+  // После распознавания в неё попадает что угодно: от строки с кэшбэком
+  // остаётся одинокая «с», и она становилась категорией целой траты.
+  if (row.bankCategory && /\p{L}{3}/u.test(row.bankCategory)) return row.bankCategory;
   return row.kind === KIND_IN ? 'Прочий доход' : 'Прочее';
 }
 

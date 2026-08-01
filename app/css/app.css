@@ -1856,3 +1856,45 @@ body.has-mascot .header { padding-top: calc(var(--safe-top) + var(--space-6)); }
 
 .spend-total .is-plus { color: var(--good-ink); }
 .spend-total .is-minus { color: var(--critical-ink); }
+
+/* Строка разбора: сверху нажимаемая часть с галочкой, снизу дата
+   и выбор категории. Две строчки вместо одной — потому что выбор должен
+   быть виден, а не прятаться за долгим нажатием. */
+.preview-row.is-pick {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--space-1);
+  padding: var(--space-2) 0;
+  border-top: 1px solid var(--line-soft);
+}
+
+.preview-row.is-pick:first-child { border-top: 0; }
+
+.preview-pick {
+  display: grid;
+  grid-template-columns: 1.2em 1fr auto;
+  gap: var(--space-2);
+  align-items: baseline;
+  width: 100%;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  padding: 0;
+  cursor: pointer;
+}
+
+.preview-meta {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: var(--space-2);
+  align-items: center;
+  padding-left: calc(1.2em + var(--space-2));
+}
+
+.preview-cat {
+  font-size: var(--text-xs);
+  padding: var(--space-1) var(--space-2);
+  min-height: 0;
+}

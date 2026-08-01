@@ -197,10 +197,14 @@ function isTime(line) {
  * доходом: двадцать рублей прихода под каждой тратой, и норма сбережений
  * растёт на ровном месте.
  *
- * Отличаем по смыслу, а не по слову: кэшбэк — это возврат части трата,
- * он меньше её и идёт в другую сторону. Строка при этом обязана нести
- * ещё и текст: одинокое «+20 ₽» может оказаться настоящей операцией,
- * и съедать её молча нельзя.
+ * Отличаем по смыслу, а не по слову: кэшбэк — это возврат части траты,
+ * он меньше её и идёт в другую сторону.
+ *
+ * Требования «на строке должен быть текст» тут нет. Оно казалось защитой
+ * от съедания настоящей операции, а на деле работало наоборот: у настоящей
+ * операции название есть всегда, а у подписи — не всегда. В Райффайзене
+ * кэшбэк стоит строкой без единого слова, «+ 8,1 ₽», и требование текста
+ * пропускало его в доходы.
  */
 function nextPlain(lines, from, today, main) {
   for (let i = from + 1; i < Math.min(lines.length, from + 3); i += 1) {
@@ -210,7 +214,7 @@ function nextPlain(lines, from, today, main) {
 
     const money = readAmount(line);
     if (!money) return i;
-    if (isCashback(money, main, line)) return i;
+    if (isCashback(money, main)) return i;
     return -1;
   }
   return -1;
@@ -220,10 +224,9 @@ function nextPlain(lines, from, today, main) {
 // у самых щедрых карт — десятки.
 const CASHBACK_SHARE = 0.35;
 
-function isCashback(money, main, line) {
+function isCashback(money, main) {
   if (!main || main.kind !== KIND_OUT || money.kind !== KIND_IN) return false;
-  if (money.amount > main.amount * CASHBACK_SHARE) return false;
-  return /\p{L}{3}/u.test(line.replace(money.raw, ''));
+  return money.amount <= main.amount * CASHBACK_SHARE;
 }
 
 function readAmount(line) {

@@ -79,6 +79,7 @@ function mappingSheet(table, filename, options, forced = null) {
   // Сохранённая раскладка годится только для той же шапки: банк может
   // добавить столбец, и тогда прежние номера указывают не туда.
   const mapping = saved && sameShape(saved, header) ? { ...saved } : S.guessMapping(header);
+  const learned = S.learnCategories(state.spending);
 
   U.sheet('Выписка', (api) => {
     const preview = h('div', { class: 'preview' });
@@ -101,7 +102,7 @@ function mappingSheet(table, filename, options, forced = null) {
 
     function current() {
       const { rows, skipped } = S.toRows(table, mapping, { account: bank, headerRow });
-      const withCategory = rows.map((r) => ({ ...r, category: S.categorise(r, state.settings.spendRules) }));
+      const withCategory = rows.map((r) => ({ ...r, category: S.categorise(r, state.settings.spendRules, learned) }));
       const marked = S.markTransfers(withCategory, contributions(state));
       const fresh = S.newRows(marked, state.spending);
       return { rows: marked, fresh, skipped };
@@ -252,6 +253,10 @@ function sameShape(mapping, header) {
 export function screenshotSheet(options = {}) {
   const state = store.getState();
   const today = D.today();
+  const learned = S.learnCategories(state.spending);
+  // Правки категорий, сделанные до записи, живут по ключу записи —
+  // как и снятые галочки: текст перечитывается на каждое нажатие.
+  const edited = new Map();
   // Снятые галочки живут по ключу записи, а не по номеру строки: текст
   // перечитывается на каждое нажатие, и номера в нём разъезжаются.
   const unchecked = new Set();
@@ -267,9 +272,10 @@ export function screenshotSheet(options = {}) {
 
     function update() {
       parsed = parseScreen(area.value, today);
-      const withCategory = parsed.rows.map((r) => ({ ...r, category: S.categorise(r, state.settings.spendRules) }));
+      const withCategory = parsed.rows.map((r) => ({ ...r, category: S.categorise(r, state.settings.spendRules, learned) }));
       parsed.rows = S.markTransfers(withCategory, contributions(state));
-      parsed.fresh = S.newRows(parsed.rows, state.spending);
+      parsed.fresh = S.newRows(parsed.rows, state.spending)
+        .map((r) => (edited.has(r.key) ? { ...r, category: edited.get(r.key) } : r));
 
       const known = parsed.rows.length - parsed.fresh.length;
       U.clear(preview);
@@ -312,8 +318,8 @@ export function screenshotSheet(options = {}) {
      */
     function rowButton(row) {
       const on = !unchecked.has(row.key);
-      const node = h('button', {
-        class: `preview-row is-pick${on ? '' : ' is-off'}`,
+      const toggle = h('button', {
+        class: 'preview-pick',
         type: 'button',
         'aria-pressed': String(on),
         onclick: () => {
@@ -323,8 +329,7 @@ export function screenshotSheet(options = {}) {
         },
       }, [
         h('span', { class: 'preview-mark', text: on ? '✓' : '' }),
-        h('span', { class: 'preview-date', text: F.dateShort(row.date) }),
-        h('span', { class: 'preview-text', text: `${row.category} · ${row.description || '—'}` }),
+        h('span', { class: 'preview-text', text: row.description || '—' }),
         h('span', {
           class: `preview-sum ${row.kind === S.KIND_IN ? 'is-plus' : row.kind === S.KIND_MOVE ? 'is-neutral' : 'is-minus'}`,
           // Копейки здесь показываются полностью: это экран сверки,
@@ -335,7 +340,24 @@ export function screenshotSheet(options = {}) {
             : F.signedMoneyExact(row.kind === S.KIND_IN ? row.amount : -row.amount),
         }),
       ]);
-      return node;
+
+      // Категория правится здесь же, а не после записи: разбор угадывает
+      // по названию, а название после распознавания бывает любым — «Дикси»
+      // читается как «КОИ», и правило по нему не срабатывает. Исправленная
+      // категория запомнится и подтянется к таким же записям в следующий раз.
+      const options = categoryOptions(row);
+      const pick = U.select(options, row.category, {
+        class: 'control preview-cat',
+        onchange: (e) => { edited.set(row.key, e.target.value); update(); },
+      });
+
+      return h('div', { class: `preview-row is-pick${on ? '' : ' is-off'}` }, [
+        toggle,
+        h('div', { class: 'preview-meta' }, [
+          h('span', { class: 'preview-date', text: F.dateShort(row.date) }),
+          pick,
+        ]),
+      ]);
     }
 
     function refreshFooter() {
@@ -417,7 +439,7 @@ export function screenshotSheet(options = {}) {
       checks,
       U.sectionTitle('Что записать'),
       preview,
-      U.callout('Нажмите на строку, чтобы не записывать её. Без плюса сумма считается тратой; вид и категорию можно поправить и после загрузки.', 'warn'),
+      U.callout('Нажмите на строку, чтобы не записывать её. Категория выбирается здесь же и запоминается: такие же записи в следующий раз получат её сами. Без плюса сумма считается тратой.', 'warn'),
     ];
   });
 }
@@ -464,4 +486,21 @@ function pairedText(added, paired) {
   const base = `Записей добавлено: ${added}`;
   if (!paired) return base;
   return `${base}. Переводов между своими счетами сведено: ${paired}`;
+}
+
+/**
+ * Что можно выбрать в категории строки.
+ *
+ * Список зависит от вида: у прихода свои категории, у траты свои. Текущее
+ * значение добавляется в начало, даже если оно чужое, — иначе открытие
+ * списка молча меняло бы категорию на первую попавшуюся.
+ */
+function categoryOptions(row) {
+  const base = row.kind === S.KIND_IN
+    ? [...S.INCOME_CATEGORIES]
+    : row.kind === S.KIND_MOVE
+      ? ['Сбережения', 'Переводы', 'Проценты']
+      : [...S.CATEGORIES];
+  if (row.category && !base.includes(row.category)) return [row.category, ...base];
+  return base;
 }
