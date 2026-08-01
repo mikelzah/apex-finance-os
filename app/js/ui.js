@@ -219,6 +219,15 @@ export function sheet(title, build, options = {}) {
   document.body.classList.add('is-locked');
   attachSwipeToClose(panel, body, backdrop);
 
+  // Клавиатура поднимает всю шторку (--keyboard-inset), но панель при этом
+  // становится ниже, и поле может остаться за краем её собственной прокрутки.
+  // Задержка — под анимацию клавиатуры: сразу после focusin высота ещё старая.
+  body.addEventListener('focusin', (e) => {
+    const field = e.target;
+    if (!field || !field.scrollIntoView) return;
+    setTimeout(() => field.scrollIntoView({ block: 'nearest' }), 350);
+  });
+
   const api = {
     close,
     setFooter(children) {

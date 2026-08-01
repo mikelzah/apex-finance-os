@@ -1283,8 +1283,13 @@ body.is-reordering .screen { overflow: hidden; }
   position: absolute;
   left: 0;
   right: 0;
-  bottom: 0;
-  max-height: 92vh;
+  /* Над клавиатурой, а не под ней. Страница здесь не прокручивается, и iOS
+     не может подтянуть поле ввода в видимую часть сам: шторка, прижатая
+     к низу оболочки, уходит под клавиатуру целиком. Поэтому низ считается
+     от замеренной высоты клавиатуры, а высота панели ужимается на неё же —
+     иначе шторка вылезет за верх экрана. */
+  bottom: var(--keyboard-inset, 0px);
+  max-height: calc(92% - var(--keyboard-inset, 0px));
   display: flex;
   flex-direction: column;
   background: var(--glass-panel);

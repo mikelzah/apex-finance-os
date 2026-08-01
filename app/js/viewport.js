@@ -99,11 +99,62 @@ export function apply() {
   document.documentElement.style.setProperty('--full-height', `${full}px`);
 }
 
+// --------------------------------------------------------------------------
+// Клавиатура
+// --------------------------------------------------------------------------
+
+// Самая большая видимая область, наблюдённая при этой ширине. Клавиатура
+// меряется не абсолютной высотой, а этой недостачей: абсолютным замерам
+// на этом устройстве верить нельзя — ровно об этом весь модуль.
+let visiblePeak = { width: 0, height: 0 };
+
+// Ниже этого недостача считается не клавиатурой. Панель браузера съедает
+// несколько десятков пикселей, и принимать её за клавиатуру значит поднять
+// шторку над пустотой. Самая низкая клавиатура на телефоне — за 250.
+const KEYBOARD_MIN = 150;
+
+/**
+ * Сколько снизу занимает клавиатура.
+ *
+ * Страница под клавиатурой не уезжает: прокрутки у документа нет, и подтянуть
+ * поле ввода в видимую часть iOS не может. Всё, что прижато к низу оболочки,
+ * оказывается под клавиатурой целиком — шторка с полем ввода в том числе.
+ */
+export function keyboardInset() {
+  const vv = window.visualViewport;
+  if (!vv) return 0;
+  const width = Math.round(vv.width);
+  // Видимая область меряется до её нижнего края: при сдвинутом вьюпорте
+  // одной высоты мало.
+  const visible = Math.round(vv.height + vv.offsetTop);
+  if (visiblePeak.width !== width) visiblePeak = { width, height: visible };
+  else if (visible > visiblePeak.height) visiblePeak.height = visible;
+  const gap = visiblePeak.height - visible;
+  return gap >= KEYBOARD_MIN ? gap : 0;
+}
+
+let insetApplied = null;
+
+export function applyKeyboard() {
+  const inset = keyboardInset();
+  if (inset === insetApplied) return;
+  insetApplied = inset;
+  document.documentElement.style.setProperty('--keyboard-inset', `${inset}px`);
+}
+
 export function watch() {
   apply();
+  applyKeyboard();
   window.addEventListener('resize', apply);
   // На поворот iOS отвечает не сразу: размеры на момент события ещё старые.
   window.addEventListener('orientationchange', () => setTimeout(apply, 250));
+
+  const vv = window.visualViewport;
+  if (vv) {
+    vv.addEventListener('resize', applyKeyboard);
+    // Клавиатура умеет не только менять высоту, но и сдвигать вьюпорт.
+    vv.addEventListener('scroll', applyKeyboard);
+  }
 }
 
 /**
