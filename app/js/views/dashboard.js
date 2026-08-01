@@ -519,7 +519,7 @@ function balanceCard(ctx) {
   const verdict = C.balanceVerdict(stats, cushion, contributed);
 
   return U.card([
-    U.sectionTitle('Жизнь и накопления', U.button('Подробно', () => go('more/spending'))),
+    U.sectionTitle('Жизнь и накопления', U.button('Подробно', () => go('spending'))),
     h('div', { class: 'grid-3' }, [
       U.stat('Прожито', F.money(stats.spent), { hint: `за ${stats.months} мес.` }),
       U.stat('Отложено', F.signedMoney(stats.free), {

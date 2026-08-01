@@ -19,13 +19,46 @@ import * as C from '../calc.js';
 import * as D from '../dates.js';
 import * as charts from '../charts.js';
 import * as forms from '../forms.js';
+import * as journal from './journal.js';
 import * as moex from '../moex.js';
 import * as store from '../store.js';
 
 const { h } = U;
 
+/**
+ * Портфель и журнал — два взгляда на одни и те же деньги: чем владею
+ * и как к этому пришёл. Раньше они стояли двумя вкладками, и переход
+ * между ними шёл через низ экрана, хотя вопросы соседние: увидел долю
+ * — захотел посмотреть, из каких сделок она сложилась.
+ */
+let mode = 'assets';
+
 export function render(ctx) {
-  return ctx.sub ? instrument(ctx) : overview(ctx);
+  if (ctx.sub) return instrument(ctx);
+
+  return [
+    h('div', { class: 'screen-head' }, [
+      h('div', { class: 'segmented', role: 'tablist' }, [
+        ['assets', 'Портфель'],
+        ['journal', 'Журнал'],
+      ].map(([value, label]) =>
+        h('button', {
+          class: `segment${mode === value ? ' is-on' : ''}`,
+          type: 'button',
+          role: 'tab',
+          'aria-selected': String(mode === value),
+          onclick: () => { mode = value; ctx.refresh(); },
+        }, [label]),
+      )),
+      mode === 'journal' ? journal.addButton(ctx) : null,
+    ]),
+    ...(mode === 'journal' ? journal.body(ctx) : overview(ctx)),
+  ];
+}
+
+/** Открывает журнал снаружи — с главной и по старому адресу. */
+export function showJournal() {
+  mode = 'journal';
 }
 
 /** Заголовок вложенной страницы — название бумаги. */

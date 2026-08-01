@@ -40,9 +40,15 @@ export function render(ctx) {
   const contributed = C.contributedBetween(state.operations, stats.from, today);
   const verdict = C.balanceVerdict(stats, cushion, contributed);
 
-  if (!state.spending.length) return [empty(ctx)];
+  const head = h('div', { class: 'screen-head' }, [
+    h('h2', { text: 'Траты и жизнь' }),
+    U.button('Загрузить', () => sourceSheet(ctx), { kind: 'primary' }),
+  ]);
+
+  if (!state.spending.length) return [head, empty(ctx)];
 
   return [
+    head,
     U.card([
       h('div', { class: 'segmented', role: 'tablist' }, WINDOWS.map(([value, label]) =>
         h('button', {
@@ -123,10 +129,6 @@ export function render(ctx) {
       ...allRows(stats.rows, refresh),
     ]) : null,
   ];
-}
-
-export function action(ctx) {
-  return U.button('Загрузить', () => sourceSheet(ctx), { kind: 'primary' });
 }
 
 /**

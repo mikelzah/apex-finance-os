@@ -44,7 +44,15 @@ let filter = 'all';
 let mode = 'list';
 let period = 'all';
 
-export function render(ctx) {
+/**
+ * Кнопка «Добавить» отдана наружу: журнал живёт внутри портфеля, и его
+ * заголовок делит строку с переключателем — своей шапки у него больше нет.
+ */
+export function addButton(ctx) {
+  return U.button('Добавить', () => forms.operationSheet(null, { onDone: ctx.refresh }), { kind: 'primary' });
+}
+
+export function body(ctx) {
   const { state, today, refresh } = ctx;
 
   const all = [...state.operations]
@@ -72,11 +80,6 @@ export function render(ctx) {
   const periodHint = { all: 'за всё время', year: 'за год', month: 'за месяц' }[period];
 
   return [
-    h('div', { class: 'screen-head' }, [
-      h('h2', { text: 'Журнал' }),
-      U.button('Добавить', () => forms.operationSheet(null, { onDone: refresh }), { kind: 'primary' }),
-    ]),
-
     all.length
       ? U.card([
           // Период стоит над числами, а не в подписи под ними: подпись

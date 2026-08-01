@@ -14,7 +14,7 @@ import * as lock from './lock.js';
 import * as dashboard from './views/dashboard.js';
 import * as goals from './views/goals.js';
 import * as portfolio from './views/portfolio.js';
-import * as journal from './views/journal.js';
+import * as spending from './views/spending.js';
 import * as more from './views/more.js';
 import * as intro from './views/intro.js';
 
@@ -24,11 +24,14 @@ const TABS = [
   { id: 'dashboard', label: 'Главная', icon: 'home' },
   { id: 'goals', label: 'Цели', icon: 'target' },
   { id: 'portfolio', label: 'Портфель', icon: 'bars' },
-  { id: 'journal', label: 'Журнал', icon: 'list' },
+  // Журнал переехал внутрь портфеля — это два взгляда на одни деньги.
+  // Освободившееся место занял быт: его смотрят чаще, чем историю сделок,
+  // а лежал он в «Ещё», через два касания от главной.
+  { id: 'spending', label: 'Траты', icon: 'wallet' },
   { id: 'more', label: 'Ещё', icon: 'more' },
 ];
 
-const VIEWS = { dashboard, goals, portfolio, journal, more };
+const VIEWS = { dashboard, goals, portfolio, spending, more };
 
 const screen = document.getElementById('screen');
 const header = document.getElementById('header');
@@ -46,6 +49,16 @@ let shownScreen = null;
 function parseHash() {
   const raw = location.hash.replace(/^#\/?/, '').split('?')[0];
   const [tab, sub] = raw.split('/');
+
+  // Прежние адреса продолжают работать: они разосланы в ярлыках «Команд»
+  // и сохранены на домашнем экране, а сломанная ссылка выглядит как
+  // сломанное приложение.
+  if (tab === 'journal') {
+    portfolio.showJournal();
+    return { tab: 'portfolio', sub: null };
+  }
+  if (tab === 'more' && sub === 'spending') return { tab: 'spending', sub: null };
+
   return { tab: VIEWS[tab] ? tab : 'dashboard', sub: sub || null };
 }
 
