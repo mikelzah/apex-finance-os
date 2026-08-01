@@ -127,6 +127,10 @@ function render() {
 
   U.clear(screen);
   screen.classList.toggle('is-bare', header.hidden);
+  // Появление экрана — про переход на другой экран. При перерисовке того же
+  // оно читается как «страница поменялась целиком», хотя изменился фильтр
+  // или переключатель. Мигает при этом всё сразу, включая то, что не менялось.
+  screen.classList.toggle('is-quiet', key === shownScreen);
 
   const notices = [offlineNotice(), backupBanner(ctx)].filter(Boolean);
   U.append(screen, notices);

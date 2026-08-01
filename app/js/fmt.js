@@ -10,6 +10,13 @@ const MONTHS = [
 
 const MONTHS_SHORT = ['янв', 'фев', 'мар', 'апр', 'мая', 'июн', 'июл', 'авг', 'сен', 'окт', 'ноя', 'дек'];
 
+// Именительный падеж — для заголовков. В дате месяц стоит в родительном
+// («5 июля»), но заголовок это не дата, а название периода: «Июль 2026».
+const MONTHS_NOM = [
+  'Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь',
+  'Июль', 'Август', 'Сентябрь', 'Октябрь', 'Ноябрь', 'Декабрь',
+];
+
 const nf0 = new Intl.NumberFormat('ru-RU', { maximumFractionDigits: 0 });
 const nf2 = new Intl.NumberFormat('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
@@ -129,9 +136,16 @@ export function dateShort(s) {
   return `${d} ${MONTHS_SHORT[m - 1]}`;
 }
 
+/**
+ * Заголовок месяца целиком: «Август 2026».
+ *
+ * Раньше было «авг 26» — сокращение ради ширины, которой на самом деле
+ * хватает. Заголовок читают глазами по одному разу за экран, и разбирать
+ * в нём обрубки незачем.
+ */
 export function monthName(s) {
   const [y, m] = s.split('-').map(Number);
-  return `${MONTHS_SHORT[m - 1]} ${String(y).slice(2)}`;
+  return `${MONTHS_NOM[m - 1]} ${y}`;
 }
 
 /** Склонение: 1 день, 2 дня, 5 дней. */

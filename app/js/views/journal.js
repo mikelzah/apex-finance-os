@@ -58,12 +58,15 @@ export function render(ctx) {
     if (filter === 'payouts') return C.isPayout(op);
     return op.type === filter;
   };
-  const visible = filter === 'all' ? all : all.filter(match);
-
   const from = period === 'month' ? D.monthStart(today)
     : period === 'year' ? D.iso(D.parts(today).y, 1, 1)
       : null;
   const inPeriod = from ? all.filter((op) => D.diffDays(op.date, from) >= 0) : all;
+
+  // Период отсекает и список, а не только сводку. Иначе выбор «Месяц» даёт
+  // числа за месяц и записи за все годы под ними — два ответа на разные
+  // вопросы на одном экране, и непонятно, какой из них про что.
+  const visible = filter === 'all' ? inPeriod : inPeriod.filter(match);
   const sum = (type) => inPeriod.filter((o) => o.type === type).reduce((s, o) => s + o.amount, 0);
   const payouts = inPeriod.filter((o) => C.isPayout(o)).reduce((s, o) => s + C.paperAmount(o), 0);
   const periodHint = { all: 'за всё время', year: 'за год', month: 'за месяц' }[period];
@@ -129,7 +132,11 @@ export function render(ctx) {
         ? [tableView(visible, state, refresh)]
         : groups(visible, state, today, refresh)),
 
-    visible.length || !all.length ? null : U.card([U.emptyState('По этому фильтру ничего нет.')]),
+    visible.length || !all.length
+      ? null
+      : U.card([U.emptyState(period === 'all'
+        ? 'По этому фильтру ничего нет.'
+        : `За этот период ничего нет — попробуйте «${PERIODS[0][1]}».`)]),
   ];
 }
 
@@ -145,7 +152,7 @@ function tableView(operations, state, refresh) {
       sortKey: 'date',
       dir: 'desc',
       onRow: (op) => forms.operationSheet(op, { onDone: refresh }),
-      empty: 'По этому фильтру ничего нет.',
+      empty: 'За этот период по этому фильтру ничего нет.',
       // Сумма — четвёртая и последняя: на 440 пикселях пятая колонка
       // уводит её за край, и главное число приходится доскроливать.
       // Цель видна в списке и в карточке операции, здесь она лишняя.
