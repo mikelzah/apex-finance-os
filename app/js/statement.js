@@ -282,7 +282,14 @@ export function toRows(table, mapping, options = {}) {
 // Категории
 // --------------------------------------------------------------------------
 
-export const CATEGORIES = [
+/**
+ * Списки категорий по умолчанию.
+ *
+ * Это начальный набор, а не закон: человек правит его в настройках, и после
+ * первой же правки приложение пользуется его списком. Здешний нужен, чтобы
+ * было с чего начать и чтобы правила разбора имели во что попадать.
+ */
+export const DEFAULT_CATEGORIES = [
   'Продукты',
   'Кафе и рестораны',
   'Транспорт',
@@ -294,7 +301,36 @@ export const CATEGORIES = [
   'Прочее',
 ];
 
-export const INCOME_CATEGORIES = ['Зарплата', 'Подработка', 'Возврат', 'Подарок', 'Прочий доход'];
+export const DEFAULT_INCOME = ['Зарплата', 'Подработка', 'Возврат', 'Подарок', 'Прочий доход'];
+
+// Куда попадает то, что не удалось отнести никуда. Эти две переименовать
+// и удалить нельзя: на них ссылается сам разбор, и без них неопознанной
+// записи некуда деться.
+export const FALLBACK_SPEND = 'Прочее';
+export const FALLBACK_INCOME = 'Прочий доход';
+
+/** Список категорий: свой, если он есть, иначе начальный. */
+export function categoriesOf(settings, kind = 'spend') {
+  const own = settings && settings.categories ? settings.categories[kind] : null;
+  const base = kind === 'income' ? DEFAULT_INCOME : DEFAULT_CATEGORIES;
+  return Array.isArray(own) && own.length ? own : base;
+}
+
+/** Категории, которые встречаются в записях, но в списке их нет. */
+export function strayCategories(spending = [], settings = null) {
+  const known = new Set([
+    ...categoriesOf(settings, 'spend'),
+    ...categoriesOf(settings, 'income'),
+    'Сбережения', 'Переводы', 'Проценты',
+  ]);
+  const found = new Map();
+  for (const row of spending) {
+    if (!row.category || known.has(row.category)) continue;
+    found.set(row.category, (found.get(row.category) || 0) + 1);
+  }
+  return [...found.entries()].map(([name, count]) => ({ name, count }))
+    .sort((a, b) => b.count - a.count);
+}
 
 /**
  * Правила «что в описании — то и категория».
@@ -391,7 +427,7 @@ export function categorise(row, userRules = [], learned = null) {
   // После распознавания в неё попадает что угодно: от строки с кэшбэком
   // остаётся одинокая «с», и она становилась категорией целой траты.
   if (row.bankCategory && /\p{L}{3}/u.test(row.bankCategory)) return row.bankCategory;
-  return row.kind === KIND_IN ? 'Прочий доход' : 'Прочее';
+  return row.kind === KIND_IN ? FALLBACK_INCOME : FALLBACK_SPEND;
 }
 
 // --------------------------------------------------------------------------

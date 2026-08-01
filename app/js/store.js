@@ -9,6 +9,7 @@
 // Дублировать его здесь значило бы однажды разойтись.
 import * as C from './calc.js';
 import * as D from './dates.js';
+import * as S from './statement.js';
 const { ASSET_CLASSES } = C;
 
 // Имя базы не меняется вместе с названием приложения — и не должно:
@@ -128,6 +129,9 @@ function emptyState() {
       bankProfiles: {},
       // За сколько месяцев считать быт. Меньше трёх — шум от отпуска и ОСАГО.
       spendMonths: 3,
+      // Свой список категорий. Пока его нет, приложение пользуется начальным
+      // из statement.js — иначе первый запуск начинался бы с пустого списка.
+      categories: null,
     },
     meta: {
       lastBackupAt: null,
@@ -152,6 +156,8 @@ function migrate(loaded) {
     if (!Array.isArray(next[key])) next[key] = [];
   }
   if (!Array.isArray(next.settings.spendRules)) next.settings.spendRules = [];
+  const cats = next.settings.categories;
+  if (cats && (!Array.isArray(cats.spend) || !Array.isArray(cats.income))) next.settings.categories = null;
   if (!next.settings.bankProfiles || typeof next.settings.bankProfiles !== 'object') next.settings.bankProfiles = {};
   // Размер лота появился вместе со сделками. Единица — не догадка, а самый
   // частый случай на Мосбирже; где не так, поправляется в карточке бумаги.
@@ -565,4 +571,97 @@ export async function pairSelfTransfers() {
     }
     return paired;
   });
+}
+
+// --------------------------------------------------------------------------
+// Свой список категорий
+// --------------------------------------------------------------------------
+
+/**
+ * Список категорий человека. Пока он не тронут, приложение пользуется
+ * начальным — и в настройках показывает именно его, чтобы правка начиналась
+ * не с пустого места.
+ */
+function ownCategories(draft) {
+  if (!draft.settings.categories) {
+    draft.settings.categories = {
+      spend: [...S.DEFAULT_CATEGORIES],
+      income: [...S.DEFAULT_INCOME],
+    };
+  }
+  return draft.settings.categories;
+}
+
+export async function addCategory(kind, name) {
+  return mutate((draft) => {
+    const clean = String(name || '').trim().slice(0, 40);
+    if (!clean) return false;
+    const list = ownCategories(draft)[kind === 'income' ? 'income' : 'spend'];
+    if (list.some((x) => x.toLowerCase() === clean.toLowerCase())) return false;
+    list.push(clean);
+    return true;
+  });
+}
+
+/**
+ * Переименование меняет категорию и в самих записях.
+ *
+ * Иначе новое имя появилось бы только в списке выбора, а записи остались бы
+ * со старым — и оно вернулось бы на экран разбора как «встречается в записях,
+ * но не в списке». Заодно переносим правила: они ссылаются на имя.
+ */
+export async function renameCategory(kind, from, to) {
+  return mutate((draft) => {
+    const clean = String(to || '').trim().slice(0, 40);
+    if (!clean || clean === from) return 0;
+
+    const list = ownCategories(draft)[kind === 'income' ? 'income' : 'spend'];
+    const at = list.indexOf(from);
+    if (at >= 0) list[at] = clean;
+    else if (!list.includes(clean)) list.push(clean);
+
+    let touched = 0;
+    for (const row of draft.spending) {
+      if (row.category !== from) continue;
+      row.category = clean;
+      touched += 1;
+    }
+    for (const rule of draft.settings.spendRules) {
+      if (rule.category === from) rule.category = clean;
+    }
+    return touched;
+  });
+}
+
+/**
+ * Удаление уносит категорию из списка, а записи переводит в запасную.
+ *
+ * Оставить их с несуществующей категорией нельзя: они выпали бы из разбора
+ * по категориям, а сумма трат при этом не изменилась бы — и итог перестал
+ * бы сходиться с частями.
+ */
+export async function removeCategory(kind, name) {
+  return mutate((draft) => {
+    const income = kind === 'income';
+    const fallback = income ? S.FALLBACK_INCOME : S.FALLBACK_SPEND;
+    if (name === fallback) return 0;
+
+    const key = income ? 'income' : 'spend';
+    const cats = ownCategories(draft);
+    cats[key] = cats[key].filter((x) => x !== name);
+    if (!cats[key].includes(fallback)) cats[key].push(fallback);
+
+    let moved = 0;
+    for (const row of draft.spending) {
+      if (row.category !== name) continue;
+      row.category = fallback;
+      moved += 1;
+    }
+    draft.settings.spendRules = draft.settings.spendRules.filter((r) => r.category !== name);
+    return moved;
+  });
+}
+
+export async function resetCategories() {
+  return mutate((draft) => { draft.settings.categories = null; });
 }

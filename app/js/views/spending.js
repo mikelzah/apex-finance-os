@@ -285,7 +285,12 @@ function rowSheet(row, onDone) {
     // Категория банка может не совпасть ни с одной нашей — тогда она
     // добавляется в список как есть. Иначе открытие записи молча меняло бы
     // её категорию на первую в списке.
-    const known = [...S.CATEGORIES, ...S.INCOME_CATEGORIES, 'Сбережения'];
+    const settings = store.getState().settings;
+    const known = [
+      ...S.categoriesOf(settings, 'spend'),
+      ...S.categoriesOf(settings, 'income'),
+      'Сбережения', 'Переводы', 'Проценты',
+    ];
     const catSelect = U.select(
       known.includes(draft.category) || !draft.category ? known : [draft.category, ...known],
       draft.category,

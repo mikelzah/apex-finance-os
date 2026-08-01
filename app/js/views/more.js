@@ -13,6 +13,7 @@ import { BUILD } from '../build.js';
 import * as mascot from '../mascot.js';
 import * as lock from '../lock.js';
 import { table } from '../table.js';
+import * as S from '../statement.js';
 
 const { h } = U;
 
@@ -25,6 +26,7 @@ export function render(ctx) {
     case 'keyrate': return keyRate(ctx);
     case 'settings': return settings(ctx);
     case 'backup': return backup(ctx);
+    case 'categories': return categories(ctx);
     default: return hub(ctx);
   }
 }
@@ -40,6 +42,9 @@ export function action(sub, ctx) {
   if (sub === 'keyrate') {
     return U.button('Добавить', () => keyRateSheet(ctx), { kind: 'primary' });
   }
+  if (sub === 'categories') {
+    return U.button('Добавить', () => categorySheet(ctx, 'spend', null), { kind: 'primary' });
+  }
   return null;
 }
 
@@ -52,6 +57,7 @@ export function title(sub) {
     keyrate: 'Ключевая ставка ЦБ',
     settings: 'Настройки',
     backup: 'Резервная копия',
+    categories: 'Категории трат',
   }[sub] || 'Ещё';
 }
 
@@ -86,6 +92,12 @@ function hub(ctx) {
       }),
     ]),
     U.card([
+      U.row('Категории трат', String(
+        S.categoriesOf(state.settings, 'spend').length + S.categoriesOf(state.settings, 'income').length,
+      ), {
+        sub: 'свой список для разбора трат',
+        onClick: () => ctx.go('more/categories'),
+      }),
       U.row('Настройки', '', { onClick: () => ctx.go('more/settings') }),
       U.row('Резервная копия', backupAge == null ? 'ни разу' : `${F.days(backupAge)} назад`, {
         sub: 'данные живут только в этом телефоне',
@@ -693,4 +705,132 @@ function backup(ctx) {
       U.callout('Данные хранятся только в этом телефоне. Очистка данных Safari, удаление приложения с домашнего экрана или потеря телефона стирают всё безвозвратно.', 'warn'),
     ]),
   ];
+}
+
+// --------------------------------------------------------------------------
+// Категории
+// --------------------------------------------------------------------------
+
+/**
+ * Свой список категорий.
+ *
+ * Встроенный набор — это начало разговора, а не его конец: у одного человека
+ * половина трат уходит на детей, у другого детей нет вовсе, зато есть машина.
+ * Поэтому список правится целиком, а записи при переименовании переезжают
+ * вместе с ним.
+ */
+function categories(ctx) {
+  const { state } = ctx;
+  const spend = S.categoriesOf(state.settings, 'spend');
+  const income = S.categoriesOf(state.settings, 'income');
+  const stray = S.strayCategories(state.spending, state.settings);
+  const used = (name) => state.spending.filter((r) => r.category === name).length;
+
+  const line = (kind) => (name) => {
+    const n = used(name);
+    const fixed = name === (kind === 'income' ? S.FALLBACK_INCOME : S.FALLBACK_SPEND);
+    return U.row(name, n ? `${n} ${F.plural(n, 'запись', 'записи', 'записей')}` : '—', {
+      sub: fixed ? 'запасная — сюда попадает неопознанное' : null,
+      onClick: fixed ? null : () => categorySheet(ctx, kind, name),
+    });
+  };
+
+  return [
+    U.card([
+      U.sectionTitle('Траты'),
+      ...spend.map(line('spend')),
+    ]),
+    U.card([
+      U.sectionTitle('Доходы', U.button('Добавить', () => categorySheet(ctx, 'income', null))),
+      ...income.map(line('income')),
+    ]),
+
+    // Категории из выписки, которых в списке нет. Банк присылает свои
+    // названия — «Маркетплейсы», «Фастфуд», — и они оседают в записях,
+    // не попадая в список выбора. Здесь их видно и можно принять.
+    stray.length
+      ? U.card([
+          U.sectionTitle('Есть в записях, но не в списке'),
+          ...stray.map((x) => U.row(x.name, `${x.count} ${F.plural(x.count, 'запись', 'записи', 'записей')}`, {
+            sub: 'нажмите, чтобы добавить в список трат',
+            onClick: async () => {
+              await store.addCategory('spend', x.name);
+              U.toast(`«${x.name}» в списке`);
+              ctx.refresh();
+            },
+          })),
+        ])
+      : null,
+
+    U.card([
+      U.callout('Переименование меняет категорию и в записях. Удаление переводит их в запасную — суммы при этом не меняются.', 'info'),
+      U.button('Вернуть список по умолчанию', () => {
+        U.confirmSheet(
+          'Вернуть начальный список?',
+          'Свой список будет забыт. Записи останутся как есть — те категории, которых не станет в списке, окажутся в разделе «Есть в записях, но не в списке».',
+          'Вернуть',
+          async () => {
+            await store.resetCategories();
+            U.toast('Список по умолчанию');
+            ctx.refresh();
+          },
+        );
+      }, { class: 'btn-wide' }),
+    ]),
+  ];
+}
+
+function categorySheet(ctx, kind, name) {
+  const isNew = !name;
+  U.sheet(isNew ? 'Новая категория' : name, (api) => {
+    const field = U.input({ type: 'text', value: name || '', 'data-autofocus': 'yes', maxlength: 40 });
+    const where = U.select(
+      [{ value: 'spend', label: 'Трата' }, { value: 'income', label: 'Доход' }],
+      kind,
+    );
+    const count = name ? ctx.state.spending.filter((r) => r.category === name).length : 0;
+
+    api.setFooter([
+      isNew
+        ? U.button('Отмена', () => api.close())
+        : U.button('Удалить', () => {
+            const fallback = kind === 'income' ? S.FALLBACK_INCOME : S.FALLBACK_SPEND;
+            U.confirmSheet(
+              `Удалить «${name}»?`,
+              count
+                ? `${count} ${F.plural(count, 'запись перейдёт', 'записи перейдут', 'записей перейдут')} в «${fallback}». Суммы не изменятся.`
+                : 'Записей с этой категорией нет.',
+              'Удалить',
+              async () => {
+                const moved = await store.removeCategory(kind, name);
+                api.close();
+                U.toast(moved ? `Перенесено записей: ${moved}` : 'Категория удалена');
+                ctx.refresh();
+              },
+            );
+          }, { kind: 'danger' }),
+      U.button('Сохранить', async () => {
+        const value = field.value.trim();
+        if (!value) return U.toast('Название не может быть пустым', 'error');
+
+        if (isNew) {
+          const added = await store.addCategory(where.value, value);
+          U.toast(added ? `«${value}» добавлена` : 'Такая категория уже есть', added ? 'ok' : 'error');
+        } else {
+          const touched = await store.renameCategory(kind, name, value);
+          U.toast(touched ? `Переименовано, записей: ${touched}` : 'Переименовано');
+        }
+        api.close();
+        ctx.refresh();
+      }, { kind: 'primary' }),
+    ]);
+
+    return [
+      U.field('Название', field),
+      isNew ? U.field('Куда', where, 'Траты и доходы выбираются из разных списков') : null,
+      !isNew && count
+        ? h('p', { class: 'field-hint', text: `Записей с этой категорией: ${count}. Переименование затронет их все.` })
+        : null,
+    ];
+  });
 }
