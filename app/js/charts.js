@@ -231,7 +231,10 @@ export function lines(main, second, options = {}) {
   axis.appendChild(div('', F.dateShort(lastPoint.x)));
   wrap.appendChild(axis);
 
-  return wrap;
+  // Таблица обязательна и здесь. Правило модуля одно на все графики: число,
+  // которое нельзя прочитать никак, делает график украшением. Двум линиям
+  // это нужно даже больше — на глаз расстояние между ними не измеришь.
+  return figure(wrap, data, options.mainLabel || label, format, other, options.secondLabel || '');
 }
 
 /**
@@ -313,18 +316,30 @@ function attachCursor(svg, wrap, coords, data, cursor, setReadout) {
  * Касание — усиление, а не единственный способ узнать число: тем же данным
  * всегда есть текстовый двойник.
  */
-function figure(chart, data, label, format) {
+function figure(chart, data, label, format, second = null, secondLabel = '') {
   const fig = document.createElement('figure');
   fig.className = 'figure';
 
   const table = div('figure-table');
   table.hidden = true;
   const rows = [...data].reverse();
+  // Второй ряд ищется по дате: у линий может не совпадать число точек,
+  // и складывать их по порядку значило бы однажды сдвинуть один относительно
+  // другого и молча показать чужие числа.
+  const other = new Map((second || []).map((p) => [p.x, p.y]));
+  const hasSecond = other.size > 0;
+
   table.innerHTML =
     '<table><thead><tr><th>Дата</th><th>' +
     escape(label) +
+    (hasSecond ? `</th><th>${escape(secondLabel)}` : '') +
     '</th></tr></thead><tbody>' +
-    rows.map((p) => `<tr><td>${escape(F.date(p.x))}</td><td>${escape(format(p.y))}</td></tr>`).join('') +
+    rows.map((p) => {
+      const extra = hasSecond
+        ? `<td>${escape(other.has(p.x) ? format(other.get(p.x)) : '—')}</td>`
+        : '';
+      return `<tr><td>${escape(F.date(p.x))}</td><td>${escape(format(p.y))}</td>${extra}</tr>`;
+    }).join('') +
     '</tbody></table>';
 
   const toggle = document.createElement('button');

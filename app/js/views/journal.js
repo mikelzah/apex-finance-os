@@ -23,9 +23,26 @@ const FILTERS = [
   { value: 'payouts', label: 'Выплаты' },
 ];
 
+/**
+ * Период сводки. По умолчанию — всё время.
+ *
+ * Раньше сводка была намертво за текущий месяц, и первого числа это давало
+ * почти пустую карточку: «внесено 1 250 ₽» там, где за всё время накоплены
+ * десятки тысяч. Вопрос «сколько я всего отложил» — главный из тех, что
+ * задают журналу, и отвечать на него месяцем неправильно.
+ *
+ * Месяц остался: он отвечает на другой вопрос — «как идёт этот месяц».
+ */
+const PERIODS = [
+  ['all', 'Всё время'],
+  ['year', 'Год'],
+  ['month', 'Месяц'],
+];
+
 // Выбор переживает перерисовку, но не перезапуск: это вид, а не настройка.
 let filter = 'all';
 let mode = 'list';
+let period = 'all';
 
 export function render(ctx) {
   const { state, today, refresh } = ctx;
@@ -43,9 +60,13 @@ export function render(ctx) {
   };
   const visible = filter === 'all' ? all : all.filter(match);
 
-  const month = D.month(today);
-  const inMonth = all.filter((op) => D.month(op.date) === month);
-  const sum = (type) => inMonth.filter((o) => o.type === type).reduce((s, o) => s + o.amount, 0);
+  const from = period === 'month' ? D.monthStart(today)
+    : period === 'year' ? D.iso(D.parts(today).y, 1, 1)
+      : null;
+  const inPeriod = from ? all.filter((op) => D.diffDays(op.date, from) >= 0) : all;
+  const sum = (type) => inPeriod.filter((o) => o.type === type).reduce((s, o) => s + o.amount, 0);
+  const payouts = inPeriod.filter((o) => C.isPayout(o)).reduce((s, o) => s + C.paperAmount(o), 0);
+  const periodHint = { all: 'за всё время', year: 'за год', month: 'за месяц' }[period];
 
   return [
     h('div', { class: 'screen-head' }, [
@@ -55,12 +76,26 @@ export function render(ctx) {
 
     all.length
       ? U.card([
-          h('div', { class: 'grid-3' }, [
+          // Период стоит над числами, а не в подписи под ними: подпись
+          // объясняет, а переключатель меняет, и путать их нельзя.
+          h('div', { class: 'segmented', role: 'tablist' }, PERIODS.map(([value, label]) =>
+            h('button', {
+              class: `segment${period === value ? ' is-on' : ''}`,
+              type: 'button',
+              role: 'tab',
+              'aria-selected': String(period === value),
+              onclick: () => { period = value; refresh(); },
+            }, [label]),
+          )),
+          h('div', { class: payouts ? 'grid-2' : 'grid-3' }, [
             // Копейки и здесь: это суммы операций, а не оценка активов,
             // и «начислено 8 ₽» вместо 8,29 не сойдётся с выпиской банка.
-            U.stat('Внесено', F.moneyExact(sum(C.OP_CONTRIBUTION)), { hint: 'за месяц' }),
-            U.stat('Начислено', F.moneyExact(sum(C.OP_INCOME)), { hint: 'проценты' }),
+            U.stat('Внесено', F.moneyExact(sum(C.OP_CONTRIBUTION)), { hint: periodHint }),
+            U.stat('Начислено', F.moneyExact(sum(C.OP_INCOME)), { hint: 'проценты банка' }),
             U.stat('Потрачено', F.moneyExact(sum(C.OP_EXPENSE)), { hint: 'расходы' }),
+            // Выплаты по бумагам — тоже полученные деньги, и молчать о них,
+            // показывая только проценты банка, было бы половиной картины.
+            payouts ? U.stat('Выплаты', F.moneyExact(payouts), { hint: 'дивиденды и купоны' }) : null,
           ]),
           h('div', { class: 'chips' }, [
             ...FILTERS.map((f) =>
