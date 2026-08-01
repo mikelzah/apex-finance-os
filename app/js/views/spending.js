@@ -1,0 +1,283 @@
+// Быт: сколько приходит, сколько уходит на жизнь и что остаётся.
+//
+// Экран отвечает на один вопрос, которого не было во всём остальном
+// приложении: какой ценой даются накопления. Портфель показывает результат,
+// журнал — движения капитала, а расходы на жизнь до сих пор были слепым
+// пятном — и без них нельзя сказать, разумно человек копит или в ущерб себе.
+//
+// Всё считается по выписке из банка. Ничего не спрашивается «примерно»:
+// придуманный средний расход даёт придуманную подушку, а на неё потом
+// опираются в решениях.
+
+import * as U from '../ui.js';
+import * as F from '../fmt.js';
+import * as C from '../calc.js';
+import * as D from '../dates.js';
+import * as charts from '../charts.js';
+import * as store from '../store.js';
+import * as S from '../statement.js';
+import { table } from '../table.js';
+import { importSheet } from '../import.js';
+
+const { h } = U;
+
+const WINDOWS = [
+  [1, 'Месяц'],
+  [3, '3 месяца'],
+  [6, 'Полгода'],
+  [12, 'Год'],
+];
+
+export function render(ctx) {
+  const { state, today, refresh } = ctx;
+  const months = state.settings.spendMonths || C.SPEND_MONTHS;
+  const stats = C.spendStats(state.spending, today, months);
+  const cushion = C.cushionMonths(state.assets, state.operations, stats);
+  const contributed = C.contributedBetween(state.operations, stats.from, today);
+  const verdict = C.balanceVerdict(stats, cushion, contributed);
+
+  if (!state.spending.length) return [empty(ctx)];
+
+  return [
+    U.card([
+      h('div', { class: 'segmented', role: 'tablist' }, WINDOWS.map(([value, label]) =>
+        h('button', {
+          class: `segment${months === value ? ' is-on' : ''}`,
+          type: 'button',
+          role: 'tab',
+          'aria-selected': String(months === value),
+          onclick: async () => {
+            await store.mutate((d) => { d.settings.spendMonths = value; });
+            refresh();
+          },
+        }, [label]),
+      )),
+      h('div', { class: 'grid-3' }, [
+        U.stat('Получено', F.money(stats.income), { hint: perMonthHint(stats.monthlyIncome) }),
+        U.stat('Прожито', F.money(stats.spent), { hint: perMonthHint(stats.monthlySpend) }),
+        U.stat('Свободно', F.signedMoney(stats.free), {
+          hint: stats.rate == null ? 'нет доходов' : `${Math.round(stats.rate * 100)}% дохода`,
+        }),
+      ]),
+    ]),
+
+    U.card([
+      U.callout(`${verdict.title}. ${verdict.text}`, level(verdict.level)),
+    ]),
+
+    U.card([
+      U.sectionTitle('Жизнь и накопления'),
+      U.row('Подушка', cushion == null ? '—' : `${F.num(cushion, 1)} мес.`, {
+        sub: cushion == null
+          ? 'нужны траты за период'
+          : `мгновенные деньги при расходе ${F.money(stats.monthlySpend)} в месяц`,
+      }),
+      U.row('Отложено за период', F.signedMoney(stats.free), { sub: 'доход минус жизнь' }),
+      // Разрыв между «осталось свободным» и «дошло до капитала» — это деньги,
+      // которые человек считает отложенными, а они лежат на карте. Число
+      // маленькое и неприятное, поэтому и нужное.
+      U.row('Дошло до капитала', F.money(contributed), {
+        sub: gapHint(stats.free, contributed),
+      }),
+      U.row('Переводы себе', F.money(stats.moved), {
+        sub: 'из выписки, не считаются тратой',
+      }),
+    ]),
+
+    stats.perMonth.length > 1
+      ? U.card([
+          U.sectionTitle('Доход и жизнь по месяцам'),
+          charts.lines(
+            stats.perMonth.map((m) => ({ x: `${m.month}-01`, y: m.income })),
+            stats.perMonth.map((m) => ({ x: `${m.month}-01`, y: m.spent })),
+            { label: 'Доход', mainLabel: 'Получено', secondLabel: 'Прожито', hint: 'Нужно минимум два месяца выписки' },
+          ),
+        ])
+      : null,
+
+    stats.categories.length
+      ? U.card([
+          U.sectionTitle('На что уходит'),
+          ...stats.categories.map((c) => bar(c, stats.spent)),
+        ])
+      : null,
+
+    U.card([
+      U.sectionTitle('Записи', U.button('Загрузить выписку', () => importSheet({ onDone: refresh }))),
+      table({
+        rows: [...stats.rows].sort((a, b) => (a.date < b.date ? 1 : -1)).slice(0, 200),
+        sortKey: 'date',
+        dir: 'desc',
+        onRow: (row) => rowSheet(row, refresh),
+        empty: 'За этот период записей нет.',
+        columns: [
+          {
+            key: 'date',
+            title: 'Дата',
+            value: (r) => r.date,
+            render: (r) => F.dateShort(r.date),
+            total: () => 'Итого',
+          },
+          {
+            key: 'category',
+            title: 'Категория',
+            value: (r) => r.category || '',
+            render: (r) => h('span', { class: 'dt-clip', text: r.category || '—' }),
+          },
+          {
+            key: 'description',
+            title: 'Где',
+            value: (r) => r.description || '',
+            render: (r) => h('span', { class: 'dt-clip', text: r.description || '—' }),
+          },
+          {
+            key: 'amount',
+            title: 'Сумма',
+            align: 'right',
+            value: (r) => signedOf(r),
+            render: (r) => (r.kind === C.SPEND_MOVE
+              ? F.moneyExact(r.amount)
+              : F.signedMoneyExact(signedOf(r))),
+            cellClass: (r) => (r.kind === C.SPEND_MOVE ? 'dt-neutral' : signedOf(r) >= 0 ? 'dt-plus' : 'dt-minus'),
+            total: (rows) => F.signedMoneyExact(rows.reduce((s, r) => s + signedOf(r), 0)),
+          },
+        ],
+      }),
+    ], { class: 'card-table' }),
+  ];
+}
+
+export function action(ctx) {
+  return U.button('Загрузить', () => importSheet({ onDone: ctx.refresh }), { kind: 'primary' });
+}
+
+// --------------------------------------------------------------------------
+
+function signedOf(row) {
+  if (row.kind === C.SPEND_IN) return row.amount;
+  if (row.kind === C.SPEND_MOVE) return 0;
+  return -row.amount;
+}
+
+function level(kind) {
+  if (kind === 'ok') return 'ok';
+  if (kind === 'none') return 'info';
+  return 'warn';
+}
+
+function perMonthHint(value) {
+  return value ? `${F.money(value)} в месяц` : null;
+}
+
+function gapHint(free, contributed) {
+  if (free <= 0) return 'свободных денег не осталось';
+  const gap = free - contributed;
+  if (gap > free * 0.15) return `${F.money(gap)} осело на карте`;
+  if (gap < -free * 0.15) return 'больше, чем осталось свободным — вкладывали из прошлых остатков';
+  return 'сходится с отложенным';
+}
+
+/**
+ * Полоса категории. Доля показана длиной, а не только числом: сравнивать
+ * пять процентов с двенадцатью глазами тяжело, а две полосы — мгновенно.
+ */
+function bar(row, total) {
+  const share = total > 0 ? row.amount / total : 0;
+  return h('div', { class: 'cat' }, [
+    h('div', { class: 'cat-head' }, [
+      h('span', { class: 'cat-name', text: row.category || 'Прочее' }),
+      h('span', { class: 'cat-sum', text: F.money(row.amount) }),
+    ]),
+    h('div', { class: 'cat-track' }, [
+      h('div', { class: 'cat-fill', style: { width: `${Math.max(share * 100, 1).toFixed(1)}%` } }),
+    ]),
+    h('span', { class: 'cat-share', text: `${F.num(share * 100, 0)}%` }),
+  ]);
+}
+
+function empty(ctx) {
+  return U.card([
+    U.emptyState('Трат пока нет. Выгрузите выписку из банка в CSV и загрузите её сюда — приложение разберёт столбцы само.'),
+    U.button('Загрузить выписку', () => importSheet({ onDone: ctx.refresh }), { kind: 'primary', class: 'btn-wide' }),
+    U.callout('Файл читается в телефоне и никуда не отправляется: сервера у приложения нет.', 'info'),
+  ]);
+}
+
+// --------------------------------------------------------------------------
+
+/**
+ * Правка записи. Кроме категории здесь меняется вид: банк не знает, что
+ * перевод на брокерский счёт — не трата, а для расчёта это решающее.
+ */
+function rowSheet(row, onDone) {
+  const draft = { ...row };
+  U.sheet('Запись', (api) => {
+    const kindSelect = U.select([C.SPEND_OUT, C.SPEND_IN, C.SPEND_MOVE], draft.kind);
+    // Категория банка может не совпасть ни с одной нашей — тогда она
+    // добавляется в список как есть. Иначе открытие записи молча меняло бы
+    // её категорию на первую в списке.
+    const known = [...S.CATEGORIES, ...S.INCOME_CATEGORIES, 'Сбережения'];
+    const catSelect = U.select(
+      known.includes(draft.category) || !draft.category ? known : [draft.category, ...known],
+      draft.category,
+    );
+    const rule = U.checkbox('Запомнить для похожих', false);
+    const amount = U.numberInput(draft.amount);
+
+    api.setFooter([
+      U.button('Удалить', () => {
+        U.confirmSheet('Удалить запись?', 'Она пропадёт из расчёта трат.', 'Удалить', async () => {
+          await store.removeSpend(draft.id);
+          api.close();
+          onDone();
+        });
+      }, { kind: 'danger' }),
+      U.button('Сохранить', async () => {
+        const value = U.parseNumber(amount.value);
+        if (value == null || value <= 0) return U.toast('Сумма должна быть больше нуля', 'error');
+        draft.amount = value;
+        draft.kind = kindSelect.value;
+        draft.category = catSelect.value;
+        await store.saveSpend(draft);
+
+        const word = keyword(draft.description);
+        if (rule.box.checked && word) {
+          const touched = await store.addSpendRule(word, draft.category);
+          U.toast(touched > 1 ? `Переложено записей: ${touched}` : 'Сохранено');
+        } else {
+          U.toast('Сохранено');
+        }
+        api.close();
+        onDone();
+      }, { kind: 'primary' }),
+    ]);
+
+    return [
+      h('p', { class: 'sheet-note', text: `${F.date(draft.date)} · ${draft.description || 'без описания'}` }),
+      U.field('Сумма, ₽', amount),
+      U.field('Вид', kindSelect, 'Перевод себе не считается ни тратой, ни доходом'),
+      U.field('Категория', catSelect),
+      U.field('', rule.node, ruleHint(draft)),
+    ];
+  });
+}
+
+/**
+ * Слово, по которому узнаётся такая же трата в будущем.
+ *
+ * Берём самое длинное слово описания: в «SUPERMARKET PYATEROCHKA 4512 MOSCOW»
+ * узнаваемое — «PYATEROCHKA», а не «MOSCOW» и не номер точки. Правило
+ * по номеру точки сработало бы ровно один раз.
+ */
+function keyword(description) {
+  const words = String(description || '')
+    .split(/[^\p{L}\p{N}]+/u)
+    .filter((w) => w.length >= 4 && !/^\d+$/.test(w));
+  if (!words.length) return null;
+  return words.sort((a, b) => b.length - a.length)[0];
+}
+
+function ruleHint(draft) {
+  const word = keyword(draft.description);
+  return word ? `Все записи со словом «${word}» получат эту категорию` : 'В описании нет слова, по которому узнать похожие';
+}

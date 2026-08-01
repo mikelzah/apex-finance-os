@@ -1233,3 +1233,205 @@ export function splitSignals(list, muted) {
 export function round2(x) {
   return Math.round((x + Number.EPSILON) * 100) / 100;
 }
+
+// --------------------------------------------------------------------------
+// Быт: доходы, траты и равновесие между жизнью и накоплением
+// --------------------------------------------------------------------------
+
+// Бытовые деньги живут отдельным контуром и в капитал не входят. Иначе
+// зарплатная карта попала бы в «Мой капитал», взносы с неё — в доходность,
+// и XIRR портфеля стал бы средним между вложениями и остатком на карте.
+// Это разные вопросы: капитал отвечает «сколько накоплено», быт — «какой
+// ценой». Связывает их одно число — сколько из свободных денег дошло
+// до накоплений.
+
+export const SPEND_OUT = 'Трата';
+export const SPEND_IN = 'Поступление';
+export const SPEND_MOVE = 'Перевод себе';
+
+/** Три месяца по умолчанию: один месяц шумит отпуском и страховкой ОСАГО. */
+export const SPEND_MONTHS = 3;
+
+/** Подушка меньше трёх месяцев считается тонкой, больше шести — избыточной. */
+export const CUSHION_MIN = 3;
+export const CUSHION_MAX = 6;
+
+export function spendFrom(day, months = SPEND_MONTHS) {
+  return D.monthStart(D.addMonths(day, -(months - 1)));
+}
+
+/**
+ * Сводка по быту за период.
+ *
+ * Переводы себе не траты и не доход: это те же деньги, перешедшие в другой
+ * контур. Считать их расходом значит утверждать, что откладывать — дорого.
+ */
+export function spendStats(spending, day, months = SPEND_MONTHS) {
+  const from = spendFrom(day, months);
+  const rows = (spending || []).filter((r) => D.isValid(r.date)
+    && D.diffDays(r.date, from) >= 0 && D.diffDays(day, r.date) >= 0);
+
+  let income = 0;
+  let spent = 0;
+  let moved = 0;
+  const byCategory = new Map();
+  const byMonth = new Map();
+
+  for (const r of rows) {
+    const key = D.month(r.date);
+    if (!byMonth.has(key)) byMonth.set(key, { month: key, income: 0, spent: 0 });
+    if (r.kind === SPEND_IN) { income += r.amount; byMonth.get(key).income += r.amount; continue; }
+    if (r.kind === SPEND_MOVE) { moved += r.amount; continue; }
+    spent += r.amount;
+    byMonth.get(key).spent += r.amount;
+    byCategory.set(r.category, (byCategory.get(r.category) || 0) + r.amount);
+  }
+
+  // Месяцев берём столько, сколько их в данных, а не сколько в окне:
+  // по выписке за две недели средний месячный расход втрое занижен,
+  // и подушка на его основе оказалась бы втрое длиннее настоящей.
+  const monthsWithData = byMonth.size || 1;
+  const free = income - spent;
+
+  return {
+    from,
+    to: day,
+    rows,
+    months: monthsWithData,
+    income,
+    spent,
+    moved,
+    free,
+    // Норма сбережений без доходов не считается: делить на ноль честнее
+    // отказом, чем цифрой, которая выглядит как ответ.
+    rate: income > 0 ? free / income : null,
+    perMonth: [...byMonth.values()].sort((a, b) => (a.month < b.month ? -1 : 1)),
+    categories: [...byCategory.entries()]
+      .map(([category, amount]) => ({ category, amount, share: spent > 0 ? amount / spent : 0 }))
+      .sort((a, b) => b.amount - a.amount),
+    monthlySpend: byMonth.size ? spent / monthsWithData : null,
+    monthlyIncome: byMonth.size ? income / monthsWithData : null,
+  };
+}
+
+/**
+ * На сколько месяцев жизни хватит мгновенно доступных денег.
+ *
+ * Знаменатель — реальные траты по выписке, а не догадка. Без выписки
+ * подушка не считается вовсе: «хватит на 4 месяца» из воздуха хуже,
+ * чем честное «не знаю, сколько вы тратите».
+ */
+export function cushionMonths(assets, operations, stats) {
+  if (!stats || !stats.monthlySpend) return null;
+  const { liquid } = netWorth(assets, operations);
+  return liquid / stats.monthlySpend;
+}
+
+/** Взносы в капитал за тот же период — без внутренних переводов. */
+export function contributedBetween(operations, from, to) {
+  const paired = new Set();
+  for (const op of operations) {
+    if (op.linkedTo) { paired.add(op.id); paired.add(op.linkedTo); }
+  }
+  return operations
+    .filter((op) => op.type === OP_CONTRIBUTION && !paired.has(op.id)
+      && D.isValid(op.date) && D.diffDays(op.date, from) >= 0 && D.diffDays(to, op.date) >= 0)
+    .reduce((s, op) => s + op.amount, 0);
+}
+
+/**
+ * Ответ на вопрос «не слишком ли резко я коплю — и не слишком ли вяло».
+ *
+ * Обе крайности реальны и обе дорого стоят. Копить рывком, не собрав
+ * подушку, — это продавать активы в худший момент, когда сломается
+ * холодильник. Копить вяло — это держать деньги на карте, где инфляция
+ * съедает их молча, без единой строки в журнале.
+ *
+ * Поэтому вердикт один и с числом: не «вы молодец», а «до трёх месяцев
+ * не хватает 40 000». Оценка без суммы — это мнение, а приложение
+ * не для мнений.
+ */
+export function balanceVerdict(stats, cushion, contributed) {
+  if (!stats || !stats.rows.length) {
+    return { level: 'none', title: 'Трат пока нет', text: 'Загрузите выписку из банка — без неё приложение видит только накопления и не знает, какой ценой они даются.' };
+  }
+  if (!(stats.income > 0)) {
+    return {
+      level: 'none',
+      title: 'Не хватает доходов',
+      text: 'В выписке есть траты, но нет поступлений. Норму сбережений без них не посчитать — загрузите выписку той карты, куда приходит зарплата.',
+    };
+  }
+
+  const rate = stats.rate;
+  const gap = stats.free - contributed;
+
+  if (stats.free < 0) {
+    return {
+      level: 'over',
+      title: 'Живёте из накоплений',
+      text: `За ${plural(stats.months, 'месяц', 'месяца', 'месяцев')} потрачено на ${money(-stats.free)} больше, чем получено. Это не всегда плохо — так бывает в отпуск или после крупной покупки, — но если так третий месяц подряд, накопления тают, а в журнале это не видно.`,
+    };
+  }
+
+  if (cushion != null && cushion < CUSHION_MIN) {
+    const need = stats.monthlySpend * CUSHION_MIN - cushion * stats.monthlySpend;
+    return {
+      level: 'thin',
+      title: 'Копите быстрее, чем страхуетесь',
+      text: `Откладываете ${Math.round(rate * 100)}% дохода, но мгновенно доступных денег хватит на ${months(cushion)}. До трёх месяцев жизни не хватает ${money(need)} — при поломке или простое их пришлось бы доставать из вложений, и почти наверняка в неудачный момент.`,
+    };
+  }
+
+  if (rate < 0.1) {
+    return {
+      level: 'soft',
+      title: 'Деньги почти не работают',
+      text: `За ${plural(stats.months, 'месяц', 'месяца', 'месяцев')} свободными осталось ${money(stats.free)} из ${money(stats.income)} — это ${Math.round(rate * 100)}%. В капитал дошло ${money(contributed)}. Подушка уже собрана, так что дальше дело не в осторожности: деньги просто остаются на карте.`,
+    };
+  }
+
+  if (cushion != null && cushion > CUSHION_MAX) {
+    const extra = (cushion - CUSHION_MAX) * stats.monthlySpend;
+    return {
+      level: 'idle',
+      title: 'Подушка больше, чем нужна',
+      text: `Мгновенно доступных денег хватит на ${months(cushion)} жизни. Сверх шестимесячной подушки лежит ${money(extra)} — эта часть уже не страховка, и её стоит поставить работать.`,
+    };
+  }
+
+  const tail = gap > stats.monthlySpend * 0.5
+    ? ` Из отложенного до накоплений дошло ${money(contributed)}, остальное осталось на карте.`
+    : '';
+  // Подушка не считается, когда трат за период нет вовсе — тогда и делить
+  // не на что. Дописывать к вердикту «хватит на неизвестно сколько» нельзя:
+  // фраза выглядит как измерение, а измерения не было.
+  const cover = cushion == null ? '' : ` подушки хватит на ${months(cushion)},`;
+  return {
+    level: 'ok',
+    title: 'Равновесие держится',
+    text: `Откладываете ${Math.round(rate * 100)}% дохода,${cover} и это разумная середина.${tail}`,
+  };
+}
+
+// Маленькие помощники для формулировок. Формат денег в расчётном ядре
+// намеренно свой и грубый: точные рубли с копейками показывает вид,
+// а во фразе «не хватает 40 000» копейки только мешают читать.
+function money(x) {
+  return `${Math.round(x).toLocaleString('ru-RU')} ₽`;
+}
+
+function months(x) {
+  if (x == null) return 'неизвестно сколько';
+  const value = x >= 10 ? Math.round(x) : Math.round(x * 10) / 10;
+  return `${String(value).replace('.', ',')} ${plural(Math.round(value), 'месяц', 'месяца', 'месяцев')}`;
+}
+
+function plural(n, one, few, many) {
+  const a = Math.abs(n) % 100;
+  const b = a % 10;
+  if (a > 10 && a < 20) return many;
+  if (b > 1 && b < 5) return few;
+  if (b === 1) return one;
+  return many;
+}

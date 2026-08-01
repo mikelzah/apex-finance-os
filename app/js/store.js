@@ -102,6 +102,10 @@ function emptyState() {
     netWorth: [],
     keyRate: [],
     priceHistory: [],
+    // Быт: траты и поступления из банковской выписки. Отдельный массив,
+    // а не операции: операции двигают капитал, считаются в доходности
+    // и в налоге, а покупка кофе не должна попадать ни туда, ни туда.
+    spending: [],
     settings: {
       quickAmount: 1250,
       quickAssetId: null,
@@ -115,6 +119,14 @@ function emptyState() {
       // Развёрнут ли блок сигналов. null — человек ещё не выбирал, тогда
       // блок открывается сам, если есть ошибки.
       signalsOpen: null,
+      // Свои правила разбора по категориям: [{ match, category }].
+      // Проверяются раньше встроенных — своё знание о своих тратах точнее.
+      spendRules: [],
+      // Раскладка столбцов выписки по банкам: { «Т-Банк»: { date: 0, … } }.
+      // Спрашивать её каждый раз при выгрузке трижды в неделю — издевательство.
+      bankProfiles: {},
+      // За сколько месяцев считать быт. Меньше трёх — шум от отпуска и ОСАГО.
+      spendMonths: 3,
     },
     meta: {
       lastBackupAt: null,
@@ -135,9 +147,11 @@ function migrate(loaded) {
   if (!Array.isArray(next.settings.mutedSignals)) next.settings.mutedSignals = [];
   migrateClasses(next, loaded.settings || {});
   next.meta = { ...base.meta, ...(loaded.meta || {}) };
-  for (const key of ['assets', 'goals', 'operations', 'portfolio', 'tax', 'netWorth', 'keyRate', 'priceHistory']) {
+  for (const key of ['assets', 'goals', 'operations', 'portfolio', 'tax', 'netWorth', 'keyRate', 'priceHistory', 'spending']) {
     if (!Array.isArray(next[key])) next[key] = [];
   }
+  if (!Array.isArray(next.settings.spendRules)) next.settings.spendRules = [];
+  if (!next.settings.bankProfiles || typeof next.settings.bankProfiles !== 'object') next.settings.bankProfiles = {};
   // Размер лота появился вместе со сделками. Единица — не догадка, а самый
   // частый случай на Мосбирже; где не так, поправляется в карточке бумаги.
   for (const a of next.assets) {
@@ -430,4 +444,76 @@ export async function wipe() {
 /** Показывать ли экран первого запуска: выбор ещё не сделан. */
 export function needsOnboarding() {
   return !state.meta.onboarded;
+}
+
+// --------------------------------------------------------------------------
+// Быт
+// --------------------------------------------------------------------------
+
+/**
+ * Записывает разобранную выписку. Возвращает, сколько добавлено.
+ *
+ * Слияние — не задача хранилища: что считать новым, решает разбор выписки,
+ * который знает про нахлёст дат и про два одинаковых кофе в один день.
+ * Сюда приходит уже готовый список того, чего в базе нет.
+ */
+export async function addSpending(rows, bank = null, mapping = null) {
+  return mutate((draft) => {
+    for (const row of rows) {
+      draft.spending.push({
+        id: newId('sp'),
+        date: row.date,
+        amount: C.round2(row.amount),
+        kind: row.kind,
+        category: row.category,
+        description: row.description || '',
+        account: row.account || bank || null,
+        key: row.key,
+        source: C.SOURCE_MANUAL,
+      });
+    }
+    if (bank && mapping) draft.settings.bankProfiles[bank] = mapping;
+    return rows.length;
+  });
+}
+
+export async function saveSpend(row) {
+  return mutate((draft) => {
+    if (!row.id) row.id = newId('sp');
+    upsert(draft.spending, row);
+    return row;
+  });
+}
+
+export async function removeSpend(id) {
+  return mutate((draft) => remove(draft.spending, id));
+}
+
+/**
+ * Правило раскладки по категориям. Заодно перекладывает уже записанное:
+ * человек правит категорию не ради будущего, а потому что видит неверную
+ * строку сейчас, и оставить прошлое как было значит не выполнить просьбу.
+ */
+export async function addSpendRule(match, category) {
+  return mutate((draft) => {
+    const text = String(match || '').trim();
+    if (!text) return 0;
+    const i = draft.settings.spendRules.findIndex((r) => r.match.toLowerCase() === text.toLowerCase());
+    if (i >= 0) draft.settings.spendRules[i].category = category;
+    else draft.settings.spendRules.push({ match: text, category });
+
+    let touched = 0;
+    for (const row of draft.spending) {
+      if (row.kind === C.SPEND_MOVE) continue;
+      if (!`${row.description || ''}`.toLowerCase().includes(text.toLowerCase())) continue;
+      if (row.category === category) continue;
+      row.category = category;
+      touched += 1;
+    }
+    return touched;
+  });
+}
+
+export async function clearSpending() {
+  return mutate((draft) => { draft.spending = []; });
 }

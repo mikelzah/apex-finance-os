@@ -31,6 +31,7 @@ export function render(ctx) {
     primaryGoal(ctx),
     attention(ctx),
     capitalChart(state, worth, today),
+    balanceCard(ctx),
     ritualCard(state, today),
     secondaryGoals(ctx),
   ];
@@ -494,6 +495,39 @@ function capitalChart(state, worth, today) {
       label: 'Капитал',
       hint: 'Первый снимок появится в конце месяца — графику нужны две точки',
     }),
+  ]);
+}
+
+/**
+ * Равновесие между жизнью и накоплением.
+ *
+ * Стоит после графика капитала намеренно: сначала «сколько накоплено»,
+ * сразу следом «какой ценой». Порознь эти два числа успокаивают по очереди —
+ * капитал растёт, значит всё хорошо, — а вместе задают настоящий вопрос.
+ *
+ * Без выписки карточки нет вовсе: приглашать загрузить её с главного экрана
+ * каждый день значит превратить совет в рекламу. Позвать один раз может
+ * раздел «Ещё», где это и живёт.
+ */
+function balanceCard(ctx) {
+  const { state, today, go } = ctx;
+  if (!state.spending.length) return null;
+
+  const stats = C.spendStats(state.spending, today, state.settings.spendMonths || C.SPEND_MONTHS);
+  const cushion = C.cushionMonths(state.assets, state.operations, stats);
+  const contributed = C.contributedBetween(state.operations, stats.from, today);
+  const verdict = C.balanceVerdict(stats, cushion, contributed);
+
+  return U.card([
+    U.sectionTitle('Жизнь и накопления', U.button('Подробно', () => go('more/spending'))),
+    h('div', { class: 'grid-3' }, [
+      U.stat('Прожито', F.money(stats.spent), { hint: `за ${stats.months} мес.` }),
+      U.stat('Отложено', F.signedMoney(stats.free), {
+        hint: stats.rate == null ? 'нет доходов' : `${Math.round(stats.rate * 100)}% дохода`,
+      }),
+      U.stat('Подушка', cushion == null ? '—' : `${F.num(cushion, 1)} мес.`, { hint: 'мгновенные деньги' }),
+    ]),
+    U.callout(`${verdict.title}. ${verdict.text}`, verdict.level === 'ok' ? 'ok' : verdict.level === 'none' ? 'info' : 'warn'),
   ]);
 }
 

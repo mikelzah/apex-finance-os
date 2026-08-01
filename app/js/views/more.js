@@ -13,6 +13,7 @@ import { BUILD } from '../build.js';
 import * as mascot from '../mascot.js';
 import * as lock from '../lock.js';
 import { table } from '../table.js';
+import * as spending from './spending.js';
 
 const { h } = U;
 
@@ -25,6 +26,7 @@ export function render(ctx) {
     case 'keyrate': return keyRate(ctx);
     case 'settings': return settings(ctx);
     case 'backup': return backup(ctx);
+    case 'spending': return spending.render(ctx);
     default: return hub(ctx);
   }
 }
@@ -40,6 +42,7 @@ export function action(sub, ctx) {
   if (sub === 'keyrate') {
     return U.button('Добавить', () => keyRateSheet(ctx), { kind: 'primary' });
   }
+  if (sub === 'spending') return spending.action(ctx);
   return null;
 }
 
@@ -52,6 +55,7 @@ export function title(sub) {
     keyrate: 'Ключевая ставка ЦБ',
     settings: 'Настройки',
     backup: 'Резервная копия',
+    spending: 'Траты и жизнь',
   }[sub] || 'Ещё';
 }
 
@@ -78,6 +82,16 @@ function hub(ctx) {
           onClick: () => ctx.go('more/health'),
           tag: errors ? 'ошибки' : null,
           tagClass: 'sell',
+        });
+      })(),
+      (() => {
+        const stats = C.spendStats(state.spending, today, state.settings.spendMonths || C.SPEND_MONTHS);
+        const cushion = C.cushionMonths(state.assets, state.operations, stats);
+        return U.row('Траты и жизнь', stats.rows.length ? F.money(stats.spent) : 'нет данных', {
+          sub: cushion == null
+            ? 'выписка из банка: сколько уходит на жизнь'
+            : `подушка на ${F.num(cushion, 1)} мес. · ${stats.rate == null ? '' : `откладываете ${Math.round(stats.rate * 100)}%`}`,
+          onClick: () => ctx.go('more/spending'),
         });
       })(),
       U.row('Ключевая ставка ЦБ', state.keyRate.length ? F.percent(C.rateOn(state.keyRate, today)) : '—', {
