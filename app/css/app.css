@@ -1739,3 +1739,26 @@ body.has-mascot .header { padding-top: calc(var(--safe-top) + var(--space-6)); }
 
 .check.is-ok { background: var(--good-wash); border-left-color: var(--good); }
 .check.is-bad { background: var(--warn-wash); border-left-color: var(--warn); }
+
+/* Строка разбора как выключатель: нажатием её исключают из записи.
+   Галочка слева, а не справа — глаз идёт по левому краю и сразу видит,
+   что попадёт в базу, не читая сумм. */
+.preview-row.is-pick {
+  grid-template-columns: 1.2em auto 1fr auto;
+  width: 100%;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  padding: var(--space-1) 0;
+  cursor: pointer;
+}
+
+.preview-mark {
+  color: var(--good-ink);
+  font-weight: var(--weight-semibold);
+}
+
+.preview-row.is-off { opacity: 0.4; }
+.preview-row.is-off .preview-text { text-decoration: line-through; }

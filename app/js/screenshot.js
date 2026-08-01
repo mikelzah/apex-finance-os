@@ -39,6 +39,29 @@ const BARE = /([+\-−–—])\s*(\d[\d\s   ]*[.,]\d{2})(?!\d)/u;
 const NOISE = /кэшб|кешб|cashback|бонус|балл|начислим|накоплено|доступно|остаток по счёту|остаток по счету/i;
 
 /**
+ * Полосы самого телефона, попавшие в снимок.
+ *
+ * Сверху часы и заряд, снизу панель вкладок приложения. Разбор видит там
+ * числа и делает из них операции: «15:12 ⚡ 50 %» становится тратой в 50 ₽,
+ * а «Главный · Платежи · История · Чаты» — тратой в 125 ₽. Обе выглядят
+ * как настоящие записи, и заметить их можно только по бессмысленному
+ * названию.
+ *
+ * Панель вкладок узнаём по словам — их там всегда несколько и они всегда
+ * одни и те же. Часы — по времени в самом начале строки, но только если
+ * дальше нет ни одного слова: «14:22 Пятёрочка −1 240 ₽» это операция,
+ * а не строка состояния.
+ */
+const TABBAR = /(главн|платеж|истори|чаты|каталог|инвестиц|сервис|оформить|мой банк|ещё|еще|поиск|карты|дом)/gi;
+
+function isPhoneChrome(line) {
+  const nav = String(line).match(TABBAR);
+  if (nav && nav.length >= 3) return true;
+  if (!/^\s*\d{1,2}[:.]\d{2}(?![\d])/.test(line)) return false;
+  return !/\p{L}{3}/u.test(line.replace(/^\s*\d{1,2}[:.]\d{2}/, ''));
+}
+
+/**
  * Итог дня — «Вы потратили 4 865,24 ₽» под заголовком с датой.
  *
  * Записывать его операцией нельзя: это сумма всех остальных строк, и день
@@ -73,7 +96,7 @@ export function parseScreen(text, today) {
     const line = lines[i];
     const asDate = readDate(line, today);
     if (asDate) { date = asDate; dated = true; pending = []; continue; }
-    if (NOISE.test(line)) continue;
+    if (NOISE.test(line) || isPhoneChrome(line)) continue;
 
     if (TOTAL.test(line)) {
       const sum = readAmount(line);
@@ -182,7 +205,7 @@ function isTime(line) {
 function nextPlain(lines, from, today, main) {
   for (let i = from + 1; i < Math.min(lines.length, from + 3); i += 1) {
     const line = lines[i];
-    if (NOISE.test(line)) continue;
+    if (NOISE.test(line) || isPhoneChrome(line)) continue;
     if (readDate(line, today) || isTime(line)) return -1;
 
     const money = readAmount(line);

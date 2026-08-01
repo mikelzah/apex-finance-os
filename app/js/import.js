@@ -117,7 +117,7 @@ function mappingSheet(table, filename, options, forced = null) {
           + (lost ? ` Без даты или суммы: ${lost}.` : '')
         : 'Ни одной строки разобрать не вышло — проверьте, какой столбец где.';
 
-      for (const row of rows.slice(0, 5)) {
+      for (const row of fresh.slice(0, 5)) {
         preview.appendChild(h('div', { class: 'preview-row' }, [
           h('span', { class: 'preview-date', text: F.dateShort(row.date) }),
           h('span', { class: 'preview-text', text: `${row.category} · ${row.description || '—'}` }),
@@ -252,13 +252,18 @@ function sameShape(mapping, header) {
 export function screenshotSheet(options = {}) {
   const state = store.getState();
   const today = D.today();
+  // Снятые галочки живут по ключу записи, а не по номеру строки: текст
+  // перечитывается на каждое нажатие, и номера в нём разъезжаются.
+  const unchecked = new Set();
 
   U.sheet('Со скриншота', (api) => {
     const area = U.textarea('', { placeholder: 'Вставьте сюда текст со скриншота' });
     const preview = h('div', { class: 'preview' });
     const summary = h('p', { class: 'sheet-note' });
     const checks = h('div', { class: 'checks' });
-    let parsed = { rows: [], dated: false, totals: [] };
+    let parsed = { rows: [], fresh: [], dated: false, totals: [] };
+
+    const chosen = () => parsed.fresh.filter((row) => !unchecked.has(row.key));
 
     function update() {
       parsed = parseScreen(area.value, today);
@@ -266,66 +271,94 @@ export function screenshotSheet(options = {}) {
       parsed.rows = S.markTransfers(withCategory, contributions(state));
       parsed.fresh = S.newRows(parsed.rows, state.spending);
 
+      const known = parsed.rows.length - parsed.fresh.length;
       U.clear(preview);
+      U.clear(checks);
+
       if (!area.value.trim()) {
         summary.textContent = 'Пока пусто.';
         preview.appendChild(h('p', { class: 'field-hint', text: 'Строки со суммами станут операциями.' }));
+        refreshFooter();
         return;
       }
+
+      // Уже записанные не показываются вовсе — выбирать из них нечего,
+      // а в списке они выглядели бы как забытые и звали нажать ещё раз.
       summary.textContent = parsed.rows.length
-        ? `Нашлось операций: ${parsed.rows.length}. Новых: ${parsed.fresh.length}.`
+        ? `Нашлось операций: ${parsed.rows.length}.`
+          + (known ? ` Уже записано раньше: ${known}, они пропущены.` : '')
           + (parsed.dated ? '' : ' Дата в тексте не найдена — всем записям встанет сегодняшнее число.')
         : 'Сумм в тексте не нашлось. Нужны строки вида «Пятёрочка −1 240,50 ₽».';
 
-      // Сверка с итогом дня. Банк печатает его над списком, и это
-      // единственный способ поймать переехавшую цифру: сумма, прочитанная
-      // неверно, выглядит совершенно правдоподобно, и глазами её не найти.
-      U.clear(checks);
       for (const line of controlLines(parsed)) {
         checks.appendChild(h('p', { class: `check ${line.ok ? 'is-ok' : 'is-bad'}`, text: line.text }));
       }
 
-      for (const row of parsed.rows) {
-        preview.appendChild(h('div', { class: 'preview-row' }, [
-          h('span', { class: 'preview-date', text: F.dateShort(row.date) }),
-          h('span', { class: 'preview-text', text: `${row.category} · ${row.description || '—'}` }),
-          h('span', {
-            class: `preview-sum ${row.kind === S.KIND_IN ? 'is-plus' : row.kind === S.KIND_MOVE ? 'is-neutral' : 'is-minus'}`,
-            // Копейки здесь показываются полностью: это экран сверки,
-            // и «−1 240 ₽» вместо «−1 240,50 ₽» скрывает ровно то,
-            // ради чего в него смотрят.
-            text: row.kind === S.KIND_MOVE
-              ? F.moneyExact(row.amount)
-              : F.signedMoneyExact(row.kind === S.KIND_IN ? row.amount : -row.amount),
-          }),
-        ]));
+      if (!parsed.fresh.length && parsed.rows.length) {
+        preview.appendChild(h('p', { class: 'field-hint', text: 'Все эти операции уже записаны.' }));
       }
+
+      for (const row of parsed.fresh) {
+        preview.appendChild(rowButton(row));
+      }
+      refreshFooter();
+    }
+
+    /**
+     * Строка разбора — она же выключатель. Галочка нужна, потому что часть
+     * строк с экрана операциями не является: подписи приложения, реклама,
+     * подтверждения. Разбор старается их отсеять, но последнее слово
+     * за человеком, и оно должно даваться одним касанием.
+     */
+    function rowButton(row) {
+      const on = !unchecked.has(row.key);
+      const node = h('button', {
+        class: `preview-row is-pick${on ? '' : ' is-off'}`,
+        type: 'button',
+        'aria-pressed': String(on),
+        onclick: () => {
+          if (unchecked.has(row.key)) unchecked.delete(row.key);
+          else unchecked.add(row.key);
+          update();
+        },
+      }, [
+        h('span', { class: 'preview-mark', text: on ? '✓' : '' }),
+        h('span', { class: 'preview-date', text: F.dateShort(row.date) }),
+        h('span', { class: 'preview-text', text: `${row.category} · ${row.description || '—'}` }),
+        h('span', {
+          class: `preview-sum ${row.kind === S.KIND_IN ? 'is-plus' : row.kind === S.KIND_MOVE ? 'is-neutral' : 'is-minus'}`,
+          // Копейки здесь показываются полностью: это экран сверки,
+          // и «−1 240 ₽» вместо «−1 240,50 ₽» скрывает ровно то,
+          // ради чего в него смотрят.
+          text: row.kind === S.KIND_MOVE
+            ? F.moneyExact(row.amount)
+            : F.signedMoneyExact(row.kind === S.KIND_IN ? row.amount : -row.amount),
+        }),
+      ]);
+      return node;
+    }
+
+    function refreshFooter() {
+      const count = chosen().length;
+      api.setFooter([
+        U.button('Отмена', () => api.close()),
+        U.button(count ? `Записать (${count})` : 'Записать', async () => {
+          const list = chosen();
+          if (!list.length) {
+            U.toast(parsed.rows.length ? 'Ни одна запись не отмечена' : 'Разбирать нечего', 'error');
+            return;
+          }
+          await store.addSpending(list, 'Со скриншота', null, null);
+          const paired = await store.pairSelfTransfers();
+          api.close();
+          U.tap();
+          U.toast(pairedText(list.length, paired));
+          options.onDone?.();
+        }, { kind: 'primary', disabled: !count }),
+      ]);
     }
 
     area.addEventListener('input', update);
-
-    api.setFooter([
-      U.button('Отмена', () => api.close()),
-      U.button('Записать', async () => {
-        if (!parsed.fresh || !parsed.fresh.length) {
-          U.toast(parsed.rows.length ? 'Все эти записи уже есть' : 'Разбирать нечего', parsed.rows.length ? 'ok' : 'error');
-          return;
-        }
-        await store.addSpending(parsed.fresh, 'Со скриншота', null, null);
-        const paired = await store.pairSelfTransfers();
-        api.close();
-        U.tap();
-        U.toast(pairedText(parsed.fresh.length, paired));
-        options.onDone?.();
-      }, { kind: 'primary' }),
-    ]);
-
-    update();
-
-    // Полоса ожидания: распознавание идёт секунды, а в первый раз к ним
-    // добавляется загрузка движка. Без полосы это выглядит как зависшая
-    // кнопка, и человек жмёт её второй раз.
-    const progress = h('p', { class: 'field-hint', text: '' });
 
     const pickImage = () => {
       const picker = h('input', { type: 'file', accept: 'image/*', style: { display: 'none' } });
@@ -356,6 +389,13 @@ export function screenshotSheet(options = {}) {
       picker.click();
     };
 
+    // Полоса ожидания: распознавание идёт секунды, а в первый раз к ним
+    // добавляется загрузка движка. Без полосы это выглядит как зависшая
+    // кнопка, и человек жмёт её второй раз.
+    const progress = h('p', { class: 'field-hint', text: '' });
+
+    update();
+
     return [
       U.callout('Снимок распознаётся в телефоне и никуда не отправляется. В первый раз загрузится сам распознаватель — около 5 МБ, дальше он работает и без сети.', 'info'),
       U.button('Выбрать снимок', pickImage, { kind: 'primary', class: 'btn-wide' }),
@@ -375,9 +415,9 @@ export function screenshotSheet(options = {}) {
       U.field('Текст со снимка', area, 'Заполняется распознаванием, но можно вписать и руками'),
       summary,
       checks,
-      U.sectionTitle('Что получилось'),
+      U.sectionTitle('Что записать'),
       preview,
-      U.callout('Без плюса сумма считается тратой. Поправить вид и категорию можно у каждой записи после загрузки.', 'warn'),
+      U.callout('Нажмите на строку, чтобы не записывать её. Без плюса сумма считается тратой; вид и категорию можно поправить и после загрузки.', 'warn'),
     ];
   });
 }
