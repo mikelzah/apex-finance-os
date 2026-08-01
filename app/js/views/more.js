@@ -396,16 +396,46 @@ function history(ctx) {
     ]),
 
     snaps.length
-      ? U.card([...[...snaps].reverse().slice(0, 40).map((r) => {
-          const row = series && series.find((x) => x.date === r.date);
-          return U.row(F.date(r.date), F.money(r.total), {
-            sub: row
-              ? `вложено ${F.money(row.invested)} · ${row.growth >= 0 ? 'наросло' : 'просело'} ${F.signedMoney(row.growth)}`
-              : `доступно ${F.money(r.liquid)} · инвестиции ${F.money(r.invested)}`,
-          });
-        })])
+      ? U.card([
+          ...[...snaps].reverse().slice(0, 40).map((r) => {
+            const row = series && series.find((x) => x.date === r.date);
+            return U.row(F.date(r.date), F.money(r.total), {
+              sub: row
+                ? `вложено ${F.money(row.invested)} · ${row.growth >= 0 ? 'наросло' : 'просело'} ${F.signedMoney(row.growth)}`
+                : `доступно ${F.money(r.liquid)} · инвестиции ${F.money(r.invested)}`,
+              onClick: () => dropSnapshot(r, today, refresh),
+            });
+          }),
+          U.callout('Нажмите на день, чтобы убрать снимок. Это нужно, когда актив ушёл из приложения задним числом: старый снимок продолжает помнить капитал вместе с ним.', 'info'),
+        ])
       : null,
   ];
+}
+
+/**
+ * Убрать снимок капитала.
+ *
+ * Единственный способ починить историю после того, как актив удалён задним
+ * числом: снимок — это память о дне, пересчитать его не из чего. График при
+ * этом перестаёт показывать обрыв, которого не было.
+ *
+ * Про снимок за сегодня говорим прямо, что он вернётся: он пишется сам при
+ * каждом открытии, и «удалил, а он на месте» выглядело бы поломкой.
+ */
+function dropSnapshot(snap, today, refresh) {
+  const tail = snap.date === today
+    ? ' Снимок за сегодня запишется заново при следующем открытии — капитал берётся из активов.'
+    : ' Точка пропадёт из истории и с графика. Вернуть её нельзя: пересчитать прошлый день не из чего.';
+  U.confirmSheet(
+    'Убрать снимок?',
+    `${F.date(snap.date)} — ${F.money(snap.total)}.${tail}`,
+    'Убрать',
+    async () => {
+      await store.removeSnapshot(snap.date);
+      U.toast(`Снимок за ${F.date(snap.date)} убран`);
+      refresh();
+    },
+  );
 }
 
 // --------------------------------------------------------------------------
