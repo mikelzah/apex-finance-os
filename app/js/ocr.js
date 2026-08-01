@@ -149,7 +149,13 @@ function rebuild(lines, amounts, left) {
   return lines.map((line) => {
     const near = amounts.find((a) => a.middle >= line.top && a.middle <= line.bottom);
     const tail = near ? (near.text.replace(/[^\d]*$/u, '').match(TAIL) || [])[0] : null;
-    if (!tail) return line.text;
+    // Длинная подпись под названием заезжает в колонку сумм, и её хвост
+    // читается как одинокая цифра: «Переводы · СБП · ОТП Банк» давало
+    // трату в один рубль. Считаем суммой только то, где цифр больше одной
+    // или рядом стоит валюта.
+    const looksLikeMoney = tail
+      && ((tail.match(/\d/g) || []).length > 1 || /₽|руб|[рp](?![\p{L}])/iu.test(near.text));
+    if (!looksLikeMoney) return line.text;
     const amount = normaliseAmount(tail.trim());
 
     const before = line.words.filter((w) => w.x0 < left).map((w) => w.text).join(' ').trim();

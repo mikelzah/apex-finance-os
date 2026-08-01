@@ -8,6 +8,7 @@
 // Список классов живёт в расчётном ядре — там же, где им пользуются.
 // Дублировать его здесь значило бы однажды разойтись.
 import * as C from './calc.js';
+import * as D from './dates.js';
 const { ASSET_CLASSES } = C;
 
 // Имя базы не меняется вместе с названием приложения — и не должно:
@@ -518,4 +519,50 @@ export async function addSpendRule(match, category) {
 
 export async function clearSpending() {
   return mutate((draft) => { draft.spending = []; });
+}
+
+/**
+ * Сводит переводы между своими счетами в разных банках.
+ *
+ * Человек перевёл себе с одной карты на другую — и в выписке первого банка
+ * это трата, а в выписке второго доход. Обе записи настоящие, но денег
+ * не прибавилось и не убавилось: они просто перешли из кармана в карман.
+ * Оставить как есть значит завысить и доход, и расход на одну и ту же сумму,
+ * а норму сбережений — испортить дважды.
+ *
+ * Признак — не имя получателя (его знает только человек), а совпадение:
+ * одинаковая сумма, соседние даты, и обе стороны похожи на перевод. Порядок
+ * загрузки неважен: сводим по всей базе, поэтому второй банк, загруженный
+ * через неделю, найдёт свою пару в уже записанном.
+ */
+const TRANSFERISH = /перевод|перевела|перевёл|перевел|сбп|c2c|между счетами|между своими/i;
+// «Пётр И.» и «Пётр Сергеевич И.» — так банк подписывает перевод человеку.
+const PERSON = /^\p{Lu}\p{Ll}+(?:\s+\p{Lu}\p{Ll}+)?\s+\p{Lu}\.$/u;
+const PAIR_DAYS = 3;
+
+export async function pairSelfTransfers() {
+  return mutate((draft) => {
+    const looksTransfer = (row) => TRANSFERISH.test(`${row.description || ''} ${row.category || ''}`)
+      || PERSON.test(String(row.description || '').trim());
+
+    const out = draft.spending.filter((r) => r.kind === C.SPEND_OUT && looksTransfer(r));
+    const income = draft.spending.filter((r) => r.kind === C.SPEND_IN && looksTransfer(r));
+    const taken = new Set();
+    let paired = 0;
+
+    for (const spent of out) {
+      const match = income.find((r) => !taken.has(r.id)
+        && Math.abs(r.amount - spent.amount) < 0.01
+        && Math.abs(D.diffDays(r.date, spent.date)) <= PAIR_DAYS);
+      if (!match) continue;
+
+      taken.add(match.id);
+      for (const row of [spent, match]) {
+        row.kind = C.SPEND_MOVE;
+        row.category = 'Переводы';
+      }
+      paired += 1;
+    }
+    return paired;
+  });
 }

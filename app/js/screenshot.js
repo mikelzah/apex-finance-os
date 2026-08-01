@@ -116,7 +116,7 @@ export function parseScreen(text, today) {
     // после «Супермаркетов» уезжала в продукты.
     let bankCategory = under;
     if (inline) {
-      const at = nextPlain(lines, i, today);
+      const at = nextPlain(lines, i, today, money);
       bankCategory = at < 0 ? null : lines[at];
       if (at >= 0) i = at;
     }
@@ -126,7 +126,7 @@ export function parseScreen(text, today) {
       amount: money.amount,
       kind: money.kind,
       description: clean(description).slice(0, 120),
-      bankCategory: bankCategory ? clean(bankCategory).slice(0, 60) || null : null,
+      bankCategory: bankCategory ? clean(stripAmount(bankCategory)).slice(0, 60) || null : null,
     });
     pending = [];
   }
@@ -142,6 +142,12 @@ export function parseScreen(text, today) {
  * Справа так же оседают часики неподтверждённой операции — «©», «®».
  * Ни то ни другое не название, а в правиле категорий такой мусор мешает.
  */
+/** Убирает сумму из строки категории — там ей делать нечего. */
+function stripAmount(text) {
+  const money = readAmount(text);
+  return money ? text.replace(money.raw, ' ') : text;
+}
+
 function clean(text) {
   return String(text || '')
     .replace(/^[^\p{L}\d]+/u, '')
@@ -160,18 +166,41 @@ function isTime(line) {
 }
 
 /**
- * Ближайшая ниже строка без суммы и без даты — она и есть категория.
- * Между ней и суммой может стоять подпись про кэшбэк; дальше одной такой
- * подписи не заглядываем, чтобы не утащить название следующей операции.
+ * Ближайшая ниже строка с категорией операции.
+ *
+ * Обычно это строка без суммы. Но в Т-Банке на ней же справа стоит кэшбэк —
+ * «Фастфуд   +20 ₽», без слова «кэшбэк» и без всякого другого признака,
+ * кроме положительного знака и мелкой суммы. Без разбора она становилась
+ * доходом: двадцать рублей прихода под каждой тратой, и норма сбережений
+ * растёт на ровном месте.
+ *
+ * Отличаем по смыслу, а не по слову: кэшбэк — это возврат части трата,
+ * он меньше её и идёт в другую сторону. Строка при этом обязана нести
+ * ещё и текст: одинокое «+20 ₽» может оказаться настоящей операцией,
+ * и съедать её молча нельзя.
  */
-function nextPlain(lines, from, today) {
+function nextPlain(lines, from, today, main) {
   for (let i = from + 1; i < Math.min(lines.length, from + 3); i += 1) {
     const line = lines[i];
     if (NOISE.test(line)) continue;
-    if (readDate(line, today) || readAmount(line) || isTime(line)) return -1;
-    return i;
+    if (readDate(line, today) || isTime(line)) return -1;
+
+    const money = readAmount(line);
+    if (!money) return i;
+    if (isCashback(money, main, line)) return i;
+    return -1;
   }
   return -1;
+}
+
+// Кэшбэк больше трети траты не бывает: обычно это единицы процентов,
+// у самых щедрых карт — десятки.
+const CASHBACK_SHARE = 0.35;
+
+function isCashback(money, main, line) {
+  if (!main || main.kind !== KIND_OUT || money.kind !== KIND_IN) return false;
+  if (money.amount > main.amount * CASHBACK_SHARE) return false;
+  return /\p{L}{3}/u.test(line.replace(money.raw, ''));
 }
 
 function readAmount(line) {

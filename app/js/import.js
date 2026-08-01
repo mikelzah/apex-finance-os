@@ -142,9 +142,10 @@ function mappingSheet(table, filename, options, forced = null) {
           return;
         }
         await store.addSpending(fresh, bank, mapping, key);
+        const paired = await store.pairSelfTransfers();
         api.close();
         U.tap();
-        U.toast(`Записей добавлено: ${fresh.length}`);
+        U.toast(pairedText(fresh.length, paired));
         options.onDone?.();
       }, { kind: 'primary' }),
     ]);
@@ -311,9 +312,10 @@ export function screenshotSheet(options = {}) {
           return;
         }
         await store.addSpending(parsed.fresh, 'Со скриншота', null, null);
+        const paired = await store.pairSelfTransfers();
         api.close();
         U.tap();
-        U.toast(`Записей добавлено: ${parsed.fresh.length}`);
+        U.toast(pairedText(parsed.fresh.length, paired));
         options.onDone?.();
       }, { kind: 'primary' }),
     ]);
@@ -412,4 +414,14 @@ function controlLines(parsed) {
         + ' Что-то прочиталось неверно — сверьте суммы со снимком.',
     };
   });
+}
+
+/**
+ * Сообщение после записи. Про сведённые переводы говорим отдельно:
+ * человек увидит, что доход и расход уменьшились, и должен понимать почему.
+ */
+function pairedText(added, paired) {
+  const base = `Записей добавлено: ${added}`;
+  if (!paired) return base;
+  return `${base}. Переводов между своими счетами сведено: ${paired}`;
 }
