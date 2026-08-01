@@ -440,10 +440,17 @@ export function ritual(operations, goalId, day) {
   const { y, m } = D.parts(day);
   const total = D.lastDayOfMonth(y, m);
   const filled = new Set();
+  // Дни серии считаются по датам целиком, а не по числам месяца: серия
+  // не обрывается оттого, что наступило первое число. Раньше обрывалась —
+  // тридцать дней подряд в июле превращались в «1 день подряд» первого
+  // августа, и выглядело это как потерянная работа.
+  const days = new Set();
+
   for (const op of operations) {
     if (goalId && op.goalId !== goalId) continue;
     if (op.type !== 'Взнос') continue;
     if (!D.isValid(op.date)) continue;
+    days.add(op.date);
     const p = D.parts(op.date);
     if (p.y === y && p.m === m) filled.add(p.d);
   }
@@ -458,14 +465,23 @@ export function ritual(operations, goalId, day) {
     cell.title = `${d} — ${done ? 'взнос есть' : future ? 'ещё впереди' : 'пропущен'}`;
     wrap.appendChild(cell);
   }
-  return { node: wrap, filled: filled.size, elapsed: todayD, streak: streakOf(filled, todayD) };
+  return { node: wrap, filled: filled.size, elapsed: todayD, streak: streakOf(days, day) };
 }
 
-function streakOf(filled, todayD) {
+/**
+ * Сколько дней подряд был взнос.
+ *
+ * Сегодняшний день прощается: пока он не кончился, отсутствие взноса ещё
+ * ничего не значит, и обнулять счётчик с утра было бы наказанием за то,
+ * что человек просто не успел. Любой другой пропуск серию обрывает —
+ * иначе это уже не «подряд».
+ */
+function streakOf(days, day) {
   let n = 0;
-  for (let d = todayD; d >= 1; d -= 1) {
-    if (filled.has(d)) n += 1;
-    else if (d !== todayD) break;
+  let cursor = days.has(day) ? day : D.addDays(day, -1);
+  while (days.has(cursor)) {
+    n += 1;
+    cursor = D.addDays(cursor, -1);
   }
   return n;
 }
