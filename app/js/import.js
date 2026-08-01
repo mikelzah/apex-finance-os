@@ -14,8 +14,15 @@ import * as C from './calc.js';
 import * as D from './dates.js';
 import * as store from './store.js';
 import * as S from './statement.js';
+import * as xlsx from './xlsx.js';
 
 const { h } = U;
+
+async function tableOf(file) {
+  if (/\.xlsx$/i.test(file.name)) return xlsx.readSheet(await file.arrayBuffer());
+  const text = await S.readFile(file);
+  return S.parseTable(text, S.sniffDelimiter(text));
+}
 
 const FIELDS = [
   ['date', 'Дата', true],
@@ -30,7 +37,10 @@ const FIELDS = [
 export function importSheet(options = {}) {
   const picker = h('input', {
     type: 'file',
-    accept: '.csv,.txt,.tsv,text/csv,text/plain',
+    // xlsx первым: Альфа-Банк и ВТБ отдают выписку только таблицей Excel,
+    // и требовать от человека пересохранить её в CSV на телефоне,
+    // где нет Excel, значило бы не поддержать эти банки вовсе.
+    accept: '.xlsx,.csv,.txt,.tsv,text/csv,text/plain',
     style: { display: 'none' },
   });
   picker.addEventListener('change', async () => {
@@ -38,11 +48,9 @@ export function importSheet(options = {}) {
     picker.remove();
     if (!file) return;
     try {
-      const text = await S.readFile(file);
-      const delimiter = S.sniffDelimiter(text);
-      const rows = S.parseTable(text, delimiter);
+      const rows = await tableOf(file);
       if (rows.length < 2) {
-        U.toast('В файле не нашлось таблицы — нужен CSV из банка', 'error');
+        U.toast('В файле не нашлось таблицы операций', 'error');
         return;
       }
       mappingSheet(rows, file.name, options);
@@ -56,11 +64,17 @@ export function importSheet(options = {}) {
 
 // --------------------------------------------------------------------------
 
-function mappingSheet(table, filename, options) {
-  const header = table[0];
+function mappingSheet(table, filename, options, forced = null) {
+  // Шапка столбцов лежит не в первой строке, если банк напечатал сверху
+  // реквизиты и итоги за период. Найденный номер строки показывается
+  // и меняется руками: если догадка промахнулась, это первое, что нужно
+  // поправить, и без этого файл не загрузить вовсе.
+  const headerRow = forced != null ? forced : S.findHeaderRow(table);
+  const header = table[headerRow] || [];
   const state = store.getState();
-  const bank = guessBank(filename);
-  const saved = state.settings.bankProfiles[bank];
+  const bank = guessBank(filename, table);
+  const key = profileKey(header);
+  const saved = state.settings.bankProfiles[key];
   // Сохранённая раскладка годится только для той же шапки: банк может
   // добавить столбец, и тогда прежние номера указывают не туда.
   const mapping = saved && sameShape(saved, header) ? { ...saved } : S.guessMapping(header);
@@ -85,7 +99,7 @@ function mappingSheet(table, filename, options) {
     }
 
     function current() {
-      const { rows, skipped } = S.toRows(table, mapping, { account: bank });
+      const { rows, skipped } = S.toRows(table, mapping, { account: bank, headerRow });
       const withCategory = rows.map((r) => ({ ...r, category: S.categorise(r, state.settings.spendRules) }));
       const marked = S.markTransfers(withCategory, contributions(state));
       const fresh = S.newRows(marked, state.spending);
@@ -113,7 +127,7 @@ function mappingSheet(table, filename, options) {
         ]));
       }
       if (!rows.length) {
-        preview.appendChild(h('p', { class: 'field-hint', text: 'Первая строка файла считается шапкой.' }));
+        preview.appendChild(h('p', { class: 'field-hint', text: 'Проверьте строку с названиями столбцов — возможно, разбор взял не ту.' }));
       }
     }
 
@@ -126,7 +140,7 @@ function mappingSheet(table, filename, options) {
           api.close();
           return;
         }
-        await store.addSpending(fresh, bank, mapping);
+        await store.addSpending(fresh, bank, mapping, key);
         api.close();
         U.tap();
         U.toast(`Записей добавлено: ${fresh.length}`);
@@ -136,12 +150,25 @@ function mappingSheet(table, filename, options) {
 
     update();
 
+    // Переключение строки шапки перестраивает всё: и список столбцов,
+    // и догадку о том, какой из них что значит. Проще открыть шторку заново,
+    // чем чинить её по частям.
+    const headerPick = U.select(
+      table.slice(0, 30).map((cells, i) => ({
+        value: String(i),
+        label: `${i + 1}: ${cells.filter(Boolean).join(' · ').slice(0, 60) || 'пусто'}`,
+      })),
+      String(headerRow),
+      { onchange: (e) => { api.close(true); mappingSheet(table, filename, options, Number(e.target.value)); } },
+    );
+
     return [
-      h('p', { class: 'sheet-note', text: `${filename} · ${table.length - 1} строк` }),
+      h('p', { class: 'sheet-note', text: `${bank} · ${filename.slice(0, 40)} · строк с операциями: ${Math.max(table.length - headerRow - 1, 0)}` }),
       summary,
       U.sectionTitle('Как понята таблица'),
       preview,
       U.sectionTitle('Столбцы'),
+      U.field('Строка с названиями столбцов', headerPick, 'Выше неё у банка обычно реквизиты и итоги за период'),
       // Приход и расход отдельными столбцами — форма Сбера; одна сумма
       // со знаком — форма Т-Банка. Показываем оба набора: угадать по шапке
       // выходит не всегда, а перещёлкнуть руками — секунда.
@@ -173,19 +200,31 @@ function contributions(state) {
 }
 
 /**
- * Банк по имени файла: выгрузки называются «operations.csv», «movementList.csv»,
- * «report_2026.csv». Точное имя не важно — важно, чтобы раскладка столбцов
- * запомнилась под устойчивым ключом и в следующий раз подошла.
+ * Раскладка запоминается по названиям столбцов, а не по банку.
+ *
+ * Имя файла для этого не годится: Альфа-Банк называет выписку временем
+ * выгрузки — «Выписка 2026-07-01T14:05:59.534+0300.xlsx», — и такой ключ
+ * не совпадёт сам с собой уже через секунду. Названия столбцов, наоборот,
+ * у одного банка одни и те же из месяца в месяц.
  */
-function guessBank(filename) {
-  const name = String(filename || '').toLowerCase();
+function profileKey(header) {
+  return header.map((x) => String(x).toLowerCase().replace(/\s+/g, ' ').trim()).join('|').slice(0, 300);
+}
+
+/**
+ * Название банка — для подписи счёта у записей. Ищем сначала в самом файле:
+ * в шапке выписки банк называет себя, а в имени файла его может не быть.
+ */
+function guessBank(filename, table = []) {
+  const inside = table.slice(0, 15).map((r) => r.join(' ')).join(' ');
+  const name = `${inside} ${filename || ''}`.toLowerCase();
   if (/tinkoff|tbank|т-банк|тинько/.test(name)) return 'Т-Банк';
   if (/sber|сбер/.test(name)) return 'Сбер';
   if (/alfa|альфа/.test(name)) return 'Альфа-Банк';
   if (/vtb|втб/.test(name)) return 'ВТБ';
   if (/ozon|озон/.test(name)) return 'Озон Банк';
   if (/yandex|яндекс/.test(name)) return 'Яндекс Банк';
-  return name.replace(/\.[^.]+$/, '').slice(0, 24) || 'Банк';
+  return String(filename || '').replace(/\.[^.]+$/, '').slice(0, 24) || 'Банк';
 }
 
 function sameShape(mapping, header) {

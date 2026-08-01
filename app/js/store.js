@@ -457,7 +457,7 @@ export function needsOnboarding() {
  * который знает про нахлёст дат и про два одинаковых кофе в один день.
  * Сюда приходит уже готовый список того, чего в базе нет.
  */
-export async function addSpending(rows, bank = null, mapping = null) {
+export async function addSpending(rows, bank = null, mapping = null, profileKey = null) {
   return mutate((draft) => {
     for (const row of rows) {
       draft.spending.push({
@@ -472,7 +472,9 @@ export async function addSpending(rows, bank = null, mapping = null) {
         source: C.SOURCE_MANUAL,
       });
     }
-    if (bank && mapping) draft.settings.bankProfiles[bank] = mapping;
+    // Ключом служат названия столбцов, а не банк: имя файла у некоторых
+    // банков содержит время выгрузки и не повторяется.
+    if (profileKey && mapping) draft.settings.bankProfiles[profileKey] = mapping;
     return rows.length;
   });
 }
