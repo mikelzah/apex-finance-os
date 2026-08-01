@@ -49,6 +49,7 @@ const SHELL = [
   './js/lock.js',
   './js/statement.js',
   './js/xlsx.js',
+  './js/screenshot.js',
   './js/import.js',
   './js/views/dashboard.js',
   './js/views/spending.js',

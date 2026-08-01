@@ -15,6 +15,7 @@ import * as D from './dates.js';
 import * as store from './store.js';
 import * as S from './statement.js';
 import * as xlsx from './xlsx.js';
+import { parseScreen } from './screenshot.js';
 
 const { h } = U;
 
@@ -229,4 +230,101 @@ function guessBank(filename, table = []) {
 
 function sameShape(mapping, header) {
   return Object.values(mapping).every((i) => typeof i === 'number' && i < header.length);
+}
+
+// --------------------------------------------------------------------------
+// Скриншот
+// --------------------------------------------------------------------------
+
+/**
+ * Операции со снимка экрана банковского приложения.
+ *
+ * Распознаёт текст сам телефон — приложение получает уже готовые строки.
+ * Так честнее и точнее: системное распознавание на iPhone читает рублёвые
+ * суммы лучше любого движка, который поместился бы в офлайн-кэш, и не стоит
+ * ни мегабайта загрузки.
+ *
+ * Разбор показывается до записи, как и у выписки: у списка на экране нет
+ * ни статусов, ни знаков у части сумм, и догадка «без плюса — значит трата»
+ * должна быть видимой, а не молчаливой.
+ */
+export function screenshotSheet(options = {}) {
+  const state = store.getState();
+  const today = D.today();
+
+  U.sheet('Со скриншота', (api) => {
+    const area = U.textarea('', { placeholder: 'Вставьте сюда текст со скриншота' });
+    const preview = h('div', { class: 'preview' });
+    const summary = h('p', { class: 'sheet-note' });
+    let parsed = { rows: [], dated: false };
+
+    function update() {
+      parsed = parseScreen(area.value, today);
+      const withCategory = parsed.rows.map((r) => ({ ...r, category: S.categorise(r, state.settings.spendRules) }));
+      parsed.rows = S.markTransfers(withCategory, contributions(state));
+      parsed.fresh = S.newRows(parsed.rows, state.spending);
+
+      U.clear(preview);
+      if (!area.value.trim()) {
+        summary.textContent = 'Пока пусто.';
+        preview.appendChild(h('p', { class: 'field-hint', text: 'Строки со суммами станут операциями.' }));
+        return;
+      }
+      summary.textContent = parsed.rows.length
+        ? `Нашлось операций: ${parsed.rows.length}. Новых: ${parsed.fresh.length}.`
+          + (parsed.dated ? '' : ' Дата в тексте не найдена — всем записям встанет сегодняшнее число.')
+        : 'Сумм в тексте не нашлось. Нужны строки вида «Пятёрочка −1 240,50 ₽».';
+
+      for (const row of parsed.rows.slice(0, 8)) {
+        preview.appendChild(h('div', { class: 'preview-row' }, [
+          h('span', { class: 'preview-date', text: F.dateShort(row.date) }),
+          h('span', { class: 'preview-text', text: `${row.category} · ${row.description || '—'}` }),
+          h('span', {
+            class: `preview-sum ${row.kind === S.KIND_IN ? 'is-plus' : row.kind === S.KIND_MOVE ? 'is-neutral' : 'is-minus'}`,
+            text: row.kind === S.KIND_MOVE ? F.money(row.amount) : F.signedMoney(row.kind === S.KIND_IN ? row.amount : -row.amount),
+          }),
+        ]));
+      }
+    }
+
+    area.addEventListener('input', update);
+
+    api.setFooter([
+      U.button('Отмена', () => api.close()),
+      U.button('Записать', async () => {
+        if (!parsed.fresh || !parsed.fresh.length) {
+          U.toast(parsed.rows.length ? 'Все эти записи уже есть' : 'Разбирать нечего', parsed.rows.length ? 'ok' : 'error');
+          return;
+        }
+        await store.addSpending(parsed.fresh, 'Со скриншота', null, null);
+        api.close();
+        U.tap();
+        U.toast(`Записей добавлено: ${parsed.fresh.length}`);
+        options.onDone?.();
+      }, { kind: 'primary' }),
+    ]);
+
+    update();
+
+    return [
+      U.callout('На снимке в «Фото» удерживайте палец на списке операций, нажмите «Выделить всё», потом «Копировать» — и вставьте сюда. Текст распознаёт сам телефон, картинка никуда не уходит.', 'info'),
+      U.button('Вставить из буфера', async () => {
+        try {
+          const text = await navigator.clipboard.readText();
+          if (!text.trim()) return U.toast('В буфере пусто', 'error');
+          area.value = text;
+          update();
+        } catch {
+          // Safari разрешает чтение буфера только по прямому жесту и только
+          // с разрешения — отказ здесь обычное дело, а не поломка.
+          U.toast('Не удалось прочитать буфер — вставьте вручную', 'error');
+        }
+      }, { class: 'btn-wide' }),
+      U.field('Текст со скриншота', area),
+      summary,
+      U.sectionTitle('Что получилось'),
+      preview,
+      U.callout('Без плюса сумма считается тратой. Поправить вид и категорию можно у каждой записи после загрузки.', 'warn'),
+    ];
+  });
 }

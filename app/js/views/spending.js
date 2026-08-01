@@ -17,7 +17,7 @@ import * as charts from '../charts.js';
 import * as store from '../store.js';
 import * as S from '../statement.js';
 import { table } from '../table.js';
-import { importSheet } from '../import.js';
+import { importSheet, screenshotSheet } from '../import.js';
 
 const { h } = U;
 
@@ -103,7 +103,7 @@ export function render(ctx) {
       : null,
 
     U.card([
-      U.sectionTitle('Записи', U.button('Загрузить выписку', () => importSheet({ onDone: refresh }))),
+      U.sectionTitle('Записи', U.button('Со скриншота', () => screenshotSheet({ onDone: refresh }))),
       table({
         rows: [...stats.rows].sort((a, b) => (a.date < b.date ? 1 : -1)).slice(0, 200),
         sortKey: 'date',
@@ -148,7 +148,25 @@ export function render(ctx) {
 }
 
 export function action(ctx) {
-  return U.button('Загрузить', () => importSheet({ onDone: ctx.refresh }), { kind: 'primary' });
+  return U.button('Загрузить', () => sourceSheet(ctx), { kind: 'primary' });
+}
+
+/**
+ * Откуда брать операции. Два пути неравны: выписка точна и полна, скриншот
+ * удобен и приблизителен — поэтому выписка стоит первой и названа первой,
+ * а скриншот честно подписан как способ для одной-двух операций.
+ */
+function sourceSheet(ctx) {
+  U.sheet('Добавить траты', (api) => [
+    U.row('Выписка из банка', '', {
+      sub: 'CSV или xlsx за период — точно и целиком',
+      onClick: () => { api.close(); importSheet({ onDone: ctx.refresh }); },
+    }),
+    U.row('Со скриншота', '', {
+      sub: 'текст со снимка экрана — быстро, для нескольких операций',
+      onClick: () => { api.close(); screenshotSheet({ onDone: ctx.refresh }); },
+    }),
+  ]);
 }
 
 // --------------------------------------------------------------------------
@@ -197,8 +215,9 @@ function bar(row, total) {
 
 function empty(ctx) {
   return U.card([
-    U.emptyState('Трат пока нет. Выгрузите выписку из банка в CSV и загрузите её сюда — приложение разберёт столбцы само.'),
+    U.emptyState('Трат пока нет. Загрузите выписку из банка — CSV или xlsx, столбцы разберутся сами. Для пары операций хватит и текста со скриншота.'),
     U.button('Загрузить выписку', () => importSheet({ onDone: ctx.refresh }), { kind: 'primary', class: 'btn-wide' }),
+    U.button('Со скриншота', () => screenshotSheet({ onDone: ctx.refresh }), { class: 'btn-wide' }),
     U.callout('Файл читается в телефоне и никуда не отправляется: сервера у приложения нет.', 'info'),
   ]);
 }
