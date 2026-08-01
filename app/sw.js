@@ -19,6 +19,14 @@
 const VERSION = 'v4';
 const CACHE = `apex-finance-os-${VERSION}`;
 
+// Распознаватель живёт в отдельном кэше, который не чистится вместе с версией.
+// Он весит пять с половиной мегабайт и не меняется от сборки к сборке — качать
+// его заново после каждого обновления приложения было бы издевательством
+// над мобильным трафиком. Версия в имени папки: сменится движок — сменится
+// и путь, а старый кэш уйдёт вместе с ним.
+const VENDOR_CACHE = 'apex-finance-os-vendor-1';
+const isVendor = (url) => url.pathname.includes('/vendor/');
+
 // Сколько ждать сеть, прежде чем показать сохранённую копию. Порог заметно
 // больше обычного ответа Pages и заметно меньше терпения человека.
 const NETWORK_TIMEOUT = 2500;
@@ -50,6 +58,7 @@ const SHELL = [
   './js/statement.js',
   './js/xlsx.js',
   './js/screenshot.js',
+  './js/ocr.js',
   './js/import.js',
   './js/views/dashboard.js',
   './js/views/spending.js',
@@ -105,7 +114,9 @@ self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches
       .keys()
-      .then((keys) => Promise.all(keys.filter((k) => k !== CACHE).map((k) => caches.delete(k))))
+      .then((keys) => Promise.all(keys
+        .filter((k) => k !== CACHE && k !== VENDOR_CACHE)
+        .map((k) => caches.delete(k))))
       .then(() => self.clients.claim()),
   );
 });
@@ -139,8 +150,8 @@ async function networkFirst(request) {
   });
 }
 
-async function cacheFirst(request) {
-  const cache = await caches.open(CACHE);
+async function cacheFirst(request, name = CACHE) {
+  const cache = await caches.open(name);
   const cached = await cache.match(request);
   if (cached) return cached;
 
@@ -160,6 +171,13 @@ self.addEventListener('fetch', (event) => {
   // Котировки идут мимо кэша: вчерашняя цена, выданная как сегодняшняя,
   // хуже честного отказа — приложение умеет попросить ввести её руками.
   if (url.origin !== self.location.origin) return;
+
+  // Движок распознавания — всегда из кэша: он не меняется, а весит столько,
+  // что даже проверка свежести по сети на каждом обращении заметна.
+  if (isVendor(url)) {
+    event.respondWith(cacheFirst(request, VENDOR_CACHE));
+    return;
+  }
 
   event.respondWith(isCode(url) ? networkFirst(request) : cacheFirst(request));
 });

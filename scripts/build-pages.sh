@@ -15,7 +15,7 @@ out="$root/deploy"
 rm -rf "$out"
 mkdir -p "$out"
 
-cp -r "$src/css" "$src/js" "$src/fonts" "$src/icons" "$src/data" "$out/"
+cp -r "$src/css" "$src/js" "$src/fonts" "$src/icons" "$src/data" "$src/vendor" "$out/"
 cp "$src/index.html" "$src/manifest.webmanifest" "$src/sw.js" "$out/"
 cp "$root/scripts/pages/README.md" "$out/"
 

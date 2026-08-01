@@ -306,8 +306,44 @@ export function screenshotSheet(options = {}) {
 
     update();
 
+    // Полоса ожидания: распознавание идёт секунды, а в первый раз к ним
+    // добавляется загрузка движка. Без полосы это выглядит как зависшая
+    // кнопка, и человек жмёт её второй раз.
+    const progress = h('p', { class: 'field-hint', text: '' });
+
+    const pickImage = () => {
+      const picker = h('input', { type: 'file', accept: 'image/*', style: { display: 'none' } });
+      picker.addEventListener('change', async () => {
+        const file = picker.files && picker.files[0];
+        picker.remove();
+        if (!file) return;
+        progress.textContent = 'Готовлю снимок…';
+        try {
+          const { recognise } = await import('./ocr.js');
+          const text = await recognise(file, (label, done) => {
+            progress.textContent = `${label}… ${Math.round((done || 0) * 100)}%`;
+          });
+          progress.textContent = '';
+          if (!text.trim()) {
+            U.toast('На снимке не нашлось текста', 'error');
+            return;
+          }
+          area.value = text;
+          update();
+          U.tap();
+        } catch (err) {
+          progress.textContent = '';
+          U.toast(`Распознать не вышло: ${err.message}`, 'error');
+        }
+      });
+      document.body.appendChild(picker);
+      picker.click();
+    };
+
     return [
-      U.callout('На снимке в «Фото» удерживайте палец на списке операций, нажмите «Выделить всё», потом «Копировать» — и вставьте сюда. Текст распознаёт сам телефон, картинка никуда не уходит.', 'info'),
+      U.callout('Снимок распознаётся в телефоне и никуда не отправляется. В первый раз загрузится сам распознаватель — около 5 МБ, дальше он работает и без сети.', 'info'),
+      U.button('Выбрать снимок', pickImage, { kind: 'primary', class: 'btn-wide' }),
+      progress,
       U.button('Вставить из буфера', async () => {
         try {
           const text = await navigator.clipboard.readText();
@@ -320,7 +356,7 @@ export function screenshotSheet(options = {}) {
           U.toast('Не удалось прочитать буфер — вставьте вручную', 'error');
         }
       }, { class: 'btn-wide' }),
-      U.field('Текст со скриншота', area),
+      U.field('Текст со снимка', area, 'Заполняется распознаванием, но можно вписать и руками'),
       summary,
       U.sectionTitle('Что получилось'),
       preview,
