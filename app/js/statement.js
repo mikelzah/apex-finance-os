@@ -309,6 +309,11 @@ export const DEFAULT_INCOME = ['Зарплата', 'Подработка', 'Во
 export const FALLBACK_SPEND = 'Прочее';
 export const FALLBACK_INCOME = 'Прочий доход';
 
+// Переводы себе — не траты и не доход, у них свой короткий набор. Править
+// его в настройках нельзя: эти три названия ставит сам разбор выписки.
+export const TRANSFER_CATEGORIES = ['Сбережения', 'Переводы', 'Проценты'];
+export const FALLBACK_MOVE = 'Переводы';
+
 /** Список категорий: свой, если он есть, иначе начальный. */
 export function categoriesOf(settings, kind = 'spend') {
   const own = settings && settings.categories ? settings.categories[kind] : null;
@@ -316,12 +321,32 @@ export function categoriesOf(settings, kind = 'spend') {
   return Array.isArray(own) && own.length ? own : base;
 }
 
+/**
+ * Категории, подходящие виду записи.
+ *
+ * Списки не смешиваются: у траты нечего делать «Зарплате», а у прихода —
+ * «Продуктам». Выбор из общей кучи не просто длинный — он позволяет молча
+ * записать доход в расходную категорию, и потом разбор по категориям врёт.
+ */
+export function categoriesForKind(settings, kind) {
+  if (kind === KIND_IN) return [...categoriesOf(settings, 'income')];
+  if (kind === KIND_MOVE) return [...TRANSFER_CATEGORIES];
+  return [...categoriesOf(settings, 'spend')];
+}
+
+/** Куда попадает запись этого вида, если своя категория не подходит. */
+export function fallbackForKind(kind) {
+  if (kind === KIND_IN) return FALLBACK_INCOME;
+  if (kind === KIND_MOVE) return FALLBACK_MOVE;
+  return FALLBACK_SPEND;
+}
+
 /** Категории, которые встречаются в записях, но в списке их нет. */
 export function strayCategories(spending = [], settings = null) {
   const known = new Set([
     ...categoriesOf(settings, 'spend'),
     ...categoriesOf(settings, 'income'),
-    'Сбережения', 'Переводы', 'Проценты',
+    ...TRANSFER_CATEGORIES,
   ]);
   const found = new Map();
   for (const row of spending) {

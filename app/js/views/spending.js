@@ -282,19 +282,32 @@ function rowSheet(row, onDone) {
   const draft = { ...row };
   U.sheet('Запись', (api) => {
     const kindSelect = U.select([C.SPEND_OUT, C.SPEND_IN, C.SPEND_MOVE], draft.kind);
+    // Категории берутся под вид записи: в трате нечего выбирать «Зарплату».
+    // Общий список не просто длинный — из него легко молча записать доход
+    // в расходную категорию, и разбор по категориям после этого врёт.
+    //
     // Категория банка может не совпасть ни с одной нашей — тогда она
     // добавляется в список как есть. Иначе открытие записи молча меняло бы
     // её категорию на первую в списке.
-    const settings = store.getState().settings;
-    const known = [
-      ...S.categoriesOf(settings, 'spend'),
-      ...S.categoriesOf(settings, 'income'),
-      'Сбережения', 'Переводы', 'Проценты',
-    ];
-    const catSelect = U.select(
-      known.includes(draft.category) || !draft.category ? known : [draft.category, ...known],
-      draft.category,
-    );
+    const was = { kind: draft.kind, category: draft.category };
+    const optionsFor = (kind) => {
+      const base = S.categoriesForKind(store.getState().settings, kind);
+      if (kind === was.kind && was.category && !base.includes(was.category)) {
+        return [was.category, ...base];
+      }
+      return base;
+    };
+    const catSelect = U.select(optionsFor(draft.kind), draft.category);
+    // Сменили вид — список меняется вместе с ним. Прежняя категория
+    // остаётся, если она подходит и новому виду; иначе запись уходит
+    // в запасную, а не остаётся с чужим ярлыком.
+    kindSelect.addEventListener('change', () => {
+      const options = optionsFor(kindSelect.value);
+      const keep = options.includes(catSelect.value) ? catSelect.value : S.fallbackForKind(kindSelect.value);
+      U.clear(catSelect);
+      U.append(catSelect, options.map((name) => h('option', { value: name, selected: name === keep }, [name])));
+      catSelect.value = keep;
+    });
     const rule = U.checkbox('Запомнить для похожих', false);
     const amount = U.numberInput(draft.amount);
 

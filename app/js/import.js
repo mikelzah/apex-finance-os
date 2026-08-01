@@ -496,12 +496,7 @@ function pairedText(added, paired) {
  * списка молча меняло бы категорию на первую попавшуюся.
  */
 function categoryOptions(row) {
-  const settings = store.getState().settings;
-  const base = row.kind === S.KIND_IN
-    ? [...S.categoriesOf(settings, 'income')]
-    : row.kind === S.KIND_MOVE
-      ? ['Сбережения', 'Переводы', 'Проценты']
-      : [...S.categoriesOf(settings, 'spend')];
+  const base = S.categoriesForKind(store.getState().settings, row.kind);
   if (row.category && !base.includes(row.category)) return [row.category, ...base];
   return base;
 }
