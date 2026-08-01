@@ -1665,9 +1665,47 @@ body.has-mascot .header { padding-top: calc(var(--safe-top) + var(--space-6)); }
   gap: var(--space-1) var(--space-2);
   padding: var(--space-2) 0;
   border-bottom: 1px solid var(--line-soft);
+  /* Полоса — кнопка: она раскрывает свои записи. Оформление кнопки
+     при этом снимается полностью, иначе строка списка выглядела бы
+     как призыв нажать, а нажимают тут не каждую. */
+  width: 100%;
+  border-top: 0;
+  border-left: 0;
+  border-right: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
 }
 
-.cat:last-child { border-bottom: 0; }
+.cat:last-child, .cat-group:last-child .cat { border-bottom: 0; }
+.cat.is-open { border-bottom-color: transparent; }
+.cat.is-open .cat-name { font-weight: var(--weight-semibold); }
+
+/* Записи раскрытой категории. Отступ слева показывает подчинённость —
+   это не отдельный список, а расшифровка числа над ним. */
+.cat-group { border-bottom: 1px solid var(--line-soft); }
+
+.cat-op {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: var(--space-2);
+  align-items: baseline;
+  width: 100%;
+  padding: var(--space-2) 0 var(--space-2) var(--space-3);
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.cat-op + .cat-op { border-top: 1px solid var(--line-soft); }
+.cat-op-date { font-size: var(--text-xs); color: var(--ink-3); font-variant-numeric: tabular-nums; }
+.cat-op-name { font-size: var(--text-sm); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cat-op-sum { font-size: var(--text-sm); font-variant-numeric: tabular-nums; }
 
 .cat-head { grid-column: 1 / -1; display: flex; justify-content: space-between; gap: var(--space-2); }
 .cat-name { font-size: var(--text-sm); }

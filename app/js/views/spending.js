@@ -21,6 +21,11 @@ import { importSheet, screenshotSheet } from '../import.js';
 
 const { h } = U;
 
+// Что раскрыто на экране. Живёт в модуле, а не в состоянии: это вид,
+// а не настройка, и переживать перезапуск ему незачем.
+let openCategory = null;
+let showAll = false;
+
 const WINDOWS = [
   [1, 'Месяц'],
   [3, '3 месяца'],
@@ -95,15 +100,25 @@ export function render(ctx) {
         ])
       : null,
 
+    // Список записей закрыт, пока его не спросили. Разбор по категориям
+    // отвечает на вопрос «куда уходит» целиком, а две сотни строк под ним
+    // этот ответ заслоняют: до сравнения долей человек доходит, пролистав
+    // весь месяц по одной операции.
     stats.categories.length
       ? U.card([
           U.sectionTitle('На что уходит'),
-          ...stats.categories.map((c) => bar(c, stats.spent)),
+          ...stats.categories.map((c) => bar(c, stats.spent, stats.rows, refresh)),
+          U.button(showAll ? 'Скрыть список' : 'Показать все траты', () => {
+            showAll = !showAll;
+            openCategory = null;
+            refresh();
+          }, { class: 'btn-wide' }),
         ])
       : null,
 
-    U.card([
+    showAll ? U.card([
       U.sectionTitle('Записи', U.button('Со скриншота', () => screenshotSheet({ onDone: refresh }))),
+      h('p', { class: 'field-hint', text: 'Все записи периода — вместе с доходами и переводами' }),
       table({
         rows: [...stats.rows].sort((a, b) => (a.date < b.date ? 1 : -1)).slice(0, 200),
         sortKey: 'date',
@@ -143,7 +158,7 @@ export function render(ctx) {
           },
         ],
       }),
-    ], { class: 'card-table' }),
+    ], { class: 'card-table' }) : null,
   ];
 }
 
@@ -196,20 +211,55 @@ function gapHint(free, contributed) {
 }
 
 /**
- * Полоса категории. Доля показана длиной, а не только числом: сравнивать
- * пять процентов с двенадцатью глазами тяжело, а две полосы — мгновенно.
+ * Полоса категории — она же раскрывающаяся группа.
+ *
+ * Доля показана длиной, а не только числом: сравнивать пять процентов
+ * с двенадцатью глазами тяжело, а две полосы — мгновенно. Нажатие
+ * раскрывает записи именно этой категории: вопрос «на что ушли эти
+ * 2 597 ₽» возникает сразу за вопросом «сколько», и ответ на него должен
+ * лежать под тем же числом, а не в общем списке ниже.
  */
-function bar(row, total) {
+function bar(row, total, all, refresh) {
   const share = total > 0 ? row.amount / total : 0;
-  return h('div', { class: 'cat' }, [
+  const name = row.category || 'Прочее';
+  const open = openCategory === name;
+
+  const head = h('button', {
+    class: `cat${open ? ' is-open' : ''}`,
+    type: 'button',
+    'aria-expanded': String(open),
+    onclick: () => {
+      openCategory = open ? null : name;
+      refresh();
+    },
+  }, [
     h('div', { class: 'cat-head' }, [
-      h('span', { class: 'cat-name', text: row.category || 'Прочее' }),
+      h('span', { class: 'cat-name', text: name }),
       h('span', { class: 'cat-sum', text: F.money(row.amount) }),
     ]),
     h('div', { class: 'cat-track' }, [
       h('div', { class: 'cat-fill', style: { width: `${Math.max(share * 100, 1).toFixed(1)}%` } }),
     ]),
     h('span', { class: 'cat-share', text: `${F.num(share * 100, 0)}%` }),
+  ]);
+
+  if (!open) return head;
+
+  const rows = all
+    .filter((r) => r.kind === C.SPEND_OUT && (r.category || 'Прочее') === name)
+    .sort((a, b) => (a.date < b.date ? 1 : -1));
+
+  return h('div', { class: 'cat-group' }, [
+    head,
+    ...rows.map((r) => h('button', {
+      class: 'cat-op',
+      type: 'button',
+      onclick: () => rowSheet(r, refresh),
+    }, [
+      h('span', { class: 'cat-op-date', text: F.dateShort(r.date) }),
+      h('span', { class: 'cat-op-name', text: r.description || '—' }),
+      h('span', { class: 'cat-op-sum', text: F.moneyExact(r.amount) }),
+    ])),
   ]);
 }
 
