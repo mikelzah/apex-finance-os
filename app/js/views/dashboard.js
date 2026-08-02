@@ -28,12 +28,11 @@ export function render(ctx) {
     advice(ctx),
     quickAdd(ctx),
     accruals(ctx),
-    primaryGoal(ctx),
+    ...goalCards(ctx),
     attention(ctx),
     capitalChart(state, worth, today),
     balanceCard(ctx),
     ritualCard(state, today),
-    secondaryGoals(ctx),
   ];
 }
 
@@ -274,21 +273,23 @@ function accruals(ctx) {
 }
 
 /**
- * Цель, которая идёт крупной карточкой.
+ * Цели крупными карточками — все активные и только они.
  *
- * Первая активная в том порядке, в каком цели расставлены руками. Раньше
- * бралась первая по массиву — то есть по времени заведения, — и перетаскивание
- * целей на их же экране на главную не влияло.
+ * Порядок — тот, в каком цели расставлены руками на своём экране: главная
+ * не решает за человека, что для него важнее.
+ *
+ * Целей на паузе и достигнутых здесь нет вовсе. Пауза — это решение отложить,
+ * и место на первом экране такой цели не нужно; достигнутая не требует уже
+ * ничего. И та и другая остаются на экране целей, где их видно целиком.
  */
-function featuredGoal(goals) {
-  return C.orderedGoals(goals).find((g) => g.status === C.GOAL_ACTIVE) || null;
+function goalCards(ctx) {
+  const { state, today } = ctx;
+  return C.orderedGoals(state.goals)
+    .filter((g) => g.status === C.GOAL_ACTIVE)
+    .map((goal) => goalCard(goal, state, today));
 }
 
-function primaryGoal(ctx) {
-  const { state, today } = ctx;
-  const goal = featuredGoal(state.goals);
-  if (!goal) return null;
-
+function goalCard(goal, state, today) {
   const m = C.goalMetrics(goal, state.assets, state.operations, today);
   const late = m.reserveDays != null && m.reserveDays < 0;
 
@@ -557,28 +558,3 @@ function ritualCard(state, today) {
   ]);
 }
 
-/**
- * Все цели, кроме той, что уже показана карточкой.
- *
- * Отбор именно такой — «всё, кроме показанного», — а не «неактивные». Раньше
- * было по статусу, и вторая активная цель пропадала с главной совсем: крупная
- * карточка берёт только первую, а в список её не пускал статус. Заведя цель,
- * человек не находил её на главной вовсе.
- */
-function secondaryGoals(ctx) {
-  const { state, today } = ctx;
-  const featured = featuredGoal(state.goals);
-  const rest = C.orderedGoals(state.goals).filter((g) => !featured || g.id !== featured.id);
-  if (!rest.length) return null;
-
-  return U.card([
-    U.sectionTitle('Остальные цели', U.button('Все', () => ctx.go('goals'))),
-    ...rest.map((goal) => {
-      const m = C.goalMetrics(goal, state.assets, state.operations, today);
-      return U.row(goal.name, F.share(m.progress), {
-        sub: `${F.money(m.current)} из ${F.money(m.target)} · ${goal.status.toLowerCase()}`,
-        onClick: () => ctx.go('goals'),
-      });
-    }),
-  ]);
-}
