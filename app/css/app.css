@@ -286,6 +286,21 @@ body.is-locked .screen { overflow: hidden; }
 .hero-delta.is-quiet { color: var(--ink-4); }
 .hero-delta-word { color: var(--ink-3); }
 
+/* Сравнение с безриском под доходностью. Строкой мельче самой доходности:
+   это не второе главное число, а мера для первого. */
+.hero-bench {
+  margin: var(--space-1) 0 0;
+  font-size: var(--text-xs);
+  color: var(--ink-3);
+  display: flex;
+  justify-content: center;
+  gap: var(--space-1);
+}
+
+.hero-bench .is-good { color: var(--good-ink); }
+.hero-bench .is-bad { color: var(--warn-ink); }
+.hero-bench-dot { color: var(--ink-4); }
+
 /* Объяснение на месте пропавшего числа. Не тревога и не ошибка — сноска,
    поэтому краски статуса здесь нет, только приглушённый текст. */
 .hero-note {

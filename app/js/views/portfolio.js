@@ -88,7 +88,13 @@ function overview(ctx) {
   );
 
   return [
-    total_(total, C.returnOf(inPortfolio, state.operations, ctx.today), inPortfolio, ctx),
+    total_(
+      total,
+      C.returnOf(inPortfolio, state.operations, ctx.today),
+      inPortfolio,
+      ctx,
+      C.benchmark(inPortfolio, state.operations, state.keyRate, ctx.today),
+    ),
 
     ...holdings(ctx, total),
 
@@ -126,7 +132,7 @@ function overview(ctx) {
  * «В расчёте долей» объясняла сумму через механику расчёта, хотя человек
  * читает её как «сколько у меня в портфеле».
  */
-function total_(total, rate, assets, ctx) {
+function total_(total, rate, assets, ctx, bench) {
   return h('section', { class: 'hero' }, [
     h('p', { class: 'hero-label', text: 'Портфель' }),
     h('p', { class: 'hero-value', text: F.money(total) }),
@@ -142,6 +148,32 @@ function total_(total, rate, assets, ctx) {
       // — а потом человек перестаёт верить и остальным цифрам. Поэтому здесь
       // сказано, чего не хватает, и куда идти дозаполнять.
       : blockerLine(assets, ctx),
+    rate == null ? null : benchLine(rate, bench),
+  ]);
+}
+
+/**
+ * Сравнение с безриском.
+ *
+ * «+12,84% годовых» само по себе не значит ни хорошо, ни плохо: значение
+ * появляется рядом с тем, что можно было получить, ничего не делая. Отставание
+ * от вклада — это не «чуть меньше», это риск, за который не заплатили.
+ *
+ * Разница в процентных пунктах, а не в процентах: 12,84 против 16,30 — это
+ * отставание на 3,46 п.п., а не на 21%. Второе арифметически тоже верно
+ * и в разговоре о доходности означает совсем другое.
+ */
+function benchLine(rate, bench) {
+  if (!bench) return null;
+  const gap = rate - bench.rate;
+  const ahead = gap >= 0;
+  return h('p', { class: 'hero-bench' }, [
+    h('span', { text: `Ключевая за период ${F.percent(bench.rate, 1)}` }),
+    h('span', { class: 'hero-bench-dot', text: '·' }),
+    h('span', {
+      class: ahead ? 'is-good' : 'is-bad',
+      text: `${ahead ? 'опережаете' : 'отстаёте'} на ${F.num(Math.abs(gap), 1)} п.п.`,
+    }),
   ]);
 }
 

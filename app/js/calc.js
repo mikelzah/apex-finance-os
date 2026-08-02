@@ -546,6 +546,67 @@ export function rateOn(series, day) {
 }
 
 /**
+ * Средняя ключевая ставка за период, взвешенная по дням её действия.
+ *
+ * Не «ставка сегодня»: доходность заработана за весь срок, и сравнивать её
+ * надо с тем, что за этот же срок давал безриск. При ставке, съехавшей
+ * с 21% до 16%, сегодняшнее значение сделало бы портфель лучше, чем он был.
+ *
+ * Считается только по тем дням, для которых ставка известна. Если ряд
+ * начинается позже периода, средняя выйдет по хвосту — это честнее, чем
+ * дотягивать первую известную ставку в прошлое, где она не действовала.
+ */
+export function averageRate(series, from, to) {
+  if (!series || !series.length || D.diffDays(to, from) <= 0) return null;
+  const points = [...series]
+    .filter((p) => D.isValid(p.date) && p.rate != null)
+    .sort((a, b) => (a.date < b.date ? -1 : 1));
+  if (!points.length) return null;
+
+  let sum = 0;
+  let covered = 0;
+  for (let i = 0; i < points.length; i += 1) {
+    const next = points[i + 1];
+    const start = D.diffDays(points[i].date, from) > 0 ? points[i].date : from;
+    const end = next && D.diffDays(next.date, to) < 0 ? next.date : to;
+    const days = D.diffDays(end, start);
+    if (days <= 0) continue;
+    sum += points[i].rate * days;
+    covered += days;
+  }
+  return covered > 0 ? sum / covered : null;
+}
+
+/** Короче месяца годовые проценты — шум: два дня растягиваются в год. */
+export const BENCHMARK_MIN_DAYS = 30;
+
+/**
+ * С чем сравнивать доходность портфеля.
+ *
+ * Само по себе «+12,84% годовых» не значит ни хорошо, ни плохо. Значение оно
+ * приобретает рядом с тем, что можно было получить, ничего не делая: вклад
+ * под ключевую ставку. Портфель, отстающий от безриска, — это не «немного
+ * меньше», это риск, за который не заплатили.
+ *
+ * Период берётся от первого вложения, а не от начала года: доходность
+ * посчитана именно за него.
+ */
+export function benchmark(assets, operations, keyRate, day) {
+  const flows = flowsOf(assets, operations, day)
+    .map((f) => f.date)
+    .filter((d) => D.isValid(d) && D.diffDays(day, d) > 0)
+    .sort();
+  if (!flows.length) return null;
+
+  const from = flows[0];
+  const days = D.diffDays(day, from);
+  if (days < BENCHMARK_MIN_DAYS) return null;
+
+  const rate = averageRate(keyRate, from, day);
+  return rate == null ? null : { from, days, rate };
+}
+
+/**
  * Необлагаемый лимит = 1 млн × макс. ключевая ставка на 1-е число месяца.
  * Считаются первые числа всех прошедших месяцев года. Лимит в течение года
  * может только расти, поэтому за основу берётся максимум.
