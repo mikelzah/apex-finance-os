@@ -273,9 +273,20 @@ function accruals(ctx) {
   ]);
 }
 
+/**
+ * Цель, которая идёт крупной карточкой.
+ *
+ * Первая активная в том порядке, в каком цели расставлены руками. Раньше
+ * бралась первая по массиву — то есть по времени заведения, — и перетаскивание
+ * целей на их же экране на главную не влияло.
+ */
+function featuredGoal(goals) {
+  return C.orderedGoals(goals).find((g) => g.status === C.GOAL_ACTIVE) || null;
+}
+
 function primaryGoal(ctx) {
   const { state, today } = ctx;
-  const goal = state.goals.find((g) => g.status === C.GOAL_ACTIVE);
+  const goal = featuredGoal(state.goals);
   if (!goal) return null;
 
   const m = C.goalMetrics(goal, state.assets, state.operations, today);
@@ -546,9 +557,18 @@ function ritualCard(state, today) {
   ]);
 }
 
+/**
+ * Все цели, кроме той, что уже показана карточкой.
+ *
+ * Отбор именно такой — «всё, кроме показанного», — а не «неактивные». Раньше
+ * было по статусу, и вторая активная цель пропадала с главной совсем: крупная
+ * карточка берёт только первую, а в список её не пускал статус. Заведя цель,
+ * человек не находил её на главной вовсе.
+ */
 function secondaryGoals(ctx) {
   const { state, today } = ctx;
-  const rest = state.goals.filter((g) => g.status !== C.GOAL_ACTIVE);
+  const featured = featuredGoal(state.goals);
+  const rest = C.orderedGoals(state.goals).filter((g) => !featured || g.id !== featured.id);
   if (!rest.length) return null;
 
   return U.card([
