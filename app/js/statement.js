@@ -187,11 +187,45 @@ export function toNumber(raw) {
   return Number.isFinite(value) ? value : null;
 }
 
+export const ORDER_DMY = 'dmy';
+export const ORDER_MDY = 'mdy';
+
+/**
+ * Порядок чисел в столбце дат: день первым или месяц.
+ *
+ * Решается по всему столбцу разом, а не по каждой ячейке. Иначе один файл
+ * читается двумя способами: «29.07» разбирается верно, потому что месяца 29
+ * не бывает, а «03.04» из того же файла — наугад. Половина операций уезжает
+ * на три месяца, и заметить это по списку невозможно.
+ *
+ * Голосуют только однозначные строки: те, где одно из чисел больше двенадцати
+ * и потому днём может быть только оно. Неоднозначные молчат — они одинаково
+ * подходят обоим порядкам и ничего не сообщают. Если однозначных нет вовсе,
+ * остаётся русский порядок: день первым.
+ */
+export function dateOrder(values) {
+  let dayFirst = 0;
+  let monthFirst = 0;
+
+  for (const raw of values) {
+    const m = String(raw || '').trim().match(/^(\d{1,2})[.\/-](\d{1,2})[.\/-]\d{2,4}/);
+    if (!m) continue;
+    const a = Number(m[1]);
+    const b = Number(m[2]);
+    if (a > 12 && b <= 12) dayFirst += 1;
+    else if (b > 12 && a <= 12) monthFirst += 1;
+  }
+  return monthFirst > dayFirst ? ORDER_MDY : ORDER_DMY;
+}
+
 /**
  * Дата из выписки в ISO. Понимает 31.12.2026, 2026-12-31, 31/12/2026
  * и серийный номер Excel.
+ *
+ * Порядок дня и месяца берётся снаружи — его определяет весь столбец,
+ * одной ячейке он не виден.
  */
-export function toDate(raw) {
+export function toDate(raw, order = ORDER_DMY) {
   const text = String(raw || '').trim();
 
   // Excel хранит дату числом дней от 30.12.1899. В выписке xlsx ячейка даты
@@ -206,27 +240,25 @@ export function toDate(raw) {
   let m = text.match(/^(\d{4})-(\d{2})-(\d{2})/);
   if (m) return valid(D.iso(Number(m[1]), Number(m[2]), Number(m[3])));
   m = text.match(/^(\d{1,2})[.\/-](\d{1,2})[.\/-](\d{4})/);
-  if (m) return dayMonth(Number(m[1]), Number(m[2]), Number(m[3]));
+  if (m) return dayMonth(Number(m[1]), Number(m[2]), Number(m[3]), order);
   m = text.match(/^(\d{1,2})[.\/-](\d{1,2})[.\/-](\d{2})(?!\d)/);
-  if (m) return dayMonth(Number(m[1]), Number(m[2]), 2000 + Number(m[3]));
+  if (m) return dayMonth(Number(m[1]), Number(m[2]), 2000 + Number(m[3]), order);
   return null;
 }
 
 /**
- * Дата из двух чисел, порядок которых заявлен как «день, месяц».
+ * Дата из двух чисел в заданном порядке.
  *
- * Порядок русских выписок — день первым, и он остаётся основным. Но если
- * второе число больше двенадцати, а первое нет, то прочтение ровно одно:
- * это мм/дд, и месяцем может быть только первое. Тут нет догадки — другого
- * непротиворечивого чтения просто не существует.
- *
- * Когда оба числа не больше двенадцати, «03/04» неразличимо, и остаётся
- * порядок по умолчанию. Полностью разбирает такой файл только выбор формата
- * по всему столбцу разом, а не по одной ячейке.
+ * Порядок пробуется первым, но не любой ценой: в файле с мм/дд попадаются
+ * строки, которые в нём не читаются вовсе — «29.07» при месяце-первым даёт
+ * тринадцатый месяц. Тогда берётся другое прочтение, потому что оно
+ * единственное непротиворечивое. Не читается ни так, ни этак — значит,
+ * это не дата, и пусто честнее выдуманного дня.
  */
-function dayMonth(a, b, year) {
-  if (b > 12 && a <= 12) return valid(D.iso(year, a, b));
-  return valid(D.iso(year, b, a));
+function dayMonth(a, b, year, order = ORDER_DMY) {
+  const first = order === ORDER_MDY ? valid(D.iso(year, a, b)) : valid(D.iso(year, b, a));
+  if (first) return first;
+  return order === ORDER_MDY ? valid(D.iso(year, b, a)) : valid(D.iso(year, a, b));
 }
 
 // Дата, которой не существует, — это не дата. «31.02» и «29.02» невисокосного
@@ -272,12 +304,16 @@ export function toRows(table, mapping, options = {}) {
   const rows = [];
   const skipped = { date: 0, amount: 0, status: 0 };
 
+  // Порядок дня и месяца — свойство файла, а не строки: решаем один раз
+  // по всему столбцу, иначе один и тот же файл читается двумя способами.
+  const order = dateOrder(body.map((cells) => (cells || [])[mapping.date]));
+
   for (const cells of body) {
     const at = (i) => (i == null ? '' : cells[i] || '');
 
     if (mapping.status != null && BAD_STATUS.test(at(mapping.status))) { skipped.status += 1; continue; }
 
-    const date = toDate(at(mapping.date));
+    const date = toDate(at(mapping.date), order);
     if (!date) { skipped.date += 1; continue; }
 
     let amount = null;
@@ -299,7 +335,7 @@ export function toRows(table, mapping, options = {}) {
       account,
     });
   }
-  return { rows, skipped };
+  return { rows, skipped, order };
 }
 
 // --------------------------------------------------------------------------

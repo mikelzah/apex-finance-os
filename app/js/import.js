@@ -101,19 +101,23 @@ function mappingSheet(table, filename, options, forced = null) {
     }
 
     function current() {
-      const { rows, skipped } = S.toRows(table, mapping, { account: bank, headerRow });
+      const { rows, skipped, order } = S.toRows(table, mapping, { account: bank, headerRow });
       const withCategory = rows.map((r) => ({ ...r, category: S.categorise(r, state.settings.spendRules, learned) }));
       const marked = S.markTransfers(withCategory, contributions(state));
       const fresh = S.newRows(marked, state.spending);
-      return { rows: marked, fresh, skipped };
+      return { rows: marked, fresh, skipped, order };
     }
 
     function update() {
-      const { rows, fresh, skipped } = current();
+      const { rows, fresh, skipped, order } = current();
       U.clear(preview);
       const lost = skipped.date + skipped.amount;
       summary.textContent = rows.length
         ? `Разобрано строк: ${rows.length}. Новых: ${fresh.length}.`
+          // Про месяц-первым говорим вслух. Русские выписки пишут день первым,
+          // и молча прочитать файл наоборот значит увезти половину операций
+          // на несколько месяцев так, что по списку это не видно.
+          + (order === S.ORDER_MDY ? ' Даты в файле: месяц первым.' : '')
           + (skipped.status ? ` Отменённых пропущено: ${skipped.status}.` : '')
           + (lost ? ` Без даты или суммы: ${lost}.` : '')
         : 'Ни одной строки разобрать не вышло — проверьте, какой столбец где.';
