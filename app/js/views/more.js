@@ -707,9 +707,28 @@ function backup(ctx) {
       if (!file) return;
       try {
         const text = await file.text();
-        const counts = await store.importText(text);
-        U.toast(`Загружено: ${counts.assets} активов, ${counts.operations} операций`);
-        refresh();
+        // Сначала читаем, потом спрашиваем, и только затем заменяем. Загрузка
+        // стирает всё, что есть в приложении, и откатить её нечем: человек
+        // должен увидеть, что приедет вместо этого, до того как это случится.
+        const parsed = store.readCopy(text);
+        const from = store.copyCounts(parsed);
+        const now = store.getState();
+        const assets = (n) => `${n} ${F.plural(n, 'актив', 'актива', 'активов')}`;
+        const ops = (n) => `${n} ${F.plural(n, 'операция', 'операции', 'операций')}`;
+        U.confirmSheet(
+          'Заменить всё на копию?',
+          `В копии${from.savedAt ? ` от ${F.date(from.savedAt)}` : ''}: ${assets(from.assets)}, ${ops(from.operations)}, `
+          + `${from.goals} ${F.plural(from.goals, 'цель', 'цели', 'целей')}, `
+          + `${from.spending} ${F.plural(from.spending, 'запись', 'записи', 'записей')} трат.`
+          + ` Сейчас в приложении: ${assets(now.assets.length)}, ${ops(now.operations.length)}.`
+          + ' Всё нынешнее пропадёт, вернуть его будет нечем.',
+          'Заменить',
+          async () => {
+            const counts = await store.importText(text);
+            U.toast(`Загружено: ${counts.assets} активов, ${counts.operations} операций`);
+            refresh();
+          },
+        );
       } catch (err) {
         U.toast(`Не удалось загрузить: ${err.message}`, 'error');
       } finally {

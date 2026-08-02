@@ -257,8 +257,13 @@ export function readDate(line, today) {
   if (/^вчера/i.test(text)) return D.addDays(today, -1);
   if (/^позавчера/i.test(text)) return D.addDays(today, -2);
 
+  // Распознавание путает цифры, и «31.11» из снимка — обычное дело.
+  // Несуществующая дата уехала бы в соседний месяц молча.
   let m = text.match(/^(\d{1,2})[.\/-](\d{1,2})[.\/-](\d{4})/);
-  if (m) return D.iso(Number(m[3]), Number(m[2]), Number(m[1]));
+  if (m) {
+    const at = D.iso(Number(m[3]), Number(m[2]), Number(m[1]));
+    return D.isValid(at) ? at : null;
+  }
 
   m = text.match(/^(\d{1,2})\s+([\p{L}]+)\.?\s*(\d{4})?/u);
   if (!m) return null;

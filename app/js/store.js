@@ -161,8 +161,21 @@ function migrate(loaded) {
   if (!next.settings.bankProfiles || typeof next.settings.bankProfiles !== 'object') next.settings.bankProfiles = {};
   // Размер лота появился вместе со сделками. Единица — не догадка, а самый
   // частый случай на Мосбирже; где не так, поправляется в карточке бумаги.
+  //
+  // Название, статус и список целей экраны считают обязательными: они
+  // выводятся как текст и приводятся к нижнему регистру. Своя форма их всегда
+  // заполняет, а вот чужая или правленная руками копия — нет, и один актив
+  // без статуса роняет весь экран активов. Здесь единственное место, где это
+  // чинится сразу для всех экранов.
+  //
+  // Ликвидности среди них нет намеренно: пустая означает «не мгновенная»,
+  // и подставить сюда «Мгновенная» значило бы приписать подушке деньги,
+  // которых в ней нет.
   for (const a of next.assets) {
     if (a.lotSize == null) a.lotSize = 1;
+    if (!a.name) a.name = 'Без названия';
+    if (!a.status) a.status = C.STATUS_ACTIVE;
+    if (!Array.isArray(a.goalIds)) a.goalIds = [];
   }
   return next;
 }
@@ -433,16 +446,46 @@ export function exportText() {
 }
 
 /**
+ * Прочитать копию, ничего не меняя.
+ *
+ * Отдельно от применения нарочно: загрузка стирает всё, что есть, и человек
+ * должен увидеть, что именно приедет вместо этого, до того как это случится,
+ * а не после. Заодно сообщение о поломанном файле пишем по-человечески —
+ * JSON.parse говорит про «Unexpected token», и в тосте это выглядит как сбой
+ * приложения, а не как «файл не тот».
+ */
+export function readCopy(text) {
+  let parsed = null;
+  try {
+    parsed = JSON.parse(text);
+  } catch {
+    throw new Error('файл не читается — похоже, он повреждён или это не копия');
+  }
+  if (!parsed || typeof parsed !== 'object') throw new Error('это не похоже на копию данных');
+  if (!Array.isArray(parsed.assets) || !Array.isArray(parsed.operations)) {
+    throw new Error('в файле нет активов и операций — похоже, это не та копия');
+  }
+  return parsed;
+}
+
+/** Что лежит в копии. Для предупреждения перед заменой. */
+export function copyCounts(parsed) {
+  return {
+    assets: parsed.assets.length,
+    operations: parsed.operations.length,
+    goals: Array.isArray(parsed.goals) ? parsed.goals.length : 0,
+    spending: Array.isArray(parsed.spending) ? parsed.spending.length : 0,
+    savedAt: typeof parsed.exportedAt === 'string' ? parsed.exportedAt.slice(0, 10) : null,
+  };
+}
+
+/**
  * Импорт заменяет состояние целиком, а не сливает.
  * Слияние двух расходящихся копий журнала операций без общей истории
  * даёт дубли, которые потом руками не разберёшь.
  */
 export async function importText(text) {
-  const parsed = JSON.parse(text);
-  if (!parsed || typeof parsed !== 'object') throw new Error('Это не похоже на копию данных');
-  if (!Array.isArray(parsed.assets) || !Array.isArray(parsed.operations)) {
-    throw new Error('В файле нет активов и операций — похоже, это не та копия');
-  }
+  const parsed = readCopy(text);
   const next = migrate(parsed);
   next.meta.onboarded = true;
   delete next.app;
@@ -638,17 +681,26 @@ export async function renameCategory(kind, from, to) {
 
     const list = ownCategories(draft)[kind === 'income' ? 'income' : 'spend'];
     const at = list.indexOf(from);
-    if (at >= 0) list[at] = clean;
-    else if (!list.includes(clean)) list.push(clean);
+
+    // Переименование в имя, которое уже есть, — это слияние, а не вторая
+    // строка с тем же названием. Иначе список раздваивается, и в каждом
+    // выборе появляются две одинаковые категории, между которыми нельзя
+    // выбрать осмысленно. Написание побеждает то, что уже в списке:
+    // «Продукты» и «продукты» — одна категория, и остаться должна одна.
+    const twin = list.findIndex((x, i) => i !== at && x.toLowerCase() === clean.toLowerCase());
+    const target = twin >= 0 ? list[twin] : clean;
+    if (at >= 0 && twin >= 0) list.splice(at, 1);
+    else if (at >= 0) list[at] = clean;
+    else if (twin < 0) list.push(clean);
 
     let touched = 0;
     for (const row of draft.spending) {
       if (row.category !== from) continue;
-      row.category = clean;
+      row.category = target;
       touched += 1;
     }
     for (const rule of draft.settings.spendRules) {
-      if (rule.category === from) rule.category = clean;
+      if (rule.category === from) rule.category = target;
     }
     return touched;
   });

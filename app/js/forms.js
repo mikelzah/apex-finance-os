@@ -314,7 +314,9 @@ export function tradeSheet(existing, options = {}) {
     api.setFooter([
       !isNew
         ? U.button('Удалить', () => {
-            U.confirmSheet(`Удалить: ${op.type.toLowerCase()}?`,
+            // Вид операции берём через строку: у записи из чужой копии его
+            // может не быть, а удалять её всё равно надо.
+            U.confirmSheet(`Удалить: ${String(op.type || 'операцию').toLowerCase()}?`,
               'Количество бумаг и движение денег по счёту откатятся.', 'Удалить', async () => {
                 await store.mutate((d) => store.removePaperOp(d, op.id));
                 U.toast('Операция удалена');
