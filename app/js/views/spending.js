@@ -97,6 +97,8 @@ export function render(ctx) {
       }),
     ]),
 
+    regularCard(state, today, stats),
+
     stats.perMonth.length > 1
       ? U.card([
           U.sectionTitle('Доход и жизнь по месяцам'),
@@ -261,6 +263,45 @@ function bar(row, total, all, refresh) {
       h('span', { class: 'cat-op-sum', text: F.moneyExact(r.amount) }),
     ])),
   ]);
+}
+
+/**
+ * Что списывается само.
+ *
+ * Отдельным блоком, а не строкой в разборе по категориям, потому что это
+ * другой род трат. Продукты человек покупает решением, подписку — один раз
+ * решил и забыл, а деньги уходят каждый месяц. Разбор по категориям на этот
+ * вопрос не отвечает: подписки лежат в разных категориях и в сумму не
+ * собираются нигде.
+ *
+ * Доля от месячных трат важнее самой суммы: 3 400 ₽ звучит небольшим числом
+ * ровно до того момента, когда выясняется, что это восьмая часть всей жизни.
+ */
+function regularCard(state, today, stats) {
+  const list = C.recurring(state.spending, today);
+  if (!list.length) return null;
+
+  const total = C.recurringTotal(list);
+  const share = stats.monthlySpend ? (total / stats.monthlySpend) * 100 : null;
+
+  return U.card([
+    U.sectionTitle('Списывается само'),
+    U.stat('В месяц', F.money(total), {
+      big: true,
+      hint: share == null ? 'повторяющиеся платежи' : `${F.percent(share, 0)} месячных трат`,
+    }),
+    ...list.map((r) => U.row(r.name, F.money(r.amount), {
+      // Число платежей — это мера уверенности. Два подряд ещё могут оказаться
+      // совпадением, шесть — уже нет, и человек вправе видеть, на чём вывод.
+      sub: `${r.category || 'без категории'} · ${platezhi(r.count)} · следующий ${F.dateShort(r.nextDate)}`,
+    })),
+    U.callout('Найдено по повторам в выписке: тот же магазин, та же сумма, шаг около месяца. '
+      + 'Это не список ваших подписок из банка — приложение видит только то, что уже списывалось.', 'info'),
+  ]);
+}
+
+function platezhi(n) {
+  return `${n} ${F.plural(n, 'платёж', 'платежа', 'платежей')}`;
 }
 
 function empty(ctx) {

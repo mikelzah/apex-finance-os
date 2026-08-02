@@ -467,6 +467,18 @@ export function learnCategories(spending = []) {
   return learned;
 }
 
+/**
+ * Ключ магазина: по чему две записи считаются одним и тем же местом.
+ *
+ * Обычно это самое длинное слово названия. Но короткие имена — «МТС», «IVI»,
+ * «Дом» — целиком короче четырёх букв, и слова у них нет вовсе. Для них
+ * ключом становится всё название: оно и так короткое, дробить его нечем.
+ * Без этого повторяющийся платёж в «МТС» не находился никогда.
+ */
+export function merchantKey(text) {
+  return signature(text) || normalise(text) || null;
+}
+
 function normalise(text) {
   return String(text || '').toLowerCase().replace(/\s+/g, ' ').trim();
 }
@@ -474,8 +486,13 @@ function normalise(text) {
 /**
  * Опознавательное слово названия — самое длинное. В «SUPERMARKET PYATEROCHKA
  * 4512 MOSCOW» это «PYATEROCHKA», а не «MOSCOW» и не номер точки.
+ *
+ * Одно и то же слово должно узнаваться везде, где записи сравниваются между
+ * собой: и когда категория подтягивается к похожей записи, и когда ищутся
+ * повторяющиеся платежи. Два разных правила «что считать одним магазином»
+ * разошлись бы, и человек видел бы подписку там, где приложение её не видит.
  */
-function signature(text) {
+export function signature(text) {
   const words = normalise(text)
     .split(/[^\p{L}\p{N}]+/u)
     .filter((w) => w.length >= 4 && !/^\d+$/.test(w));

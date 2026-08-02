@@ -7,6 +7,10 @@
 
 import * as D from './dates.js';
 import * as F from './fmt.js';
+// Только ради опознавательного слова названия: «один и тот же магазин»
+// должно значить одно и то же и при подстановке категории, и при поиске
+// повторяющихся платежей.
+import * as S from './statement.js';
 
 export const STATUS_ACTIVE = 'Активен';
 export const STATUS_FROZEN = 'Заморожен';
@@ -1325,6 +1329,117 @@ export function cushionMonths(assets, operations, stats) {
   if (!stats || !stats.monthlySpend) return null;
   const { liquid } = netWorth(assets, operations);
   return liquid / stats.monthlySpend;
+}
+
+// --------------------------------------------------------------------------
+// Регулярные платежи
+// --------------------------------------------------------------------------
+
+/** Сколько месяцев назад смотреть в поисках повторов. */
+export const RECURRING_MONTHS = 6;
+
+// Границы месячного шага. Подписки списываются в тот же день месяца, но день
+// съезжает: короткий февраль, выходные, разные часовые пояса банка. Двадцать
+// пять и тридцать восемь — это «тот же день плюс-минус неделя», и в этот
+// коридор не попадают ни две случайные покупки в одном магазине, ни покупки
+// раз в две недели.
+const STEP_MIN = 25;
+const STEP_MAX = 38;
+
+// Насколько может гулять сумма. Подписка часто ровно одна и та же, но связь
+// и облачное хранилище считаются по тарифу и меняются на проценты.
+const SPREAD = 0.2;
+
+/**
+ * Платежи, которые повторяются каждый месяц.
+ *
+ * Отвечает на вопрос, которого нет ни в одном отчёте по категориям: сколько
+ * денег уходит само, без всякого решения. Категория «Развлечения» говорит,
+ * что человек потратил столько-то; строка «подписок на 3 400 ₽ в месяц»
+ * говорит, что столько будет списываться и в следующем месяце тоже, пока
+ * он что-нибудь не отменит.
+ *
+ * Ищется по названию магазина, а не по категории: подписки живут в разных
+ * категориях и по категориям не собираются. Двух платежей достаточно —
+ * ждать третьего значит молчать два месяца о том, что уже видно.
+ */
+export function recurring(spending = [], day, months = RECURRING_MONTHS) {
+  const from = spendFrom(day, months);
+  const groups = new Map();
+
+  for (const row of spending) {
+    if (row.kind !== SPEND_OUT) continue;
+    if (!D.isValid(row.date) || row.date < from || row.date > day) continue;
+    const key = S.merchantKey(row.description);
+    if (!key) continue;
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(row);
+  }
+
+  const found = [];
+  for (const rows of groups.values()) {
+    const line = pickRegular(rows);
+    // Отменённая подписка перестаёт быть подпиской. Если с последнего
+    // списания прошло больше полутора шагов, она либо кончилась, либо
+    // выписку давно не загружали — в обоих случаях обещать следующее
+    // списание нельзя. Иначе список ещё полгода показывает то, за что
+    // человек уже не платит, и вся сумма «в месяц» становится враньём.
+    if (line && D.diffDays(day, line.lastDate) <= STEP_MAX + 7) found.push(line);
+  }
+  return found.sort((a, b) => b.amount - a.amount);
+}
+
+/**
+ * Похожи ли платежи одного магазина на подписку.
+ *
+ * Разбор идёт по суммам, а не по всей группе разом: в «Яндексе» лежат и
+ * подписка на 299 ₽ каждый месяц, и такси по случайным ценам. Считать их
+ * вместе — значит либо потерять подписку в шуме, либо назвать подпиской
+ * такси. Поэтому платежи сначала собираются в кучки по близкой сумме,
+ * и на регулярность проверяется каждая кучка отдельно.
+ */
+function pickRegular(rows) {
+  const sorted = [...rows].sort((a, b) => (a.date < b.date ? -1 : 1));
+  const buckets = [];
+
+  for (const row of sorted) {
+    const bucket = buckets.find((b) => Math.abs(b[0].amount - row.amount) <= b[0].amount * SPREAD);
+    if (bucket) bucket.push(row);
+    else buckets.push([row]);
+  }
+
+  let best = null;
+  for (const bucket of buckets) {
+    if (bucket.length < 2) continue;
+
+    // Шаги считаются между соседними платежами. Один выпавший месяц
+    // (списание не прошло, карта перевыпущена) не отменяет подписку,
+    // поэтому достаточно, чтобы месячных шагов было большинство.
+    const steps = [];
+    for (let i = 1; i < bucket.length; i += 1) steps.push(D.diffDays(bucket[i].date, bucket[i - 1].date));
+    const monthly = steps.filter((s) => s >= STEP_MIN && s <= STEP_MAX).length;
+    if (!monthly || monthly * 2 < steps.length) continue;
+
+    const last = bucket[bucket.length - 1];
+    const amount = round2(bucket.reduce((s, r) => s + r.amount, 0) / bucket.length);
+    const line = {
+      name: last.description || '—',
+      category: last.category || null,
+      amount,
+      count: bucket.length,
+      lastDate: last.date,
+      // Ждать ровно месяц, а не средний шаг: подписка привязана к числу,
+      // а средний шаг из двух точек — это просто расстояние между ними.
+      nextDate: D.addMonths(last.date, 1),
+    };
+    if (!best || line.amount > best.amount) best = line;
+  }
+  return best;
+}
+
+/** Сколько всего уходит в месяц на то, что списывается само. */
+export function recurringTotal(list = []) {
+  return round2(list.reduce((s, r) => s + r.amount, 0));
 }
 
 /** Взносы в капитал за тот же период — без внутренних переводов. */
