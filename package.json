@@ -1,0 +1,11 @@
+{
+  "name": "kubysh",
+  "private": true,
+  "description": "Кубыш — приложение о деньгах, которое работает целиком в телефоне. Сборки у приложения нет: package.json нужен только проверкам.",
+  "scripts": {
+    "test": "./scripts/test.sh"
+  },
+  "devDependencies": {
+    "playwright": "^1.49.0"
+  }
+}

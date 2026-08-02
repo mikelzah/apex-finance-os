@@ -1,0 +1,46 @@
+{
+  "app": "Кубыш",
+  "exportedAt": "2026-08-02T18:06:42.334Z",
+  "schemaVersion": 1,
+  "seedVersion": 0,
+  "assets": [
+    {
+      "id": "only",
+      "name": "Единственный",
+      "type": "Деньги",
+      "status": "Активен",
+      "liquidity": "Мгновенная",
+      "assetClass": "Вклады",
+      "opening": 777,
+      "goalIds": [],
+      "lotSize": 1
+    }
+  ],
+  "goals": [],
+  "operations": [],
+  "portfolio": [],
+  "tax": [],
+  "netWorth": [],
+  "keyRate": [],
+  "priceHistory": [],
+  "spending": [],
+  "settings": {
+    "quickAmount": 1250,
+    "quickAssetId": null,
+    "quickGoalId": null,
+    "backupReminderDays": 14,
+    "taxLimitBase": 1000000,
+    "autoQuotes": true,
+    "mutedSignals": [],
+    "signalsOpen": null,
+    "spendRules": [],
+    "bankProfiles": {},
+    "spendMonths": 3,
+    "categories": null
+  },
+  "meta": {
+    "lastBackupAt": null,
+    "createdAt": "2026-08-02T18:06:42.333Z",
+    "onboarded": true
+  }
+}

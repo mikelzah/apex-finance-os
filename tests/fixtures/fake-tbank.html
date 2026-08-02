@@ -1,0 +1,67 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>История</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    width: 430px;
+    font: 400 17px/1.25 -apple-system, "SF Pro Text", "Helvetica Neue", Arial, sans-serif;
+    background: #0a0a0a; color: #f4f4f5;
+    -webkit-font-smoothing: antialiased;
+  }
+  .top { padding: 18px 20px; font-size: 26px; font-weight: 700; }
+  .day { padding: 22px 20px 10px; font-size: 13px; letter-spacing: .06em; color: #8b8d92; text-transform: uppercase; font-weight: 600; }
+  .op { display: grid; grid-template-columns: 48px 1fr auto; gap: 14px; padding: 10px 20px 14px; align-items: start; }
+  .ic { width: 48px; height: 48px; border-radius: 14px; grid-row: span 2; }
+  .name { font-size: 17px; }
+  .cat { font-size: 15px; color: #8b8d92; margin-top: 3px; }
+  .sum { font-size: 17px; white-space: nowrap; text-align: right; display: flex; align-items: center; justify-content: flex-end; gap: 6px; }
+  .sum.in { color: #3ec97a; }
+  /* Кэшбэк — вторая строка справа, серым и мельче. Слова «кэшбэк» нет. */
+  .back { font-size: 15px; color: #8b8d92; text-align: right; margin-top: 3px; }
+  .clock { width: 17px; height: 17px; border-radius: 50%; background: #3a3b3f; position: relative; }
+  .clock::after { content: ''; position: absolute; left: 8px; top: 3px; width: 1.5px; height: 6px; background: #b7b9bd; }
+  .chip { grid-column: 2 / 4; justify-self: start; margin-top: 8px; background: #1b1c1f; border-radius: 12px; padding: 8px 14px; font-size: 15px; }
+</style>
+
+<div class="top">История</div>
+
+<div class="day">Сегодня, 1 августа</div>
+<div class="op">
+  <div class="ic" style="background:#f5d20a"></div>
+  <div><div class="name">Яндекс.Еда</div><div class="cat">Фастфуд</div></div>
+  <div><div class="sum">−1 174 ₽<span class="clock"></span></div><div class="back">+23 ₽</div></div>
+</div>
+<div class="op">
+  <div class="ic" style="background:#2d8cf0"></div>
+  <div><div class="name">Перевод</div><div class="cat">Между своими счетами</div></div>
+  <div><div class="sum">1 640 ₽</div></div>
+</div>
+<div class="op">
+  <div class="ic" style="background:#28a745"></div>
+  <div><div class="name">Пётр И.</div><div class="cat">Переводы · СБП · ОТП Банк</div></div>
+  <div><div class="sum in">+2 803,41 ₽</div></div>
+  <div class="chip">4127,24</div>
+</div>
+
+<div class="day">Вчера, 31 июля</div>
+<div class="op">
+  <div class="ic" style="background:#12a37a"></div>
+  <div><div class="name">Процент на остаток по накопи…</div><div class="cat">Накопления</div></div>
+  <div><div class="sum in">+1,42 ₽</div></div>
+</div>
+<div class="op">
+  <div class="ic" style="background:#1d6b3f"></div>
+  <div><div class="name">Вкусно — и точка</div><div class="cat">Фастфуд</div></div>
+  <div><div class="sum">−667 ₽</div></div>
+</div>
+<div class="op">
+  <div class="ic" style="background:#6aa84f"></div>
+  <div><div class="name">Подорожник</div><div class="cat">Транспорт</div></div>
+  <div><div class="sum">−985 ₽<span class="clock"></span></div><div class="back">+77 ₽</div></div>
+</div>
+<div class="op">
+  <div class="ic" style="background:#28a745"></div>
+  <div><div class="name">Пётр И.</div><div class="cat">Переводы · СБП · ОТП Банк</div></div>
+  <div><div class="sum in">+1 900 ₽</div></div>
+</div>

@@ -1,0 +1,48 @@
+name: tests
+
+# Проверки гоняются на каждый пуш и на каждый pull request. Смысл в том,
+# чтобы поломка находилась здесь, а не на телефоне: приложение выкладывается
+# сразу в рабочую копию, и «проверю потом» означает «замечу через неделю».
+#
+# Проверки настоящие — приложение поднимается в браузере, и с ним работают
+# так же, как работает человек. Поэтому шаг небыстрый: несколько минут.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Установка
+        run: npm ci
+
+      # Только Chromium: приложение живёт на телефоне под WebKit, но здесь
+      # проверяется поведение кода, а не движок. Три браузера ради этого
+      # качать незачем.
+      - name: Браузер
+        run: npx playwright install --with-deps chromium
+
+      - name: Проверки
+        run: ./scripts/test.sh
+
+      # Логи и снимки пригодятся, когда упало: по одной строке «FAIL»
+      # причину не понять, а воспроизвести у себя выходит не всегда.
+      - name: Вывод упавших проверок
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-output
+          path: tests/.out/
+          retention-days: 7

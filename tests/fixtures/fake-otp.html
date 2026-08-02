@@ -1,0 +1,44 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>История</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    width: 430px;
+    font: 400 17px/1.25 -apple-system, "SF Pro Text", "Helvetica Neue", Arial, sans-serif;
+    background: #fff; color: #0d0d0f;
+    -webkit-font-smoothing: antialiased;
+  }
+  .top { text-align: center; padding: 14px; font-size: 17px; }
+  .chips { display: flex; gap: 8px; padding: 8px 16px 16px; }
+  .chip { background: #f1f2f4; border-radius: 999px; padding: 10px 16px; font-size: 15px; white-space: nowrap; }
+  .chip.on { background: #17181c; color: #fff; }
+  .day { padding: 18px 16px 4px; }
+  .day h2 { font-size: 26px; font-weight: 700; }
+  .day p { font-size: 15px; color: #8a8d94; margin-top: 2px; }
+  .op { display: flex; align-items: center; gap: 12px; padding: 12px 16px; }
+  .ic { width: 44px; height: 44px; border-radius: 12px; flex: none; }
+  .mid { flex: 1; min-width: 0; }
+  .name { font-size: 17px; }
+  .cat { font-size: 15px; color: #8a8d94; margin-top: 2px; }
+  .sum { font-size: 17px; white-space: nowrap; display: flex; align-items: center; gap: 6px; }
+  /* Часики «операция ещё не проведена» — тот самый значок, который
+     прилипает к сумме и превращает 756 в 7562. */
+  .clock { width: 15px; height: 15px; border: 1.5px solid #a9acb2; border-radius: 50%; position: relative; }
+  .clock::after { content: ''; position: absolute; left: 6px; top: 2.5px; width: 1.5px; height: 5px; background: #a9acb2; }
+</style>
+
+<div class="top">История</div>
+<div class="chips"><span class="chip on">Август ⌄</span><span class="chip">Счета и карты ⌄</span><span class="chip">Тип операции ⌄</span></div>
+
+<div class="day"><h2>Сегодня</h2><p>Вы потратили 3 401,41 ₽</p></div>
+<div class="op"><div class="ic" style="background:#e8342c"></div><div class="mid"><div class="name">Пётр Сергеевич К.</div><div class="cat">Переводы</div></div><div class="sum">−2 803,41 ₽<span class="clock"></span></div></div>
+<div class="op"><div class="ic" style="background:#28b4f0"></div><div class="mid"><div class="name">Яндекс Лавка</div><div class="cat">Продуктовые магазины</div></div><div class="sum">−598 ₽<span class="clock"></span></div></div>
+
+<div class="day"><h2>Вчера</h2><p>Вы потратили 5 271,47 ₽</p></div>
+<div class="op"><div class="ic" style="background:#28b4f0"></div><div class="mid"><div class="name">Яндекс Лавка</div><div class="cat">Продуктовые магазины</div></div><div class="sum">−694 ₽<span class="clock"></span></div></div>
+<div class="op"><div class="ic" style="background:#0a5c2e"></div><div class="mid"><div class="name">Перекрёсток</div><div class="cat">Продуктовые магазины</div></div><div class="sum">−832,17 ₽<span class="clock"></span></div></div>
+<div class="op"><div class="ic" style="background:#e8342c"></div><div class="mid"><div class="name">Пётр Сергеевич К.</div><div class="cat">Переводы</div></div><div class="sum">−1 900 ₽</div></div>
+<div class="op"><div class="ic" style="background:#f08a1e"></div><div class="mid"><div class="name">Дикси</div><div class="cat">Продуктовые магазины</div></div><div class="sum">−54,33 ₽<span class="clock"></span></div></div>
+<div class="op"><div class="ic" style="background:#0a5c2e"></div><div class="mid"><div class="name">Перекрёсток</div><div class="cat">Продуктовые магазины</div></div><div class="sum">−480,97 ₽<span class="clock"></span></div></div>
+<div class="op"><div class="ic" style="background:#e8342c"></div><div class="mid"><div class="name">Пётр Сергеевич К.</div><div class="cat">Переводы</div></div><div class="sum">−1 310 ₽</div></div>

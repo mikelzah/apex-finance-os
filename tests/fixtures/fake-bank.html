@@ -1,0 +1,40 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Экран банка</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    width: 430px;
+    font: 400 17px/1.3 -apple-system, "SF Pro Text", "Helvetica Neue", Arial, sans-serif;
+    background: #fff; color: #101114;
+    -webkit-font-smoothing: antialiased;
+  }
+  header { padding: 18px 20px 8px; }
+  h1 { font-size: 28px; font-weight: 700; }
+  .day { padding: 18px 20px 8px; font-size: 15px; color: #8b8f98; }
+  .op { display: flex; align-items: center; gap: 12px; padding: 10px 20px; }
+  .ic { width: 40px; height: 40px; border-radius: 50%; background: #eceef2; flex: none; }
+  .mid { flex: 1; min-width: 0; }
+  .name { font-size: 17px; }
+  .cat { font-size: 14px; color: #8b8f98; margin-top: 2px; }
+  .sum { font-size: 17px; white-space: nowrap; }
+  .sum.in { color: #14834a; }
+  .note { font-size: 13px; color: #8b8f98; padding: 0 20px 6px 72px; }
+  body.dark { background: #0b0b0d; color: #f2f3f5; }
+  body.dark .ic { background: #1d1f24; }
+  body.dark .cat, body.dark .day, body.dark .note { color: #7c8089; }
+</style>
+<header><h1>Операции</h1></header>
+
+<div class="day">Сегодня</div>
+<div class="op"><div class="ic"></div><div class="mid"><div class="name">Пятёрочка</div><div class="cat">Супермаркеты</div></div><div class="sum">−2 317,40 ₽</div></div>
+<div class="note">Кэшбэк 73 ₽</div>
+<div class="op"><div class="ic"></div><div class="mid"><div class="name">Аптека Ригла</div><div class="cat">Здоровье</div></div><div class="sum">−610 ₽</div></div>
+
+<div class="day">Вчера</div>
+<div class="op"><div class="ic"></div><div class="mid"><div class="name">Яндекс Go</div><div class="cat">Такси</div></div><div class="sum">−265 ₽</div></div>
+<div class="op"><div class="ic"></div><div class="mid"><div class="name">ВкусВилл</div><div class="cat">Супермаркеты</div></div><div class="sum">−1 962,30 ₽</div></div>
+
+<div class="day">29 июля</div>
+<div class="op"><div class="ic"></div><div class="mid"><div class="name">Зарплата за июль</div><div class="cat">Поступление</div></div><div class="sum in">+132 500,00 ₽</div></div>
+<div class="op"><div class="ic"></div><div class="mid"><div class="name">Перевод между счетами</div><div class="cat">Переводы</div></div><div class="sum">−35 000 ₽</div></div>
