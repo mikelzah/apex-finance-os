@@ -25,6 +25,12 @@
     document.documentElement.dataset.theme = theme;
     document.querySelector('meta[name="theme-color"]')
       .setAttribute('content', theme === 'light' ? '#f4f8fb' : '#080a0e');
+
+    // Оформление — тем же способом и по той же причине: смена набора стилей
+    // после первой отрисовки видна как перестроение экрана на глазах.
+    var skin = null;
+    try { skin = localStorage.getItem('apex-finance-os:skin'); } catch (e) { /* приватный режим */ }
+    document.documentElement.dataset.skin = skin === 't' ? 't' : 'kubysh';
   })();
 </script>
 
@@ -36,6 +42,9 @@
      только разобрав CSS, и первый кадр выходит системным. -->
 <link rel="preload" href="./fonts/inter-subset.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="./css/app.css">
+<!-- Слой оформления. Пустой при своём оформлении: всё внутри [data-skin='t'],
+     и без этого атрибута ни одно правило не срабатывает. -->
+<link rel="stylesheet" href="./css/t-style.css">
 
 <!-- Старые ключи Apple: iOS до 17.4 понимает только их. -->
 <meta name="apple-mobile-web-app-capable" content="yes">

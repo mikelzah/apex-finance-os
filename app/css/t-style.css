@@ -1,0 +1,347 @@
+/* Т-стиль: оформление в духе приложения банка.
+ *
+ * Отдельный слой поверх своего оформления. Всё до единого правило заперто
+ * внутри [data-skin='t'] — без этого атрибута файл не делает ничего. Это
+ * условие эксперимента: выключение должно стоить ровно один переключатель,
+ * а не разбор того, что и куда просочилось.
+ *
+ * Что взято за образец. Экран истории операций восстановлен по снимку
+ * и лежит рядом в tests/fixtures/fake-tbank.html: тёмный почти чёрный фон,
+ * квадратная иконка со скруглением 14 на строку, крупный основной текст,
+ * серая подпись под ним, сумма справа. Отсюда же плотность и кегли.
+ *
+ * Чего здесь нет и не будет: логотипа банка, его названия внутри интерфейса
+ * и его фирменного шрифта. Оформление можно повторить, чужой знак —
+ * присвоить, и это разные вещи. Приложение остаётся «Кубышем».
+ */
+
+/* ==========================================================================
+ * Токены
+ * ========================================================================== */
+
+[data-skin='t'] {
+  /* Шрифт системный. У банка свой, лицензионный, и подменять его похожим
+     начертанием — хуже, чем честно взять системный: на самом устройстве
+     системный и стоит в большинстве приложений. */
+  --font-sans: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', system-ui, sans-serif;
+
+  /* Кегли крупнее наших: банковское приложение читают на ходу. */
+  --text-micro: 0.6875rem;
+  --text-xs: 0.8125rem;   /* 13 */
+  --text-sm: 0.9375rem;   /* 15 — подписи под строкой */
+  --text-base: 1.0625rem; /* 17 — основной */
+  --text-md: 1.0625rem;
+  --text-lg: 1.25rem;     /* 20 */
+  --text-xl: 1.625rem;    /* 26 — заголовок экрана */
+  --text-2xl: 1.75rem;
+  --text-hero: 2.5rem;    /* 40 */
+
+  --tracking-hero: -0.03em;
+  --tracking-2xl: -0.02em;
+  --tracking-xl: -0.02em;
+  --tracking-lg: -0.01em;
+
+  --radius-xs: 8px;
+  --radius-sm: 12px;
+  --radius-md: 16px;
+  --radius-lg: 20px;
+  --radius-xl: 24px;
+
+  --gutter: 1.25rem;      /* 20 — поле экрана шире нашего */
+  --row-h: 3rem;
+  --tabbar-h: 3.75rem;
+}
+
+/* Тёмная — основная: именно её видно на снимке. */
+[data-skin='t'][data-theme='dark'] {
+  --bg: #0a0a0a;
+  --surface: #17181b;
+  --sunken: #1b1c1f;
+  --raised: #1b1c1f;
+
+  --line: #232427;
+  --line-soft: #1d1e21;
+  --line-strong: #3a3b3f;
+
+  --ink: #f4f4f5;
+  --ink-2: #a8aab0;
+  --ink-3: #8b8d92;
+  --ink-4: #6d6f75;
+
+  /* Жёлтый — заливка и только заливка: текст по нему всегда чёрный.
+     Жёлтым текстом по тёмному не набирают ничего, контраста не хватает. */
+  --accent: #ffdd2d;
+  --accent-mark: #ffdd2d;
+  --accent-ink: #ffdd2d;
+  --on-accent: #14140f;
+  --accent-wash: rgba(255, 221, 45, 0.14);
+
+  --good: #3ec97a;
+  --good-ink: #3ec97a;
+  --good-wash: rgba(62, 201, 122, 0.16);
+  --warn: #ffb300;
+  --warn-ink: #ffb300;
+  --warn-wash: rgba(255, 179, 0, 0.14);
+  --critical: #ff5c5c;
+  --critical-ink: #ff5c5c;
+  --critical-wash: rgba(255, 92, 92, 0.16);
+
+  --card: #17181b;
+  --card-edge: transparent;
+  --glass: rgba(10, 10, 10, 0.86);
+  --glass-solid: #101012;
+  --glass-panel: #17181b;
+  --glass-edge: #232427;
+  --glass-sheen: transparent;
+
+  /* Фоновых пятен нет: фон ровный и глухой. */
+  --wash-a: transparent;
+  --wash-b: transparent;
+
+  --focus: #ffdd2d;
+  --elev-1: none;
+  --elev-2: none;
+  --elev-3: 0 -8px 40px rgba(0, 0, 0, 0.6);
+}
+
+[data-skin='t'][data-theme='light'] {
+  --bg: #f2f3f5;
+  --surface: #ffffff;
+  --sunken: #f2f3f5;
+  --raised: #ffffff;
+
+  --line: #e6e7ea;
+  --line-soft: #eff0f2;
+  --line-strong: #d2d4d8;
+
+  --ink: #131313;
+  --ink-2: #5c5e63;
+  --ink-3: #86888d;
+  --ink-4: #9b9da2;
+
+  --accent: #ffdd2d;
+  --accent-mark: #b58900;
+  --accent-ink: #8a6d00;
+  --on-accent: #14140f;
+  --accent-wash: rgba(255, 221, 45, 0.3);
+
+  --good: #12a05a;
+  --good-ink: #0f8c4e;
+  --good-wash: rgba(18, 160, 90, 0.14);
+  --warn: #c07800;
+  --warn-ink: #9a6100;
+  --warn-wash: rgba(255, 179, 0, 0.18);
+  --critical: #e03131;
+  --critical-ink: #c92a2a;
+  --critical-wash: rgba(224, 49, 49, 0.12);
+
+  --card: #ffffff;
+  --card-edge: transparent;
+  --glass: rgba(242, 243, 245, 0.9);
+  --glass-solid: #ffffff;
+  --glass-panel: #ffffff;
+  --glass-edge: #e6e7ea;
+  --glass-sheen: transparent;
+
+  --wash-a: transparent;
+  --wash-b: transparent;
+
+  --focus: #b58900;
+  --elev-1: none;
+  --elev-2: none;
+  --elev-3: 0 -8px 40px rgba(0, 0, 0, 0.16);
+}
+
+/* ==========================================================================
+ * Каркас
+ * ========================================================================== */
+
+/* Ровный фон вместо двух градиентных пятен: они были нужны стеклу,
+   а стекла здесь нет. */
+[data-skin='t'] body { background: var(--bg); }
+
+/* Размытия нет нигде. Материал этого оформления — плотный цвет, и блюр
+   в нём не читается, зато греет телефон ровно так же. */
+[data-skin='t'] .header,
+[data-skin='t'] .tabbar,
+[data-skin='t'] .sheet-panel,
+[data-skin='t'] .toast {
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  background: var(--glass-solid);
+  border: 0;
+}
+
+[data-skin='t'] .header {
+  border-bottom: 0;
+  padding-top: calc(var(--safe-top) + var(--space-2));
+}
+
+[data-skin='t'] .header h1 {
+  font-size: var(--text-xl);
+  font-weight: var(--weight-bold);
+}
+
+/* Нижняя панель без плашки и без скруглений — во всю ширину, как системная. */
+[data-skin='t'] .tabbar {
+  margin: 0;
+  border-radius: 0;
+  border-top: 1px solid var(--line);
+  box-shadow: none;
+}
+
+/* Выбранная вкладка отмечается цветом, а не капсулой под иконкой.
+   Жёлтая подложка на тёмном фоне читается как нажатая кнопка, хотя это
+   просто указание, где мы находимся. */
+[data-skin='t'] .tab.is-on::before { display: none; }
+[data-skin='t'] .tab.is-on { color: var(--ink); }
+[data-skin='t'] .tab { color: var(--ink-4); }
+[data-skin='t'] .tab-label { font-size: var(--text-micro); }
+
+/* ==========================================================================
+ * Карточки и строки
+ * ========================================================================== */
+
+/* Карточка — плотный прямоугольник без кромки и без тени. Разделяет
+   их фон, а не рамка. */
+[data-skin='t'] .card {
+  background: var(--card);
+  border: 0;
+  box-shadow: none;
+  border-radius: var(--radius-lg);
+  padding: var(--space-4) var(--space-5);
+}
+
+/* Заголовок раздела — обычным регистром и в цвет основного текста.
+   Капсом набирают дни в истории операций, а не названия блоков: капс
+   в блоке спорит за внимание с самими числами. */
+[data-skin='t'] .section-title h2 {
+  font-size: var(--text-base);
+  font-weight: var(--weight-semibold);
+  color: var(--ink);
+}
+
+[data-skin='t'] .row {
+  min-height: var(--row-h);
+  padding: var(--space-3) 0;
+}
+
+[data-skin='t'] .row-label span { font-size: var(--text-base); }
+[data-skin='t'] .row-label small { font-size: var(--text-sm); color: var(--ink-3); }
+[data-skin='t'] .row-value span { font-size: var(--text-base); }
+[data-skin='t'] .row-chevron { color: var(--ink-4); }
+
+/* ==========================================================================
+ * Кнопки
+ * ========================================================================== */
+
+[data-skin='t'] .btn {
+  border-radius: var(--radius-sm);
+  font-weight: var(--weight-medium);
+  font-size: var(--text-base);
+}
+
+[data-skin='t'] .btn-primary {
+  background: var(--accent);
+  color: var(--on-accent);
+  border: 0;
+  font-weight: var(--weight-semibold);
+}
+
+[data-skin='t'] .btn-ghost {
+  background: var(--sunken);
+  border: 0;
+  color: var(--ink);
+}
+
+[data-skin='t'] .btn-wide { border-radius: var(--radius-sm); }
+
+[data-skin='t'] .segmented {
+  background: var(--sunken);
+  border-radius: var(--radius-sm);
+  padding: 3px;
+}
+
+[data-skin='t'] .segment.is-on {
+  background: var(--surface);
+  color: var(--ink);
+  border-radius: calc(var(--radius-sm) - 3px);
+}
+
+[data-skin='t'] .chip { border-radius: var(--radius-sm); border-color: var(--line); }
+[data-skin='t'] .chip.is-on { background: var(--accent); color: var(--on-accent); border-color: var(--accent); }
+
+/* ==========================================================================
+ * Главный экран
+ * ========================================================================== */
+
+/* Капитал не по центру, а по левому краю: так он стоит в приложении банка,
+   и так же выровнены все остальные экраны. */
+[data-skin='t'] .hero {
+  text-align: left;
+  padding: var(--space-4) var(--gutter) var(--space-5);
+}
+
+[data-skin='t'] .hero-label {
+  font-size: var(--text-sm);
+  color: var(--ink-3);
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+[data-skin='t'] .hero-value {
+  font-size: var(--text-hero);
+  font-weight: var(--weight-bold);
+}
+
+[data-skin='t'] .hero-delta,
+[data-skin='t'] .hero-bench { justify-content: flex-start; }
+
+[data-skin='t'] .hero-note { margin-left: 0; }
+
+/* «Доступно» и «Инвестиции» — по левому краю, как и всё остальное.
+   Центр остался бы единственным местом на экране, выровненным иначе. */
+[data-skin='t'] .hero-split { justify-content: flex-start; gap: var(--space-8); }
+[data-skin='t'] .hero-split-label { font-size: var(--text-sm); }
+[data-skin='t'] .hero-split-value { font-size: var(--text-lg); font-weight: var(--weight-bold); }
+
+/* Строка про накопленные проценты набиралась в две строки: при кегле 17
+   она в ширину телефона не помещается. */
+[data-skin='t'] .quiet-line { font-size: var(--text-xs); }
+
+/* Быстрый взнос — жёлтая плашка во всю ширину, главное действие экрана.
+   Тени нет: в этом оформлении её нет нигде. */
+[data-skin='t'] .quick {
+  border-radius: var(--radius-md);
+  box-shadow: none;
+  padding: var(--space-4);
+}
+
+[data-skin='t'] .quick-amount { font-size: var(--text-lg); }
+[data-skin='t'] .quick-target { opacity: 0.7; }
+
+/* Полоса цели: жёлтая и чуть толще — на тёмном тонкая теряется. */
+[data-skin='t'] .bar { height: 0.375rem; background: var(--sunken); }
+[data-skin='t'] .bar-fill { background: var(--accent); }
+[data-skin='t'] .bar.is-over .bar-fill { background: var(--good); }
+
+/* Календарь дисциплины: заполненный день — жёлтый квадрат со скруглением,
+   как иконка операции в истории. */
+[data-skin='t'] .ritual-cell { border-radius: var(--radius-xs); }
+[data-skin='t'] .ritual-cell.is-done {
+  background: var(--accent);
+  color: var(--on-accent);
+  font-weight: var(--weight-semibold);
+}
+
+/* ==========================================================================
+ * Шторка
+ * ========================================================================== */
+
+[data-skin='t'] .sheet-panel {
+  border-radius: var(--radius-xl) var(--radius-xl) 0 0;
+  border-top: 0;
+}
+
+[data-skin='t'] .sheet-head h2 { font-size: var(--text-lg); font-weight: var(--weight-bold); }
+[data-skin='t'] .control { border-radius: var(--radius-sm); font-size: var(--text-md); }

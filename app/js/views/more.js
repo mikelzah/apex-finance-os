@@ -9,6 +9,7 @@ import * as charts from '../charts.js';
 import * as store from '../store.js';
 import * as forms from '../forms.js';
 import * as theme from '../theme.js';
+import * as skin from '../skin.js';
 import { BUILD } from '../build.js';
 import * as mascot from '../mascot.js';
 import * as lock from '../lock.js';
@@ -499,6 +500,21 @@ function keyRateSheet(ctx) {
 
 // --------------------------------------------------------------------------
 
+function skinSheet() {
+  U.sheet('Оформление', () => ['kubysh', 't'].map((value) =>
+    U.row(skin.label(value), skin.preference() === value ? '✓' : '', {
+      sub: value === 't' ? 'плотнее, темнее, жёлтый акцент' : 'стекло и синий акцент',
+      onClick: () => {
+        skin.set(value);
+        U.close();
+        // Перезагрузка, а не перерисовка: оформление меняет размеры всего,
+        // и замеры высоты экрана, снятые при старом наборе, после смены врут.
+        location.reload();
+      },
+    }),
+  ));
+}
+
 function settings(ctx) {
   const { state, refresh } = ctx;
   const s = state.settings;
@@ -576,6 +592,11 @@ function settings(ctx) {
       U.row('Тема', theme.label(), {
         sub: theme.preference() === 'system' ? `сейчас ${theme.label(theme.resolved()).toLowerCase()}` : null,
         onClick: themeSheet,
+      }),
+      // Оформление рядом с темой: вопрос один и тот же — как это выглядит.
+      U.row('Оформление', skin.label(), {
+        sub: skin.preference() === 't' ? 'в духе банковского приложения' : 'своё',
+        onClick: skinSheet,
       }),
       U.row('Быстрый взнос', s.quickAmount ? F.money(s.quickAmount) : 'выключен', {
         sub: asset ? asset.name : 'актив не выбран',
