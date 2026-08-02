@@ -24,6 +24,7 @@ const { h } = U;
 // а не настройка, и переживать перезапуск ему незачем.
 let openCategory = null;
 let showAll = false;
+let query = '';
 
 const WINDOWS = [
   [1, 'Месяц'],
@@ -116,19 +117,32 @@ export function render(ctx) {
     // отвечает на вопрос «куда уходит» целиком, а две сотни строк под ним
     // этот ответ заслоняют: до сравнения долей человек доходит, пролистав
     // весь месяц по одной операции.
+    //
+    // Пока не ищут — разбор по категориям. Как только ищут, категории
+    // мешают: человек уже знает, что ему нужно, и хочет видеть найденное,
+    // а не долю «Продуктов» в месяце.
     stats.categories.length
       ? U.card([
-          U.sectionTitle('На что уходит'),
-          ...stats.categories.map((c) => bar(c, stats.spent, stats.rows, refresh)),
-          U.button(showAll ? 'Скрыть список' : 'Показать все траты', () => {
-            showAll = !showAll;
+          U.sectionTitle(query ? 'Найдено' : 'На что уходит'),
+          U.search(query, (value) => {
+            query = value;
             openCategory = null;
             refresh();
-          }, { class: 'btn-wide' }),
+          }, { key: 'spend-search', placeholder: 'Магазин, категория, сумма' }),
+          ...(query
+            ? found(stats.rows, query, refresh)
+            : [
+                ...stats.categories.map((c) => bar(c, stats.spent, stats.rows, refresh)),
+                U.button(showAll ? 'Скрыть список' : 'Показать все траты', () => {
+                  showAll = !showAll;
+                  openCategory = null;
+                  refresh();
+                }, { class: 'btn-wide' }),
+              ]),
         ])
       : null,
 
-    showAll ? U.card([
+    showAll && !query ? U.card([
       U.sectionTitle('Записи'),
       ...allRows(stats.rows, refresh),
     ]) : null,
@@ -151,6 +165,15 @@ function sourceSheet(ctx) {
       onClick: () => { api.close(); screenshotSheet({ onDone: ctx.refresh }); },
     }),
   ]);
+}
+
+/** Найденное по запросу — тем же списком, что и все записи. */
+function found(rows, text, refresh) {
+  const hits = rows.filter((r) => U.matches(
+    text, r.description, r.category, r.account, r.kind, String(Math.round(r.amount || 0)),
+  ));
+  if (!hits.length) return [U.emptyState(`По запросу «${text}» в этом периоде ничего нет.`)];
+  return allRows(hits, refresh);
 }
 
 /**

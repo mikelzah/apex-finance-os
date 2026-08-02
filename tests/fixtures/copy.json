@@ -1,6 +1,6 @@
 {
   "app": "Кубыш",
-  "exportedAt": "2026-08-02T18:06:42.334Z",
+  "exportedAt": "2026-08-02T18:35:27.612Z",
   "schemaVersion": 1,
   "seedVersion": 0,
   "assets": [
@@ -40,7 +40,7 @@
   },
   "meta": {
     "lastBackupAt": null,
-    "createdAt": "2026-08-02T18:06:42.333Z",
+    "createdAt": "2026-08-02T18:35:27.610Z",
     "onboarded": true
   }
 }

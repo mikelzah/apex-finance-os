@@ -134,6 +134,7 @@ function render() {
 
   // Положение читаем до перестройки: после очистки экрана оно теряется.
   const keepScroll = key === shownScreen ? scrollTopNow() : 0;
+  const keepFocus = focusNow();
 
   renderHeader(ctx);
   tabbar.hidden = false;
@@ -152,7 +153,36 @@ function render() {
   renderTabs();
   shownScreen = key;
   scrollTo(keepScroll);
+  restoreFocus(keepFocus);
   viewport.note(key);
+}
+
+/**
+ * Поле, в котором стоит курсор, — чтобы вернуть его после перерисовки.
+ *
+ * Экран собирается заново целиком на каждое изменение, и поле ввода при этом
+ * создаётся другое. Для кнопок и переключателей это неважно, а вот строка
+ * поиска без этого становится непригодной: фокус слетает после первой буквы.
+ *
+ * Помечать поля приходится вручную (data-keep-focus): восстанавливать фокус
+ * во всём подряд нельзя — в шторке это перебивало бы её собственный автофокус.
+ */
+function focusNow() {
+  const el = document.activeElement;
+  const key = el && el.dataset ? el.dataset.keepFocus : null;
+  if (!key) return null;
+  return { key, start: el.selectionStart, end: el.selectionEnd };
+}
+
+function restoreFocus(saved) {
+  if (!saved) return;
+  const el = screen.querySelector(`[data-keep-focus="${saved.key}"]`);
+  if (!el) return;
+  el.focus({ preventScroll: true });
+  // Диапазон есть не у всякого поля — у type=number его нет вовсе.
+  try {
+    if (saved.start != null) el.setSelectionRange(saved.start, saved.end);
+  } catch { /* поле без выделения — и не надо */ }
 }
 
 function renderIntro() {

@@ -174,6 +174,49 @@ export function select(options, value, attrs = {}) {
   );
 }
 
+/**
+ * Строка поиска.
+ *
+ * data-keep-focus обязателен: экран собирается заново на каждое нажатие
+ * клавиши, и без этого признака фокус слетал бы после первой же буквы,
+ * а искать пришлось бы по одному символу за раз.
+ */
+export function search(value, onInput, options = {}) {
+  return h('div', { class: 'search' }, [
+    h('input', {
+      class: 'control search-input',
+      type: 'search',
+      // inputmode search даёт на iOS клавишу «Найти» вместо перевода строки.
+      inputmode: 'search',
+      enterkeyhint: 'search',
+      autocomplete: 'off',
+      placeholder: options.placeholder || 'Поиск',
+      value: value || '',
+      'data-keep-focus': options.key || 'search',
+      oninput: (e) => onInput(e.target.value),
+    }),
+    value ? h('button', {
+      class: 'search-clear',
+      type: 'button',
+      'aria-label': 'Очистить',
+      onclick: () => onInput(''),
+    }, ['✕']) : null,
+  ]);
+}
+
+/**
+ * Подходит ли запись под запрос.
+ *
+ * Слова ищутся по отдельности и в любом порядке: «лавка 738» должно находить
+ * запись «Яндекс Лавка» на 738 ₽, хотя такой строки целиком нигде нет.
+ */
+export function matches(query, ...parts) {
+  const words = String(query || '').toLowerCase().split(/\s+/).filter(Boolean);
+  if (!words.length) return true;
+  const hay = parts.filter((x) => x != null).join(' ').toLowerCase();
+  return words.every((w) => hay.includes(w));
+}
+
 export function checkbox(label, checked, attrs = {}) {
   const box = h('input', { type: 'checkbox', checked: checked || false, ...attrs });
   return { node: h('label', { class: 'check' }, [box, h('span', { text: label })]), box };

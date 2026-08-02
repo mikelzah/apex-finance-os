@@ -43,6 +43,7 @@ const PERIODS = [
 let filter = 'all';
 let mode = 'list';
 let period = 'all';
+let query = '';
 
 /**
  * Кнопка «Добавить» отдана наружу: журнал живёт внутри портфеля, и его
@@ -74,7 +75,21 @@ export function body(ctx) {
   // Период отсекает и список, а не только сводку. Иначе выбор «Месяц» даёт
   // числа за месяц и записи за все годы под ними — два ответа на разные
   // вопросы на одном экране, и непонятно, какой из них про что.
-  const visible = filter === 'all' ? inPeriod : inPeriod.filter(match);
+  const byFilter = filter === 'all' ? inPeriod : inPeriod.filter(match);
+
+  // Поиск идёт по тому, что человек видит в строке: названию актива, цели,
+  // виду операции и сумме. Искать по внутренним полям бессмысленно — их
+  // никто не помнит, а по сумме ищут постоянно: «где та трата на 4 500».
+  const visible = query
+    ? byFilter.filter((op) => U.matches(
+        query,
+        op.type,
+        state.assets.find((a) => a.id === op.assetId)?.name,
+        state.goals.find((g) => g.id === op.goalId)?.name,
+        op.note,
+        String(Math.round(C.isPaperOp(op) ? C.paperAmount(op) : op.amount || 0)),
+      ))
+    : byFilter;
   const sum = (type) => inPeriod.filter((o) => o.type === type).reduce((s, o) => s + o.amount, 0);
   const payouts = inPeriod.filter((o) => C.isPayout(o)).reduce((s, o) => s + C.paperAmount(o), 0);
   const periodHint = { all: 'за всё время', year: 'за год', month: 'за месяц' }[period];
@@ -112,6 +127,10 @@ export function body(ctx) {
               }, [f.label]),
             ),
           ]),
+          U.search(query, (value) => { query = value; refresh(); }, {
+            key: 'journal-search',
+            placeholder: 'Актив, цель, сумма',
+          }),
           // Фильтр и вид — разные по смыслу органы управления. Двумя
           // одинаковыми рядами кнопок они читались бы как один список.
           h('div', { class: 'segmented', role: 'tablist' }, [
@@ -137,9 +156,11 @@ export function body(ctx) {
 
     visible.length || !all.length
       ? null
-      : U.card([U.emptyState(period === 'all'
-        ? 'По этому фильтру ничего нет.'
-        : `За этот период ничего нет — попробуйте «${PERIODS[0][1]}».`)]),
+      : U.card([U.emptyState(query
+        ? `По запросу «${query}» ничего не нашлось.`
+        : period === 'all'
+          ? 'По этому фильтру ничего нет.'
+          : `За этот период ничего нет — попробуйте «${PERIODS[0][1]}».`)]),
   ];
 }
 

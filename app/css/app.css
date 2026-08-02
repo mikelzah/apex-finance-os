@@ -897,6 +897,39 @@ h3 {
 
 .chips { display: flex; gap: var(--space-1); flex-wrap: wrap; }
 
+/* Поиск. Крестик лежит поверх поля, а не рядом: своя колонка ради него
+   отъедала бы ширину у самого поля на каждом экране, включая те, где
+   ничего не набрано. */
+.search { position: relative; margin: var(--space-3) 0; }
+
+.search-input {
+  padding-right: var(--space-8);
+  border-radius: var(--radius-full);
+  /* Свой крестик у type=search в WebKit не убрать иначе, а два подряд
+     выглядят поломкой. */
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.search-input::-webkit-search-cancel-button { display: none; }
+
+.search-clear {
+  position: absolute;
+  right: var(--space-2);
+  top: 50%;
+  transform: translateY(-50%);
+  appearance: none;
+  border: 0;
+  background: var(--sunken);
+  color: var(--ink-3);
+  width: 1.75rem;
+  height: 1.75rem;
+  border-radius: var(--radius-full);
+  font-family: inherit;
+  font-size: var(--text-sm);
+  cursor: pointer;
+}
+
 .chip {
   appearance: none;
   padding: var(--space-1) var(--space-3);
