@@ -71,6 +71,8 @@ export function render(ctx) {
       ]),
     ]),
 
+    outlookCard(state, today),
+
     // Когда доходов в выписке нет, вердикта нет тоже: приложение об этом
     // уже сказало под словом «Свободно», и повторять это блоком на четыре
     // строки при каждом заходе значит выпрашивать выписку, а не считать.
@@ -262,6 +264,44 @@ function bar(row, total, all, refresh) {
       h('span', { class: 'cat-op-name', text: r.description || '—' }),
       h('span', { class: 'cat-op-sum', text: F.moneyExact(r.amount) }),
     ])),
+  ]);
+}
+
+/**
+ * Хватит ли до конца месяца.
+ *
+ * Вопрос ближайших двух недель, и он не совпадает с остальным экраном:
+ * подушка и норма сбережений говорят о годах. Человек, у которого «в среднем»
+ * всё хорошо, вполне может не дожить до зарплаты — и узнать об этом лучше
+ * заранее, а не двадцать восьмого числа.
+ */
+function outlookCard(state, today) {
+  const out = C.monthOutlook(state.spending, state.assets, state.operations, today);
+  if (!out || !out.daysLeft) return null;
+
+  const short = out.left < 0;
+  return U.card([
+    U.sectionTitle('До конца месяца'),
+    U.stat(short ? 'Не хватит' : 'Останется', F.money(Math.abs(out.left)), {
+      big: true,
+      class: short ? 'is-bad' : out.level === 'warn' ? 'is-warn' : '',
+      hint: `${F.days(out.daysLeft)} по ${F.money(out.pace)} в день`,
+    }),
+    U.row('Сейчас доступно', F.money(out.liquid), { sub: 'мгновенные деньги' }),
+    U.row('Уйдёт по нынешнему темпу', F.money(out.expectedSpend), {
+      sub: `${F.days(out.daysLeft)} × ${F.money(out.pace)}`,
+    }),
+    // Приход показываем поимённо. «Ожидается 90 000» без источника — это
+    // обещание, в которое остаётся только верить; со строкой «Зарплата,
+    // 10 августа» человек сам решит, сбудется оно или нет.
+    ...out.income.map((r) => U.row(`Ждём: ${r.name}`, F.money(r.amount), {
+      sub: `${F.dateShort(r.nextDate)} · по прошлым месяцам`,
+    })),
+    out.level === 'ok' ? null : U.callout(short
+      ? 'При нынешнем темпе денег до конца месяца не хватит. Это не приговор — '
+        + 'но лучше знать сейчас, а не двадцать восьмого числа.'
+      : 'Останется меньше недели трат. Запас на неожиданное — сломанный телефон, '
+        + 'лекарства — в этот месяц тонкий.', short ? 'warn' : 'info'),
   ]);
 }
 

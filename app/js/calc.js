@@ -1424,12 +1424,12 @@ const SPREAD = 0.2;
  * категориях и по категориям не собираются. Двух платежей достаточно —
  * ждать третьего значит молчать два месяца о том, что уже видно.
  */
-export function recurring(spending = [], day, months = RECURRING_MONTHS) {
+export function recurring(spending = [], day, months = RECURRING_MONTHS, kind = SPEND_OUT) {
   const from = spendFrom(day, months);
   const groups = new Map();
 
   for (const row of spending) {
-    if (row.kind !== SPEND_OUT) continue;
+    if (row.kind !== kind) continue;
     if (!D.isValid(row.date) || row.date < from || row.date > day) continue;
     const key = S.merchantKey(row.description);
     if (!key) continue;
@@ -1501,6 +1501,73 @@ function pickRegular(rows) {
 /** Сколько всего уходит в месяц на то, что списывается само. */
 export function recurringTotal(list = []) {
   return round2(list.reduce((s, r) => s + r.amount, 0));
+}
+
+// --------------------------------------------------------------------------
+// Что будет к концу месяца
+// --------------------------------------------------------------------------
+
+/** По скольким последним дням меряется темп трат. */
+export const PACE_DAYS = 30;
+
+// Меньше десяти записей за месяц — это не темп, а обрывки. Считать по ним
+// «уйдёт ещё столько-то» значит выдать случайное число за прогноз.
+const PACE_MIN_ROWS = 10;
+
+/** Сколько уходит в день по последним тридцати дням. */
+export function dailyPace(spending = [], day) {
+  const from = D.addDays(day, -PACE_DAYS);
+  const rows = spending.filter((r) => r.kind === SPEND_OUT && D.isValid(r.date)
+    && D.diffDays(r.date, from) > 0 && D.diffDays(day, r.date) >= 0);
+  if (rows.length < PACE_MIN_ROWS) return null;
+  return rows.reduce((s, r) => s + (r.amount || 0), 0) / PACE_DAYS;
+}
+
+/** Последний день месяца, к которому относится дата. */
+export function monthEnd(day) {
+  const { y, m } = D.parts(day);
+  return D.iso(y, m, D.lastDayOfMonth(y, m));
+}
+
+/**
+ * Хватит ли денег до конца месяца.
+ *
+ * Вопрос тактический и отдельный от всего остального экрана: подушка и норма
+ * сбережений говорят о годах, а этот — о ближайших двух неделях. Человек,
+ * у которого всё хорошо «в среднем», вполне может не дожить до зарплаты.
+ *
+ * Ожидаемый приход считается только по тем поступлениям, которые уже
+ * повторялись: зарплата видна в выписке дважды и потому предсказуема.
+ * Разовый перевод от родителей — нет, и обещать его нельзя.
+ */
+export function monthOutlook(spending = [], assets = [], operations = [], day) {
+  const pace = dailyPace(spending, day);
+  if (pace == null) return null;
+
+  const end = monthEnd(day);
+  const daysLeft = D.diffDays(end, day);
+  const { liquid } = netWorth(assets, operations);
+
+  const income = recurring(spending, day, RECURRING_MONTHS, SPEND_IN)
+    .filter((r) => D.diffDays(r.nextDate, day) > 0 && D.diffDays(end, r.nextDate) >= 0);
+  const expectedIncome = round2(income.reduce((s, r) => s + r.amount, 0));
+  const expectedSpend = round2(pace * daysLeft);
+  const left = round2(liquid + expectedIncome - expectedSpend);
+
+  return {
+    daysLeft,
+    end,
+    pace: round2(pace),
+    liquid: round2(liquid),
+    income,
+    expectedIncome,
+    expectedSpend,
+    left,
+    // Неделя жизни — это порог, за которым любая мелочь становится проблемой:
+    // сломался телефон, понадобились лекарства. Точного числа тут нет, но
+    // «меньше недели трат в запасе» ощутимо честнее, чем «мало» без меры.
+    level: left < 0 ? 'bad' : left < pace * 7 ? 'warn' : 'ok',
+  };
 }
 
 /** Взносы в капитал за тот же период — без внутренних переводов. */

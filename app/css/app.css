@@ -509,6 +509,8 @@ h3 {
 .stat-hint { font-size: var(--text-xs); color: var(--ink-4); margin-top: var(--space-1); }
 .stat.is-bad .stat-value { color: var(--critical-ink); }
 .stat.is-good .stat-value { color: var(--good-ink); }
+/* Не «плохо», а «в обрез»: денег хватит, но запаса почти нет. */
+.stat.is-warn .stat-value { color: var(--warn-ink); }
 
 .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-4) var(--space-3); }
 .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--space-3); }
