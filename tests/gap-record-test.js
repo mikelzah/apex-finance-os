@@ -41,17 +41,28 @@ const URL = 'http://127.0.0.1:8899/app/index.html';
   await p.waitForTimeout(900);
 
   const opsCount = () => p.evaluate(async () => (await import('./js/store.js')).getState().operations.length);
+
+  // Сигналы переехали с главной под колокольчик: каждый из них занимал
+  // на экране свой блок, и в обычный день главная разъезжалась втрое.
+  // Проверяется то же самое — что расхождение видно и что рядом с ним
+  // есть кнопка на ту же сумму, — только шторку надо открыть.
+  const openBell = async () => {
+    if (await p.locator('.sheet').count()) return;
+    await p.locator('.bell').click();
+    await p.waitForTimeout(500);
+  };
   const gapSignal = () => p.evaluate(() =>
-    [...document.querySelectorAll('.signal')].find((n) => /расхождение/.test(n.textContent)) ? true : false);
+    [...document.querySelectorAll('.notice')].find((n) => /расхождение/.test(n.textContent)) ? true : false);
 
   console.log('\n1. Кнопка есть и подписана суммой');
+  await openBell();
   const signalText = await p.evaluate(() => {
-    const n = [...document.querySelectorAll('.signal')].find((x) => /расхождение/.test(x.textContent));
-    return n ? n.querySelector('.signal-note').textContent.trim() : null;
+    const n = [...document.querySelectorAll('.notice')].find((x) => /расхождение/.test(x.textContent));
+    return n ? n.querySelector('.notice-body').textContent.trim() : null;
   });
   console.log(`     текст сигнала: «${signalText}»`);
   check('в сигнале и на кнопке одно и то же число', /\+3,96 ₽/.test(signalText || ''), signalText);
-  const btn = p.locator('.signal-actions .btn');
+  const btn = p.locator('.notice', { hasText: 'расхождение' }).locator('.btn-primary');
   check('кнопка на месте', (await btn.count()) === 1, String(await btn.count()));
   const label = await btn.first().textContent();
   console.log(`     подпись: «${label}»`);
@@ -115,8 +126,12 @@ const URL = 'http://127.0.0.1:8899/app/index.html';
   await setup(-500);
   await p.reload({ waitUntil: 'networkidle' });
   await p.waitForTimeout(900);
+  await openBell();
   check('сигнал есть', await gapSignal());
-  check('кнопки нет', (await p.locator('.signal-actions .btn').count()) === 0);
+  // Обратный случай — банк показывает меньше — кнопки не получает намеренно:
+  // причина там обычно другая, и записать расход на эту разницу значило бы
+  // стереть настоящие деньги. Остаются только «открыть» и «скрыть».
+  check('кнопки записи нет', (await p.locator('.notice', { hasText: 'расхождение' }).locator('.btn-primary').count()) === 0);
 
   await c.close();
   await b.close();

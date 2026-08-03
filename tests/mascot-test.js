@@ -86,8 +86,9 @@ const check = (label, got, want) => {
 
     await page.screenshot({ path: `${OUT}/${mode}-30-mascot.png`, clip: { x: 0, y: 0, width: 440, height: 420 } });
 
-    // Радость на взносе.
-    await page.click('.quick');
+    // Радость на взносе. Быстрый взнос стал круглой кнопкой в ряду действий:
+    // полоса во всю ширину означала «действие тут одно», а их четыре.
+    await page.click('.act-round.is-key');
     await page.waitForTimeout(220);
     check('подпрыгивает на взносе', await page.evaluate(
       () => document.querySelector('.mascot').classList.contains('is-happy')), true);

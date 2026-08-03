@@ -71,11 +71,21 @@ const URL = 'http://127.0.0.1:8899/app/index.html';
 
   console.log('\n3. Панель не двигается при прокрутке');
   const before = (await geom()).barBottom;
-  await p.evaluate(() => { document.getElementById('screen').scrollTop = 400; });
+  // Прокручиваем до упора, а не на выбранное число пикселей. Проверяется
+  // здесь то, что панель стоит на месте, а не сколько именно уехало
+  // содержимое, — и жёсткие 400 привязывали проверку к росту главного
+  // экрана. Стоило ему стать короче, как проверка падала, ничего
+  // при этом не найдя.
+  const want = await p.evaluate(() => {
+    const s = document.getElementById('screen');
+    const max = s.scrollHeight - s.clientHeight;
+    s.scrollTop = max;
+    return max;
+  });
   await p.waitForTimeout(300);
   g = await geom();
-  console.log(`     прокрутили на ${g.screenTop}, панель ${g.barTop}–${g.barBottom}`);
-  check('содержимое уехало', g.screenTop === 400, String(g.screenTop));
+  console.log(`     прокрутили на ${g.screenTop} из ${want}, панель ${g.barTop}–${g.barBottom}`);
+  check('содержимое уехало', want > 0 && g.screenTop === want, `${g.screenTop} из ${want}`);
   check('панель на месте', g.barBottom === before, `${g.barBottom} было ${before}`);
 
   console.log('\n4. Положение прокрутки живёт по правилам');
@@ -83,15 +93,39 @@ const URL = 'http://127.0.0.1:8899/app/index.html';
   await p.waitForTimeout(400);
   check('переход на другой экран — сверху', (await geom()).screenTop === 0, String((await geom()).screenTop));
 
-  console.log('\n5. Стекло: панель полупрозрачна и размывает');
-  const glass = await p.evaluate(() => {
-    const cs = getComputedStyle(document.querySelector('.tabbar'));
-    return { bg: cs.backgroundColor, blur: cs.backdropFilter || cs.webkitBackdropFilter, radius: cs.borderRadius };
+  // Панель перестала быть стеклом. Раньше здесь проверялось обратное:
+  // полупрозрачный фон, размытие и радиус капсулы. Размытие под движущимся
+  // содержимым держало композитор в работе всё время, пока приложение
+  // открыто, и стоило оно дороже всего остального вместе взятого.
+  console.log('\n5. Панель сплошная, без размытия, во всю ширину');
+  const bar = await p.evaluate(() => {
+    const el = document.querySelector('.tabbar');
+    const cs = getComputedStyle(el);
+    const r = el.getBoundingClientRect();
+    return {
+      bg: cs.backgroundColor,
+      blur: cs.backdropFilter || cs.webkitBackdropFilter || 'none',
+      radius: cs.borderRadius,
+      left: Math.round(r.left),
+      width: Math.round(r.width),
+      appWidth: Math.round(document.getElementById('app').getBoundingClientRect().width),
+      tabs: el.querySelectorAll('.tab').length,
+      fabs: el.querySelectorAll('.fab').length,
+    };
   });
-  console.log(`     фон ${glass.bg}, размытие ${glass.blur}, радиус ${glass.radius}`);
-  check('фон полупрозрачный', /rgba\(.*0\.\d+\)/.test(glass.bg), glass.bg);
-  check('размытие включено', /blur/.test(glass.blur || ''), glass.blur);
-  check('капсула, а не прямоугольник', parseFloat(glass.radius) > 90, glass.radius);
+  console.log(`     фон ${bar.bg}, размытие ${bar.blur}, радиус ${bar.radius}, ширина ${bar.width} при ${bar.appWidth}`);
+  console.log(`     вкладок ${bar.tabs}, кнопок записи ${bar.fabs}`);
+  check('фон непрозрачный', !/rgba\(.*0\.\d+\)/.test(bar.bg), bar.bg);
+  check('размытия нет', !/blur/.test(bar.blur), bar.blur);
+  check('прямоугольник, а не капсула', parseFloat(bar.radius) === 0, bar.radius);
+  check('во всю ширину экрана', bar.left === 0 && bar.width === bar.appWidth, `${bar.left}+${bar.width}`);
+  // Разделов пятеро: раздел на каждый разрез, без промежуточного уровня.
+  // Группа «Деньги» не убирала выбор, а переносила его на шаг вглубь.
+  // Кнопка записи из панели ушла вместе с четвёртой колонкой — при пяти
+  // разделах места под неё нет, и операция записывается круглым действием
+  // на главной.
+  check('разделов пятеро', bar.tabs === 5, String(bar.tabs));
+  check('кнопки записи в панели нет', bar.fabs === 0, String(bar.fabs));
 
   console.log('\n6. Содержимое проходит под панелью');
   const under = await p.evaluate(() => {

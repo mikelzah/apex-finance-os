@@ -27,38 +27,40 @@ const { h } = U;
 
 /**
  * Портфель и журнал — два взгляда на одни и те же деньги: чем владею
- * и как к этому пришёл. Раньше они стояли двумя вкладками, и переход
- * между ними шёл через низ экрана, хотя вопросы соседние: увидел долю
- * — захотел посмотреть, из каких сделок она сложилась.
+ * и как к этому пришёл.
+ *
+ * Переключаются они переключателем разрезов «Денег» — тем самым, что стоит
+ * первой строкой экрана. Своего переключателя здесь больше нет: два ряда
+ * переключателей подряд, в которых слово «Портфель» стоит дважды, читаются
+ * как поломка, а не как два уровня.
  */
 let mode = 'assets';
 
 export function render(ctx) {
   if (ctx.sub) return instrument(ctx);
 
+  // Строка над содержимым нужна только журналу — ради кнопки записи сделки.
   return [
-    h('div', { class: 'screen-head' }, [
-      h('div', { class: 'segmented', role: 'tablist' }, [
-        ['assets', 'Портфель'],
-        ['journal', 'Журнал'],
-      ].map(([value, label]) =>
-        h('button', {
-          class: `segment${mode === value ? ' is-on' : ''}`,
-          type: 'button',
-          role: 'tab',
-          'aria-selected': String(mode === value),
-          onclick: () => { mode = value; ctx.refresh(); },
-        }, [label]),
-      )),
-      mode === 'journal' ? journal.addButton(ctx) : null,
-    ]),
+    mode === 'journal'
+      ? h('div', { class: 'screen-head is-end' }, [journal.addButton(ctx)])
+      : null,
     ...(mode === 'journal' ? journal.body(ctx) : overview(ctx)),
   ];
 }
 
-/** Открывает журнал снаружи — с главной и по старому адресу. */
+/** Открывает журнал снаружи — с переключателя разрезов и по старому адресу. */
 export function showJournal() {
   mode = 'journal';
+}
+
+/** Возвращает к списку бумаг — с того же переключателя. */
+export function showAssets() {
+  mode = 'assets';
+}
+
+/** Какой из двух разрезов сейчас открыт. Нужен переключателю для подсветки. */
+export function shownMode() {
+  return mode;
 }
 
 /** Заголовок вложенной страницы — название бумаги. */
@@ -133,7 +135,9 @@ function overview(ctx) {
  * читает её как «сколько у меня в портфеле».
  */
 function total_(total, rate, assets, ctx, bench) {
-  return h('section', { class: 'hero' }, [
+  // В плитке, а не голым числом на поле: вокруг теперь сетка плиток,
+  // и одинокое число без коробки читается не «главным», а «забытым снаружи».
+  return U.card([
     h('p', { class: 'hero-label', text: 'Портфель' }),
     h('p', { class: 'hero-value', text: F.money(total) }),
     // Доходность годовых — единственное число, которым портфель сравним
@@ -149,7 +153,7 @@ function total_(total, rate, assets, ctx, bench) {
       // сказано, чего не хватает, и куда идти дозаполнять.
       : blockerLine(assets, ctx),
     rate == null ? null : benchLine(rate, bench),
-  ]);
+  ], { class: 'card-hero' });
 }
 
 /**
@@ -284,14 +288,12 @@ function holdings(ctx, total) {
           text: `${rate >= 0 ? '+' : ''}${F.percent(rate)}`,
         }),
       ])),
-      ...own.map((r) =>
-        U.row(r.asset.name, F.money(r.value), {
-          sub: holdingSub(r.asset, total, r.value, ops),
-          tag: r.asset.status === C.STATUS_ACTIVE ? null : r.asset.status.toLowerCase(),
-          tagClass: 'muted',
-          onClick: () => ctx.go(`portfolio/${r.asset.id}`),
-        }),
-      ),
+      // Доходность стоит и у класса, и у каждой бумаги. Это разные числа,
+      // и одно другое не заменяет: класс отвечает «как идёт эта часть
+      // портфеля», бумага — «что именно её тянет». Класс на плюс двенадцать
+      // может состоять из бумаги на плюс сорок и бумаги на минус двенадцать,
+      // и по одному общему числу этого не увидеть никогда.
+      ...own.map((r) => paperRow(r, ctx, total, ops)),
     ]));
   }
 
@@ -315,14 +317,83 @@ function actions(ctx, withTickers) {
   const { refresh } = ctx;
   const status = h('p', { class: 'quotes-status' });
 
-  return h('div', { class: 'act act-row' }, [
+  // Обновление котировок — служебное действие и потому обводкой, а не
+  // заливкой: две одинаково крупные кнопки в ряд читались как выбор
+  // из равного, хотя завести бумагу и подтянуть цены — вещи разного веса.
+  return h('div', { class: 'act' }, [
     U.button('Добавить бумагу', () => forms.assetSheet(null, {
       onDone: refresh,
       preset: { type: C.TYPE_INVESTMENT, liquidity: 'T+1', assetClass: 'Акции', lotSize: 1 },
     }), { kind: 'primary', class: 'btn-wide' }),
-    withTickers.length ? U.button('Обновить котировки', () => updateQuotes(ctx, withTickers, status), { class: 'btn-wide' }) : null,
+    withTickers.length ? U.button('Обновить котировки', () => updateQuotes(ctx, withTickers, status), { class: 'btn-wide btn-ghost' }) : null,
     withTickers.length ? status : null,
   ]);
+}
+
+/**
+ * Строка бумаги: значок, название, сколько и почём, стоимость и доходность.
+ *
+ * Значок ищется по тикеру среди файлов приложения: логотипов у Мосбиржи нет
+ * вовсе — в описании бумаги двадцать семь полей, ни одного графического, —
+ * а тянуть картинку со стороннего хоста значит сообщить этому хосту, чем
+ * человек владеет. Приложение обещает обратное.
+ *
+ * Файла нет — рисуется монограмма. Это не аварийный случай, а обычный:
+ * облигаций на бирже тысячи, и значка у них нет по существу.
+ */
+function paperRow(r, ctx, total, ops) {
+  const asset = r.asset;
+  const rate = C.returnOf([asset], ops, ctx.today);
+  const frozen = asset.status !== C.STATUS_ACTIVE;
+
+  return h('button', {
+    class: 'paper',
+    type: 'button',
+    onclick: () => ctx.go(`portfolio/${asset.id}`),
+  }, [
+    paperMark(asset),
+    h('span', { class: 'paper-text' }, [
+      h('span', { class: 'paper-name', text: asset.name }),
+      h('span', { class: 'paper-sub', text: holdingSub(asset, total, r.value, ops) || asset.type }),
+    ]),
+    h('span', { class: 'paper-value' }, [
+      h('span', { class: 'paper-sum', text: F.money(r.value) }),
+      rate == null
+        ? (frozen ? h('span', { class: 'paper-rate is-quiet', text: asset.status.toLowerCase() }) : null)
+        : h('span', {
+            class: `paper-rate ${rate >= 0 ? 'is-up' : 'is-down'}`,
+            text: `${rate >= 0 ? '+' : '−'}${F.percent(Math.abs(rate))}`,
+          }),
+    ]),
+    h('span', { class: 'paper-chevron', text: '›' }),
+  ]);
+}
+
+/** Значок бумаги: файл по тикеру или монограмма из первых букв. */
+function paperMark(asset) {
+  const ticker = String(asset.ticker || '').trim().toUpperCase();
+  if (ticker && /^[A-Z0-9]+$/.test(ticker)) {
+    const img = h('img', {
+      src: `./icons/tickers/${ticker}.svg`,
+      alt: '',
+      loading: 'lazy',
+    });
+    const box = h('span', { class: 'paper-logo' }, [img]);
+    // Файла может не быть — тогда чип превращается в монограмму прямо здесь,
+    // без списка «у кого значок есть»: список пришлось бы держать в двух
+    // местах сразу и однажды забыть про одно из них.
+    img.addEventListener('error', () => {
+      box.className = 'paper-mono';
+      box.textContent = monogram(asset.name, ticker);
+    });
+    return box;
+  }
+  return h('span', { class: 'paper-mono', text: monogram(asset.name, ticker) });
+}
+
+function monogram(name, ticker) {
+  if (ticker) return ticker.slice(0, 4);
+  return String(name || '?').trim().slice(0, 3).toUpperCase();
 }
 
 function holdingSub(asset, total, value, ops) {

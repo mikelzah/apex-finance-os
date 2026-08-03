@@ -41,7 +41,10 @@ const URL = 'http://127.0.0.1:8899/app/index.html';
   const pf = await p.evaluate(() => ({
     hero: document.querySelector('.hero-value').textContent.trim(),
     shares: [...document.querySelectorAll('.alloc-foot div')].map((x) => x.textContent.trim()).filter(Boolean),
-    subs: [...document.querySelectorAll('.row-label small')].map((x) => x.textContent.trim()),
+    // Бумаги в портфеле стали строками со значком и построчной доходностью:
+    // количество и цена переехали из .row-label small в .paper-sub.
+    // Проверяется то же — что при скрытых суммах количества остаются видны.
+    subs: [...document.querySelectorAll('.paper-sub')].map((x) => x.textContent.trim()),
   }));
   console.log(`     доли: ${pf.shares.slice(0, 2).join(' | ')}`);
   check('проценты остались видны', pf.shares.some((x) => /%/.test(x)), pf.shares.join(', '));
@@ -119,16 +122,22 @@ const URL = 'http://127.0.0.1:8899/app/index.html';
   });
   await p.goto(`${URL}#/dashboard`, { waitUntil: 'networkidle' });
   await p.waitForTimeout(900);
+  // Фраза Кубыша переехала с главной под колокольчик — вместе с сигналами
+  // и днём капитализации. Прежде каждое из этого занимало свой блок,
+  // и в обычный день главная разъезжалась втрое. Проверяется то же:
+  // что фраза есть, что она про двойную привязку и что ведёт туда,
+  // где это чинится.
+  await p.locator('.bell').click();
+  await p.waitForTimeout(600);
   const adv = await p.evaluate(() => {
-    const n = document.querySelector('.advice');
-    return n ? { text: n.querySelector('.advice-text').textContent.trim(), mascot: Boolean(n.querySelector('.mascot-body')) } : null;
+    const n = [...document.querySelectorAll('.notice')].find((x) => /Кубыш/.test(x.textContent));
+    return n ? { text: n.querySelector('.notice-body').textContent.trim() } : null;
   });
   console.log(`     ${adv?.text}`);
   check('фраза показана', Boolean(adv));
-  check('в ней зверёк', adv.mascot);
-  check('говорит про двойную привязку', /целям/.test(adv.text || ''), adv.text);
+  check('говорит про двойную привязку', /целям/.test(adv?.text || ''), adv?.text);
 
-  await p.locator('.advice').click();
+  await p.locator('.notice-acts .btn-primary').last().click();
   await p.waitForTimeout(700);
   const went = await p.evaluate(() => location.hash);
   console.log(`     ведёт на ${went}`);
@@ -147,7 +156,13 @@ const URL = 'http://127.0.0.1:8899/app/index.html';
   });
   await p.goto(`${URL}#/dashboard`, { waitUntil: 'networkidle' });
   await p.waitForTimeout(900);
-  const quiet = await p.evaluate(() => Boolean(document.querySelector('.advice')));
+  // Молчит — значит фразы от Кубыша под колокольчиком нет. Сам колокольчик
+  // может показывать другое: сигналы и день капитализации живут там же
+  // и к совету отношения не имеют.
+  await p.locator('.bell').click();
+  await p.waitForTimeout(600);
+  const quiet = await p.evaluate(() =>
+    [...document.querySelectorAll('.notice-title')].some((n) => n.textContent.trim() === 'Кубыш'));
   check('приложение молчит', !quiet);
 
   console.log(`\n  ошибок в консоли: ${errs.length}${errs.length ? ' — ' + errs.join(' | ') : ''}`);

@@ -7,6 +7,20 @@
 const { chromium } = require('playwright');
 const fs = require('fs');
 const { execSync } = require('child_process');
+
+/**
+ * Команда оболочки. Оболочка задаётся явно: без неё Node на Windows зовёт
+ * cmd.exe, а там нет ни ./scripts/build-pages.sh, ни rm -rf, ни >/dev/null,
+ * и проверка падала на сборке, ничего при этом не проверив.
+ */
+const sh = (cmd, cwd) => execSync(cmd, {
+  cwd,
+  shell: process.platform === 'win32' ? 'bash.exe' : '/bin/sh',
+});
+
+/** Путь через косые черты: обратные внутри команды bash съедаются
+ *  как экранирование, и «C:\app\…» превращается в «C:app…». */
+const posix = (v) => String(v).replace(/\\/g, '/');
 const path = require('path');
 const FIX = path.join(__dirname, 'fixtures');
 const ROOT = path.join(__dirname, '..');
@@ -14,8 +28,8 @@ const PAGES = path.join(__dirname, '.pages');
 const URL = 'http://127.0.0.1:8900/apex-finance-os/';
 
 const rebuild = () => {
-  execSync(`cd ${ROOT} && ./scripts/build-pages.sh >/dev/null 2>&1`);
-  execSync(`rm -rf ${PAGES}/apex-finance-os && cp -r ${ROOT}/deploy ${PAGES}/apex-finance-os`);
+  sh('./scripts/build-pages.sh >/dev/null 2>&1', ROOT);
+  sh(`rm -rf "${posix(PAGES)}/apex-finance-os" && cp -r deploy "${posix(PAGES)}/apex-finance-os"`, ROOT);
   return fs.readFileSync(`${PAGES}/apex-finance-os/js/build.js`, 'utf8').match(/BUILD = '([^']+)'/)[1];
 };
 

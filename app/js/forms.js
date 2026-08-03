@@ -51,7 +51,12 @@ function moneySheet(existing, options = {}) {
   U.sheet(isNew ? 'Новая операция' : 'Операция', (api) => {
     const date = U.input({ type: 'date', value: op.date });
     const type = U.select([C.OP_CONTRIBUTION, C.OP_INCOME, C.OP_EXPENSE], op.type);
-    const amount = U.numberInput(op.amount, { 'data-autofocus': isNew ? 'yes' : 'no' });
+    // Сумма набирается крупно: её вводят, глядя на клавиатуру, а не на экран,
+    // и проверяют одним взглядом, не вчитываясь.
+    const amount = U.numberInput(op.amount, {
+      class: 'control control-big',
+      'data-autofocus': isNew ? 'yes' : 'no',
+    });
     // Бумаг в списке нет: движение денег их стоимость не меняет — она
     // считается как количество × цена. Записанный на бумагу взнос ровно так
     // и пропадал. Уже записанную такую операцию из списка не выбрасываем,
@@ -103,9 +108,9 @@ function moneySheet(existing, options = {}) {
 
     return [
       U.field('Сумма, ₽', amount),
-      U.field('Тип', type, 'Взнос — то, что отложили сами. Доход — то, что начислил банк. В дисциплину идут только взносы.'),
+      U.field('Тип', type),
       U.field('Дата', date),
-      U.field('Актив', asset, 'Куда легли деньги. Остаток актива пересчитается сам.'),
+      U.field('Актив', asset),
       U.field('Цель', goal),
       U.field('Комментарий', comment),
       !isNew && op.source === C.SOURCE_COMPUTED
@@ -557,7 +562,7 @@ export function assetSheet(existing, options = {}) {
       U.field('Тип', type),
       U.field('Статус', status),
       U.field('Ликвидность', liquidity, 'Мгновенная — попадает в «Доступно сегодня».'),
-      U.field('Класс в портфеле', assetClass, 'Определяет, в какую долю попадёт актив. Пусто — в расчёт долей не входит.'),
+      U.field('Класс в портфеле', assetClass),
 
       // Раскрыта та половина полей, которая относится к этому активу:
       // у вклада нет режима торгов, у акции — дня капитализации. У новой

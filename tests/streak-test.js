@@ -69,7 +69,17 @@ const URL = 'http://127.0.0.1:8899/app/index.html';
     await store.mutate((d) => {
       d.assets = [{ id: 'a', name: 'Счёт', type: 'Деньги', status: 'Активен', liquidity: 'Мгновенная',
         assetClass: 'Вклады', opening: 1000, goalIds: [], lotSize: 1 }];
-      const D = { dates: ['2026-07-29', '2026-07-30', '2026-07-31', '2026-08-01'] };
+      // Даты считаются от сегодняшнего дня, а не записаны числами.
+      // Серия — это «сколько дней подряд до сегодня», и прибитые гвоздями
+      // числа перестают быть серией на следующий же день после того,
+      // как их написали: проверка начинает падать сама собой, ничего
+      // при этом не найдя.
+      const iso = (back) => {
+        const t = new Date();
+        t.setDate(t.getDate() - back);
+        return t.toISOString().slice(0, 10);
+      };
+      const D = { dates: [iso(3), iso(2), iso(1), iso(0)] };
       D.dates.forEach((date, i) => d.operations.push({
         id: `o${i}`, date, type: 'Взнос', amount: 500, assetId: 'a', goalId: null,
         source: 'Вручную', comment: null,
@@ -80,7 +90,15 @@ const URL = 'http://127.0.0.1:8899/app/index.html';
   // иначе экран остаётся таким, каким был до записи операций.
   await p.reload({ waitUntil: 'networkidle' });
   await p.waitForTimeout(900);
-  const shown = await p.evaluate(() => document.querySelector('.ritual-streak')?.textContent);
+  // Дисциплина переехала из отдельной карточки с календарём в третью
+  // колонку нижней плитки: календарь на тридцать клеток занимал строку
+  // сетки целиком, а отвечает он на тот же вопрос, что и два числа рядом.
+  // Сам календарь остался на экране трат, где под него есть ширина.
+  const shown = await p.evaluate(() => {
+    const trio = [...document.querySelectorAll('.trio-cell')]
+      .find((c) => c.textContent.includes('Дисциплина'));
+    return trio?.querySelector('.trio-hint')?.textContent;
+  });
   console.log(`     на экране: «${shown}»`);
   check('на главной четыре дня подряд', /^4 дня подряд/.test(shown || ''), String(shown));
 

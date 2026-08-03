@@ -94,6 +94,29 @@ function hasKopecks(x) {
   return Math.abs(x - Math.round(x)) > 0.005;
 }
 
+/**
+ * Сумма в разрядах: «1,92 млн ₽», «75,6 тыс ₽».
+ *
+ * Для мест, где ширины нет, — плитка в половину экрана, подпись под кольцом.
+ * Там «1 920 000 ₽ из 3 000 000 ₽» либо переносится на третью строку, либо
+ * обрезается многоточием, и обе беды хуже потерянной точности.
+ *
+ * Точность здесь и не нужна: рядом с целью читают порядок, а не рубли.
+ * Везде, где сумму сверяют с банком, остаётся moneyExact.
+ *
+ * Порог сокращения — десять тысяч. Ниже него «9,4 тыс» и «9 412 ₽» одной
+ * длины, и сокращать нечего; выше — разница уже в полтора раза.
+ */
+export function moneyShort(x) {
+  if (x == null || Number.isNaN(x)) return '—';
+  if (hidden()) return MASK;
+  const abs = Math.abs(x);
+  if (abs >= 1e9) return `${num(x / 1e9, 2)} млрд ₽`;
+  if (abs >= 1e6) return `${num(x / 1e6, 2)} млн ₽`;
+  if (abs >= 1e4) return `${num(x / 1e3, 0)} тыс ₽`;
+  return money(x);
+}
+
 export function num(x, digits = 2) {
   if (x == null || Number.isNaN(x)) return '—';
   return new Intl.NumberFormat('ru-RU', { maximumFractionDigits: digits }).format(x);

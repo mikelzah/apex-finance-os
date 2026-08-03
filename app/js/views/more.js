@@ -71,11 +71,23 @@ function hub(ctx) {
     ? D.diffDays(today, state.meta.lastBackupAt.slice(0, 10))
     : null;
 
+  // Две группы под подписями вместо двух безымянных карточек подряд. Раньше
+  // они отличались только тем, что между ними был промежуток, и понять,
+  // почему «Ключевая ставка» выше этой границы, а «Категории» ниже, было
+  // неоткуда.
+  const late = backupAge == null || backupAge > (state.settings.backupReminderDays || 14);
+
   return [
+    // Настройки приложения стоят первыми и прямо здесь, без вложенного
+    // экрана. Прежде внутри этого списка была строка «Настройки», ведущая
+    // ещё глубже, — после того как раздел сам стал называться «Настройки»,
+    // это превратилось в путь «Настройки → Настройки», то есть в тупик.
+    h('p', { class: 'caption', text: 'Приложение' }),
+    U.card(appRows(ctx)),
+
+    h('p', { class: 'caption', text: 'Данные' }),
     U.card([
       U.row('Активы', String(state.assets.length), { sub: F.money(worth.total), onClick: () => ctx.go('more/assets') }),
-      U.row('Налог на проценты', F.money(t.received), { sub: `лимит ${F.money(t.limit)}`, onClick: () => ctx.go('more/tax') }),
-      U.row('История капитала', `${state.netWorth.length}`, { sub: 'снимков по дням', onClick: () => ctx.go('more/history') }),
       (() => {
         const found = C.dataHealth(state, today);
         const errors = found.filter((x) => x.level === 'error').length;
@@ -86,26 +98,43 @@ function hub(ctx) {
           tagClass: 'sell',
         });
       })(),
-      U.row('Ключевая ставка ЦБ', state.keyRate.length ? F.percent(C.rateOn(state.keyRate, today)) : '—', {
-        sub: 'от неё считается налоговый лимит',
-        onClick: () => ctx.go('more/keyrate'),
-      }),
-    ]),
-    U.card([
       U.row('Категории трат', String(
         S.categoriesOf(state.settings, 'spend').length + S.categoriesOf(state.settings, 'income').length,
       ), {
         sub: 'свой список для разбора трат',
         onClick: () => ctx.go('more/categories'),
       }),
-      U.row('Настройки', '', { onClick: () => ctx.go('more/settings') }),
-      U.row('Резервная копия', backupAge == null ? 'ни разу' : `${F.days(backupAge)} назад`, {
-        sub: 'данные живут только в этом телефоне',
-        onClick: () => ctx.go('more/backup'),
-        tag: backupAge == null || backupAge > (state.settings.backupReminderDays || 14) ? 'пора' : null,
-        tagClass: 'sell',
+      U.row('История капитала', `${state.netWorth.length}`, { sub: 'снимков по дням', onClick: () => ctx.go('more/history') }),
+      U.row('Налог на проценты', F.money(t.received), { sub: `лимит ${F.money(t.limit)}`, onClick: () => ctx.go('more/tax') }),
+      U.row('Ключевая ставка ЦБ', state.keyRate.length ? F.percent(C.rateOn(state.keyRate, today)) : '—', {
+        sub: 'от неё считается налоговый лимит',
+        onClick: () => ctx.go('more/keyrate'),
       }),
     ]),
+
+    // Копия — отдельным блоком, а не строкой в общем списке: данные живут
+    // только в этом телефоне, и это единственное место, откуда их можно
+    // достать. Строкой среди шести других она читается рядовым пунктом.
+    h('p', { class: 'caption', text: 'Резервная копия' }),
+    U.card([
+      h('div', { class: 'backup-head' }, [
+        h('div', {}, [
+          h('p', { class: 'backup-when', text: backupAge == null ? 'ни разу' : `${F.days(backupAge)} назад` }),
+          h('p', {
+            class: 'backup-sub',
+            text: state.settings.backupReminderDays
+              ? `напоминать раз в ${F.days(state.settings.backupReminderDays)}`
+              : 'напоминание выключено',
+          }),
+        ]),
+        late ? h('span', { class: 'tag tag-sell', text: 'пора' }) : null,
+      ]),
+      U.button('Выгрузить копию', () => ctx.go('more/backup'), { kind: 'primary', class: 'btn-wide' }),
+      U.callout('Данные живут только в этом телефоне: сервера у приложения нет. Копия — единственный способ перенести их или вернуть после сброса.', 'info'),
+    ]),
+
+    h('p', { class: 'caption', text: 'О приложении' }),
+    version(),
     h('p', { class: 'version', text: `${mascot.NAME} · локальная версия` }),
   ];
 }
@@ -571,42 +600,62 @@ function settings(ctx) {
 
   const asset = state.assets.find((a) => a.id === s.quickAssetId);
 
+  return [U.card(appRows(ctx, { themeSheet, quick, reminder })), version()];
+}
+
+/**
+ * Строки настроек приложения.
+ *
+ * Живут отдельной функцией, потому что показываются в двух местах: прямо
+ * в разделе и на прежнем адресе more/settings, который разослан в ярлыках.
+ * Собирать их дважды значило бы однажды поправить одно и забыть другое.
+ *
+ * Переключатели отличаются от строк со значением не украшением, а обещанием:
+ * строка со значением ведёт дальше, переключатель меняется на месте.
+ */
+function appRows(ctx, sheets) {
+  const { state, refresh } = ctx;
+  const s = state.settings;
+  const asset = state.assets.find((a) => a.id === s.quickAssetId);
+
+  // Когда строки собираются для самого раздела, шторок ещё нет: их создаёт
+  // settings(). Тогда строка просто ведёт на прежний экран, где они есть.
+  const open = (name) => (sheets ? sheets[name] : () => ctx.go('more/settings'));
+
   return [
-    U.card([
-      U.row('Тема', theme.label(), {
-        sub: theme.preference() === 'system' ? `сейчас ${theme.label(theme.resolved()).toLowerCase()}` : null,
-        onClick: themeSheet,
-      }),
-      U.row('Быстрый взнос', s.quickAmount ? F.money(s.quickAmount) : 'выключен', {
-        sub: asset ? asset.name : 'актив не выбран',
-        onClick: quick,
-      }),
-      U.row('Напоминание о копии', s.backupReminderDays ? `раз в ${F.days(s.backupReminderDays)}` : 'выключено', {
-        onClick: reminder,
-      }),
-      lock.supported()
-        ? U.row('Вход по Face ID', lock.enabled() ? 'включён' : 'выключен', {
-            sub: lock.enabled() ? 'спрашивается при запуске' : 'закрывает приложение от чужих рук',
-            onClick: () => toggleLock(refresh),
-          })
-        : null,
-      U.row('Скрывать суммы', F.hidden() ? 'скрыты' : 'видны', {
-        sub: 'вместо рублей — точки. Проценты и количества остаются',
-        onClick: () => {
-          F.setHidden(!F.hidden());
-          U.tap();
-          refresh();
-        },
-      }),
-      U.row(`${mascot.NAME} на острове`, mascot.enabled() ? 'висит' : 'выключен', {
-        sub: 'висит на Dynamic Island и радуется взносам',
-        onClick: () => {
-          mascot.setEnabled(!mascot.enabled());
-          refresh();
-        },
-      }),
-    ]),
-    version(),
+    U.row('Тема', theme.label(), {
+      sub: theme.preference() === 'system' ? `сейчас ${theme.label(theme.resolved()).toLowerCase()}` : null,
+      onClick: open('themeSheet'),
+    }),
+    U.row('Быстрый взнос', s.quickAmount ? F.money(s.quickAmount) : 'выключен', {
+      sub: asset ? asset.name : 'актив не выбран',
+      onClick: open('quick'),
+    }),
+    U.row('Напоминание о копии', s.backupReminderDays ? `раз в ${F.days(s.backupReminderDays)}` : 'выключено', {
+      onClick: open('reminder'),
+    }),
+    U.switchRow('Скрывать суммы', F.hidden(), {
+      sub: 'вместо рублей — точки. Проценты и количества остаются',
+      onChange: () => {
+        F.setHidden(!F.hidden());
+        U.tap();
+        refresh();
+      },
+    }),
+    lock.supported()
+      ? U.switchRow('Вход по Face ID', lock.enabled(), {
+          sub: lock.enabled() ? 'спрашивается при запуске' : 'закрывает приложение от чужих рук',
+          onChange: () => toggleLock(refresh),
+        })
+      : null,
+    U.switchRow(`${mascot.NAME} на острове`, mascot.enabled(), {
+      sub: 'висит на Dynamic Island и радуется взносам',
+      onChange: () => {
+        mascot.setEnabled(!mascot.enabled());
+        U.tap();
+        refresh();
+      },
+    }),
   ];
 }
 

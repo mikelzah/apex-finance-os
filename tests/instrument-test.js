@@ -51,18 +51,22 @@ const URL = 'http://127.0.0.1:8899/app/index.html';
     JSON.stringify(groups));
 
   console.log('\n2а. Действия не налезают друг на друга');
+  // Кнопки встали в столбец, а не в строку: обновление котировок — действие
+  // служебное, и рядом с «Добавить бумагу» равным по весу оно читалось
+  // как выбор из равного. Исходная жалоба — «кнопки налезают» — проверяется
+  // ровно так же: ни один пиксель одной не попадает в прямоугольник другой.
   const acts = await p.evaluate(() => {
-    const row = document.querySelector('.act-row');
+    const row = document.querySelector('.act');
     if (!row) return null;
     const btns = [...row.querySelectorAll('.btn')].map((b) => {
       const r = b.getBoundingClientRect();
       return { text: b.textContent.trim(), x: Math.round(r.left), r: Math.round(r.right), y: Math.round(r.top), b: Math.round(r.bottom) };
     });
-    return { btns, gap: btns.length === 2 ? Math.round(btns[1].x - btns[0].r) : null };
+    return { btns, gap: btns.length === 2 ? Math.round(btns[1].y - btns[0].b) : null };
   });
   console.log(`     ${acts.btns.map((x) => `«${x.text}» ${x.x}–${x.r} / ${x.y}–${x.b}`).join('  ')}`);
   check('оба действия на месте', acts.btns.length === 2, acts.btns.map((x) => x.text).join(', '));
-  check('стоят в одну строку', acts.btns[0].y === acts.btns[1].y, `${acts.btns[0].y} vs ${acts.btns[1].y}`);
+  check('стоят в столбец', acts.btns[0].x === acts.btns[1].x, `${acts.btns[0].x} vs ${acts.btns[1].x}`);
   check('не пересекаются, между ними просвет', acts.gap > 0, `${acts.gap} px`);
   // Прямая проверка исходной жалобы: ни один пиксель одной кнопки не попадает
   // в прямоугольник другой.
@@ -71,7 +75,7 @@ const URL = 'http://127.0.0.1:8899/app/index.html';
   check('площадь наложения нулевая', overlap === 0, `${overlap} px²`);
 
   console.log('\n3. Бумага открывается своей страницей');
-  const firstRow = p.locator('.card:has(.section-sum) .row').first();
+  const firstRow = p.locator('.card:has(.section-sum) .paper').first();
   const name = (await firstRow.textContent()).trim();
   await firstRow.click();
   await p.waitForTimeout(700);

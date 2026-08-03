@@ -5,7 +5,7 @@
 <!-- viewport-fit=cover отдаёт нам область под Dynamic Island и домашним
      индикатором, а safe-area-inset-* в CSS возвращает отступы обратно. -->
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
-<meta name="theme-color" content="#080a0e">
+<meta name="theme-color" content="#08090b">
 <meta name="description" content="Система управления капиталом. Данные хранятся только в этом устройстве.">
 
 <title>Кубыш</title>
@@ -24,7 +24,7 @@
       : (window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark');
     document.documentElement.dataset.theme = theme;
     document.querySelector('meta[name="theme-color"]')
-      .setAttribute('content', theme === 'light' ? '#f4f8fb' : '#080a0e');
+      .setAttribute('content', theme === 'light' ? '#eceef1' : '#08090b');
   })();
 </script>
 

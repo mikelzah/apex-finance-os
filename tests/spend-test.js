@@ -177,7 +177,10 @@ const SBER = [
   await p.locator('.btn:has-text("Показать все траты")').click();
   await p.waitForTimeout(400);
   const screen = await p.evaluate(() => ({
-    title: document.querySelector('.screen-head h2')?.textContent || '',
+    // Траты стали своим разделом в панели, а не разрезом «Денег»:
+    // переключателя над ними больше нет, и называет экран подсвеченная
+    // вкладка внизу.
+    title: document.querySelector('.tabbar .tab.is-on .tab-label')?.textContent || '',
     stats: [...document.querySelectorAll('.stat')].map((s) => s.textContent.trim()).slice(0, 3),
     cats: [...document.querySelectorAll('.cat-name')].map((s) => s.textContent),
     callout: document.querySelector('.callout')?.textContent || '',
@@ -185,24 +188,36 @@ const SBER = [
   }));
   console.log(`     ${screen.title} · ${screen.stats.join(' | ')}`);
   console.log(`     категории: ${screen.cats.join(', ')}`);
-  check('заголовок раздела', screen.title === 'Траты и жизнь', screen.title);
+  check('раздел назван переключателем', screen.title === 'Траты', screen.title);
   check('категории показаны полосами', screen.cats.length >= 3, screen.cats.join(','));
   check('вердикт на экране', screen.callout.length > 40, screen.callout.slice(0, 50));
   // Таблицы больше нет: четыре колонки не влезали в ширину телефона,
   // и за край уезжала сумма. Теперь список в две строчки.
   check('записи списком', screen.rows >= 4, String(screen.rows));
 
-  console.log('\n8. Карточка на главной');
+  console.log('\n8. Цена жизни на главной');
+  // Прежде это была одна карточка «Жизнь и накопления» с четырьмя числами
+  // внутри. Она разошлась на две плитки: подушка получила свою — это ответ
+  // на «сколько я протяну», и он стоит рядом с целями, — а прожито
+  // и отложено встали в ряд с дисциплиной. Проверяется то же самое:
+  // что оба числа доехали до главного экрана и посчитаны по выписке.
   await p.goto(`${URL}#/dashboard`, { waitUntil: 'networkidle' });
   await p.waitForTimeout(800);
   const home = await p.evaluate(() => {
-    const cards = [...document.querySelectorAll('.card')];
-    const card = cards.find((c) => c.textContent.includes('Жизнь и накопления'));
-    return card ? card.textContent.replace(/\s+/g, ' ').slice(0, 160) : null;
+    const text = (sel) => [...document.querySelectorAll(sel)]
+      .map((n) => n.textContent.replace(/\s+/g, ' ').trim());
+    const tiles = [...document.querySelectorAll('.card')]
+      .map((c) => c.textContent.replace(/\s+/g, ' ').trim());
+    return {
+      cushion: tiles.find((t) => t.startsWith('Подушка')) || null,
+      trio: text('.trio')[0] || null,
+    };
   });
-  console.log(`     ${home}`);
-  check('карточка равновесия есть', Boolean(home), String(home));
-  check('в ней подушка', /Подушка/.test(home || ''), String(home));
+  console.log(`     подушка: ${home.cushion}`);
+  console.log(`     тройка:  ${home.trio}`);
+  check('подушка на главной', Boolean(home.cushion) && /мес\./.test(home.cushion), String(home.cushion));
+  check('прожито и отложено на главной',
+    /Прожито/.test(home.trio || '') && /Отложено/.test(home.trio || ''), String(home.trio));
 
   console.log(`\n  ошибок в консоли: ${errs.length}${errs.length ? ' — ' + errs.join(' | ') : ''}`);
   if (errs.length) bad += 1;

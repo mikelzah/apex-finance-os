@@ -64,7 +64,11 @@ export function stat(label, value, options = {}) {
 }
 
 export function row(label, value, options = {}) {
-  return h('div', { class: `row ${options.class || ''}`.trim(), onclick: options.onClick }, [
+  // Нажимаемость помечается классом, а не выводится из наличия обработчика:
+  // обработчик вешается через addEventListener, и в разметке от него
+  // не остаётся следа, по которому CSS мог бы отличить одно от другого.
+  const clickable = options.onClick ? 'is-clickable' : '';
+  return h('div', { class: `row ${clickable} ${options.class || ''}`.trim(), onclick: options.onClick }, [
     h('div', { class: 'row-label' }, [
       h('span', { text: label }),
       options.sub ? h('small', { text: options.sub }) : null,
@@ -74,6 +78,32 @@ export function row(label, value, options = {}) {
       options.tag ? h('span', { class: `tag tag-${options.tagClass || 'muted'}`, text: options.tag }) : null,
     ]),
     options.onClick ? h('span', { class: 'row-chevron', text: '›' }) : null,
+  ]);
+}
+
+/**
+ * Строка с переключателем.
+ *
+ * Отличается от обычной строки не украшением, а обещанием: строка со
+ * значением и шевроном ведёт дальше, строка с переключателем меняется
+ * на месте. По виду должно быть понятно, что произойдёт, до нажатия,
+ * а не после.
+ */
+export function switchRow(label, on, options = {}) {
+  const knob = h('i', {});
+  const sw = h('span', { class: `switch ${on ? 'is-on' : ''}`.trim() }, [knob]);
+  return h('button', {
+    class: 'row row-switch',
+    type: 'button',
+    role: 'switch',
+    'aria-checked': String(Boolean(on)),
+    onclick: options.onChange,
+  }, [
+    h('div', { class: 'row-label' }, [
+      h('span', { text: label }),
+      options.sub ? h('small', { text: options.sub }) : null,
+    ]),
+    sw,
   ]);
 }
 

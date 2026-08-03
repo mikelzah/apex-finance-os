@@ -20,18 +20,49 @@ import * as intro from './views/intro.js';
 
 const { h } = U;
 
+/**
+ * Разделов пятеро: раздел на каждый разрез, без промежуточного уровня.
+ *
+ * Некоторое время их было трое — «Сегодня», «Деньги», «Ещё», — а цели,
+ * портфель и траты лежали разрезами внутри «Денег». Довод был такой: раздел,
+ * который отличается от соседа разрезом, а не темой, выбирают наугад.
+ *
+ * Довод не подтвердился на деле. Группа «Деньги» не убрала выбор, а перенесла
+ * его на шаг вглубь: чтобы попасть в траты, надо было сперва догадаться,
+ * что они внутри денег, а потом ещё найти нужный разрез в ряду из четырёх.
+ * Пять подписанных разделов называют себя сами и стоят один переход,
+ * а не два.
+ *
+ * Кнопка записи из панели убрана вместе с четвёртой колонкой: при пяти
+ * разделах места под неё нет. Записать операцию можно круглым действием
+ * на главной. Плата за это честная и её стоит знать: из портфеля или трат
+ * до записи теперь два касания вместо одного.
+ */
 const TABS = [
   { id: 'dashboard', label: 'Главная', icon: 'home' },
   { id: 'goals', label: 'Цели', icon: 'target' },
   { id: 'portfolio', label: 'Портфель', icon: 'bars' },
-  // Журнал переехал внутрь портфеля — это два взгляда на одни деньги.
-  // Освободившееся место занял быт: его смотрят чаще, чем историю сделок,
-  // а лежал он в «Ещё», через два касания от главной.
   { id: 'spending', label: 'Траты', icon: 'wallet' },
-  { id: 'more', label: 'Ещё', icon: 'more' },
+  { id: 'more', label: 'Настройки', icon: 'more' },
+];
+
+/**
+ * Два взгляда на портфель. Не навигация: это один и тот же экран в двух
+ * состояниях — чем владею и как к этому пришёл. Журнал показывает те же
+ * деньги со стороны сделок, поэтому и живёт на том же адресе.
+ *
+ * Целей и трат здесь больше нет: у них свои разделы в панели, и место
+ * в двух местах сразу означало бы, что человек выбирает между ними дважды.
+ */
+const MONEY = [
+  { key: 'portfolio', label: 'Портфель', tab: 'portfolio', mode: 'assets' },
+  { key: 'journal', label: 'Журнал', tab: 'portfolio', mode: 'journal' },
 ];
 
 const VIEWS = { dashboard, goals, portfolio, spending, more };
+
+/* Переключатель «Портфель / Журнал» стоит только на самом портфеле. */
+const hasSlices = (tab) => tab === 'portfolio';
 
 const screen = document.getElementById('screen');
 const header = document.getElementById('header');
@@ -58,6 +89,11 @@ function parseHash() {
     return { tab: 'portfolio', sub: null };
   }
   if (tab === 'more' && sub === 'spending') return { tab: 'spending', sub: null };
+
+  // «Деньги» были группой из трёх разрезов и разделом больше не являются.
+  // Адрес остаётся рабочим и ведёт в портфель: он разослан в ярлыках
+  // «Команд» и сохранён у людей на домашнем экране.
+  if (tab === 'money') return { tab: 'portfolio', sub: null };
 
   return { tab: VIEWS[tab] ? tab : 'dashboard', sub: sub || null };
 }
@@ -148,6 +184,10 @@ function render() {
 
   const notices = [offlineNotice(), backupBanner(ctx)].filter(Boolean);
   U.append(screen, notices);
+  // Переключатель стоит только на самом портфеле. На подстранице — бумага,
+  // снимок капитала — его нет: там наверху шапка с «назад», и второй ряд
+  // переключателей под ней означал бы, что уйти можно и вбок тоже.
+  if (hasSlices(route.tab) && !route.sub) U.append(screen, moneySwitch());
   U.append(screen, view.render(ctx));
 
   renderTabs();
@@ -238,6 +278,39 @@ function renderHeader(ctx) {
   ]);
 }
 
+/**
+ * Переключатель разрезов «Денег».
+ *
+ * Собирается заново на каждой перерисовке, в отличие от таб-бара: подсветка
+ * здесь меняется вместе с экраном, а сам он стоит внутри прокручиваемого
+ * содержимого и уезжает вместе с ним. Держать его закреплённым было бы
+ * ошибкой: три разреза — это не навигация верхнего уровня, и полоса,
+ * занятая ими постоянно, отняла бы место у цифр.
+ */
+function moneySwitch() {
+  const on = (part) => part.tab === route.tab
+    && (!part.mode || part.mode === portfolio.shownMode());
+
+  return h('div', { class: 'segmented segmented-wide', role: 'tablist' },
+    MONEY.map((part) => h('button', {
+      class: `segment${on(part) ? ' is-on' : ''}`,
+      type: 'button',
+      role: 'tab',
+      'aria-selected': String(on(part)),
+      onclick: () => {
+        if (on(part)) return;
+        U.tap();
+        if (part.mode === 'journal') portfolio.showJournal();
+        if (part.mode === 'assets') portfolio.showAssets();
+        // Портфель и журнал живут на одном адресе: смена хеша на тот же
+        // самый не рождает события, и экран остался бы прежним.
+        if (part.tab === route.tab) render();
+        else go(part.tab);
+      },
+    }, [part.label])),
+  );
+}
+
 let tabNodes = null;
 
 /**
@@ -263,6 +336,7 @@ function renderTabs() {
         h('span', { class: 'tab-label', text: tab.label }),
       ]),
     );
+
     U.append(U.clear(tabbar), tabNodes);
   }
 

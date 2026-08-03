@@ -40,42 +40,43 @@ const URL = 'http://127.0.0.1:8899/app/index.html';
     return { display: cs.display, height: Math.round(r.height), painted: cs.display !== 'none' && r.height > 0 };
   }, sel);
 
-  console.log('\n1. Один сигнал-предупреждение: блок обязан быть свёрнут');
-  let s = await shown('.signals');
-  console.log(`     .signals display=${s && s.display}, высота ${s && s.height}`);
-  check('содержимое не отрисовано', s && s.painted === false, s ? `${s.display}, ${s.height}px` : 'нет узла');
-  check('заголовок блока на месте', (await shown('.disclosure')).painted);
+  // Сигналы переехали с главной под колокольчик. Прежде они лежали блоком
+  // прямо на экране и потому умели сворачиваться: развёрнутый список
+  // из пяти строк выдавливал за нижний край всё остальное, а свёрнутый
+  // прятал ошибку, о которой надо знать. Складка была компромиссом между
+  // этими двумя бедами, и настройка signalsOpen — памятью о выборе.
+  //
+  // В шторке ни того, ни другого не нужно: она открывается по нажатию
+  // и закрывается сама, а на экране от неё остаётся значок со счётчиком.
+  // Поэтому проверяется теперь не сворачивание, а то, ради чего оно было:
+  // видно, что сигнал есть, и его можно скрыть.
 
-  console.log('\n2. Разворачиваем нажатием');
-  await p.tap('.disclosure');
-  await p.waitForTimeout(400);
-  s = await shown('.signals');
-  check('содержимое появилось', s.painted, `${s.display}, ${s.height}px`);
-  check('плашка сигнала видна', (await shown('.signal')).painted);
+  console.log('\n1. Сигнал есть — на колокольчике счётчик');
+  const count = Number(await p.evaluate(() => document.querySelector('.bell-count')?.textContent));
+  console.log(`     на колокольчике: ${count}`);
+  check('счётчик показан', count >= 1, String(count));
+  check('на самом экране блока сигналов нет', (await p.locator('.card-signals').count()) === 0);
 
-  console.log('\n3. Сворачиваем обратно');
-  await p.tap('.disclosure');
-  await p.waitForTimeout(400);
-  s = await shown('.signals');
-  check('содержимое снова скрыто', s.painted === false, `${s.display}, ${s.height}px`);
+  console.log('\n2. Открываем шторку');
+  await p.tap('.bell');
+  await p.waitForTimeout(500);
+  check('шторка открылась', (await shown('.sheet-panel')).painted);
+  check('сигнал виден', (await shown('.notice')).painted);
 
-  console.log('\n4. Выбор сохраняется после перезагрузки');
+  console.log('\n3. «Скрыть сигнал» действительно скрывает');
+  const before = await p.locator('.notice').count();
+  await p.locator('.notice-acts .btn', { hasText: 'Скрыть сигнал' }).first().tap();
+  await p.waitForTimeout(800);
+  const muted = await p.evaluate(async () => (await import('./js/store.js')).getState().settings.mutedSignals);
+  console.log(`     уведомлений было ${before}, записей о скрытии ${muted.length}`);
+  check('запись о скрытии сохранена', muted.length === 1, JSON.stringify(muted));
+
+  console.log('\n4. Скрытого больше не считает');
   await p.reload({ waitUntil: 'networkidle' });
   await p.waitForTimeout(900);
-  s = await shown('.signals');
-  check('осталось свёрнутым', s.painted === false, `${s.display}, ${s.height}px`);
-
-  console.log('\n5. Крестик реально скрывает сигнал');
-  await p.tap('.disclosure');
-  await p.waitForTimeout(400);
-  const before = await p.locator('.signal').count();
-  await p.tap('.signal-mute');
-  await p.waitForTimeout(800);
-  const after = await p.locator('.signal').count();
-  console.log(`     плашек было ${before}, стало ${after}`);
-  check('сигнал скрыт', after === before - 1, `${after} vs ${before - 1}`);
-  const muted = await p.evaluate(async () => (await import('./js/store.js')).getState().settings.mutedSignals);
-  check('запись о скрытии сохранена', muted.length === 1, JSON.stringify(muted));
+  const gone = Number(await p.evaluate(() => document.querySelector('.bell-count')?.textContent) || 0);
+  console.log(`     на колокольчике было ${count}, стало ${gone || '—'}`);
+  check('счётчик убавился', gone === count - 1, `${count} → ${gone}`);
 
   console.log('\n6. Переключатель «График / Таблица»: одно вместо двух');
   // Проверяем отрисованность, а не собственный display: скрывается обёртка

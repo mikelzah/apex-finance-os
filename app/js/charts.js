@@ -44,6 +44,71 @@ function empty(message) {
 }
 
 // --------------------------------------------------------------------------
+// Искра
+// --------------------------------------------------------------------------
+
+/**
+ * Линия без сетки, подписей и касания — только форма кривой.
+ *
+ * Стоит под главным числом и отвечает на единственный вопрос: растёт или нет.
+ * Значения читать с неё нельзя и не нужно — они написаны рядом цифрами,
+ * а весь график целиком лежит на своём экране.
+ *
+ * Отдельная функция, а не line() с выключенными частями: у той половина кода
+ * про сетку, засечки и таблицу под курсором, и выключать их по флагам значит
+ * держать в одной функции два разных графика.
+ *
+ * Пустоты не возвращает вовсе. Пропись «нужно две точки» уместна там, где
+ * график — содержание блока; здесь он подложка под число, и подпись на его
+ * месте выглядела бы поломкой.
+ */
+export function spark(points, options = {}) {
+  const { height = 34 } = options;
+  if (!points || points.length < 2) return null;
+
+  const data = [...points].sort((a, b) => (a.x < b.x ? -1 : 1));
+  const xs = data.map((p) => D.toDays(p.x));
+  const ys = data.map((p) => p.y);
+  const x0 = Math.min(...xs);
+  const spanX = (Math.max(...xs) - x0) || 1;
+  let y0 = Math.min(...ys);
+  let y1 = Math.max(...ys);
+  if (y1 === y0) { y0 -= 1; y1 += 1; }
+
+  // Поле сверху и снизу: линия, упирающаяся в кромку, читается обрезанной.
+  const w = 320;
+  const h = 40;
+  const pad = 4;
+  const px = (v) => ((v - x0) / spanX) * w;
+  const py = (v) => h - pad - ((v - y0) / (y1 - y0)) * (h - pad * 2);
+
+  const coords = data.map((p) => [px(D.toDays(p.x)), py(p.y)]);
+  const path = coords.map(([x, y], i) => `${i ? 'L' : 'M'}${x.toFixed(1)} ${y.toFixed(1)}`).join(' ');
+  const area = `${path} L${w} ${h} L0 ${h} Z`;
+  const gradId = `s${Math.random().toString(36).slice(2, 8)}`;
+
+  const svg = el('svg', {
+    viewBox: `0 0 ${w} ${h}`,
+    class: 'spark',
+    // none, а не meet: искра тянется во всю ширину плитки, и пропорция
+    // здесь не значит ничего — точки на конце у неё нет, искажать нечего.
+    preserveAspectRatio: 'none',
+    style: `height:${height}px`,
+    'aria-hidden': 'true',
+  }, [
+    el('defs', {}, [
+      el('linearGradient', { id: gradId, x1: 0, y1: 0, x2: 0, y2: 1 }, [
+        el('stop', { offset: '0%', 'stop-color': 'var(--accent-mark)', 'stop-opacity': '0.24' }),
+        el('stop', { offset: '100%', 'stop-color': 'var(--accent-mark)', 'stop-opacity': '0' }),
+      ]),
+    ]),
+    el('path', { d: area, fill: `url(#${gradId})` }),
+    el('path', { d: path, class: 'spark-line' }),
+  ]);
+  return svg;
+}
+
+// --------------------------------------------------------------------------
 // Линия
 // --------------------------------------------------------------------------
 
@@ -495,6 +560,45 @@ export function progress(value, options = {}) {
   fill.style.width = `${Math.max(0, Math.min(100, (value || 0) * 100))}%`;
   track.appendChild(fill);
   return track;
+}
+
+/**
+ * Кольцо с долей внутри.
+ *
+ * Полоса просит ширину, а на плитке в половину экрана её нет: под полосу
+ * ушла бы вся строка, и рядом с ней не осталось бы места ни названию цели,
+ * ни суммам. Кольцо занимает квадрат и читается тем же одним взглядом.
+ *
+ * Достигнутая цель показывает галочку вместо числа: «100%» под замкнутым
+ * кольцом — это одно и то же, сказанное дважды.
+ */
+export function ring(value, options = {}) {
+  const { size = 52, done = false, quiet = false } = options;
+  const share = Math.max(0, Math.min(1, value || 0));
+  const r = 24;
+  const len = 2 * Math.PI * r;
+
+  return el('svg', {
+    viewBox: '0 0 58 58',
+    class: 'ring',
+    width: size,
+    height: size,
+    role: 'img',
+    'aria-label': done ? 'Цель достигнута' : `Выполнено ${Math.round(share * 100)}%`,
+  }, [
+    el('circle', { cx: 29, cy: 29, r, class: 'ring-track' }),
+    el('circle', {
+      // Цель на паузе — серым: пауза это решение отложить, и красить её
+      // цветом действия значит звать туда, откуда человек сам ушёл.
+      cx: 29, cy: 29, r, class: `ring-fill${quiet ? ' is-quiet' : ''}`,
+      'stroke-dasharray': `${len.toFixed(1)} ${len.toFixed(1)}`,
+      'stroke-dashoffset': (len * (1 - (done ? 1 : share))).toFixed(1),
+      transform: 'rotate(-90 29 29)',
+    }),
+    done
+      ? el('path', { d: 'M21 29.5 27 35 38 23', class: 'ring-done' })
+      : el('text', { x: 29, y: 34, class: 'ring-text' }, [`${Math.round(share * 100)}%`]),
+  ]);
 }
 
 function escape(s) {

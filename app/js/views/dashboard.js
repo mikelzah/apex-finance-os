@@ -12,11 +12,23 @@ import * as D from '../dates.js';
 import * as charts from '../charts.js';
 import * as store from '../store.js';
 import * as forms from '../forms.js';
+import * as icons from '../icons.js';
 import { statusIcon } from '../icons.js';
+import { screenshotSheet } from '../import.js';
 import * as mascot from '../mascot.js';
 
 const { h } = U;
 
+/**
+ * Порядок блоков отвечает на три утренних вопроса по очереди: сколько у меня,
+ * что нажать, иду ли я по графику. Ниже — то, что смотрят, а не делают.
+ *
+ * Блоки со второго по последний имеют постоянную высоту и вместе с первым
+ * укладываются в экран без прокрутки. Прокрутка появляется только когда
+ * приложению есть что сказать сверх обычного: день капитализации, сигнал,
+ * фраза Кубыша. Это и правильно — такие дни редки, и лишний экран в них
+ * стоит дешевле, чем свёрнутое в складку предупреждение о деньгах.
+ */
 export function render(ctx) {
   const { state, today } = ctx;
   if (!state.assets.length) return gettingStarted(ctx);
@@ -24,16 +36,77 @@ export function render(ctx) {
   const worth = C.netWorth(state.assets, state.operations);
 
   return [
-    hero(state, worth, today),
-    advice(ctx),
-    quickAdd(ctx),
-    accruals(ctx),
-    ...goalCards(ctx),
-    attention(ctx),
-    capitalChart(state, worth, today),
-    balanceCard(ctx),
-    ritualCard(state, today),
+    topBar(ctx),
+    heroTile(ctx, worth),
+    actionsRow(ctx),
+    h('div', { class: 'tile-pair' }, [goalsTile(ctx), cushionTile(ctx)]),
+    opsTile(ctx),
+    trioTile(ctx),
   ];
+}
+
+/**
+ * Шапка экрана: имя и колокольчик.
+ *
+ * Всё, что требует внимания, собрано под колокольчиком — сигналы, день
+ * капитализации, фраза Кубыша. Прежде каждое из этого занимало на экране
+ * свой блок, и в обычный день главная разъезжалась втрое: три полосы текста
+ * между действиями и целями, ради которых приходилось прокручивать.
+ *
+ * Счётчик на колокольчике обязателен: колокольчик без числа сообщает,
+ * что уведомления в принципе бывают, а с числом — что их сейчас два.
+ * Разница между «можно зайти когда-нибудь» и «зайти сегодня» держится
+ * ровно на этой цифре.
+ */
+function topBar(ctx) {
+  const items = noticeList(ctx);
+  const errors = items.filter((x) => x.level === 'error').length;
+
+  return h('div', { class: 'top-bar' }, [
+    h('h1', { class: 'top-title', text: mascot.NAME }),
+    h('button', {
+      class: 'bell',
+      type: 'button',
+      'aria-label': items.length ? `Требует внимания: ${items.length}` : 'Ничего не требует внимания',
+      onclick: () => noticeSheet(ctx, items),
+    }, [
+      icons.icon('bell'),
+      items.length
+        ? h('span', { class: `bell-count ${errors ? 'is-error' : ''}`.trim(), text: String(items.length) })
+        : null,
+    ]),
+  ]);
+}
+
+/**
+ * Что показать под колокольчиком. Порядок — по цене вопроса: сперва то,
+ * что стоит денег, потом то, что мешает считать, и только потом дисциплина.
+ */
+function noticeList(ctx) {
+  const { state, today } = ctx;
+  const out = [];
+
+  const pending = C.pendingAccruals(state.assets, state.operations, today).filter((p) => p.fires);
+  for (const item of pending) {
+    out.push({
+      level: 'warn',
+      kind: 'accrual',
+      title: `${item.asset.name}: день капитализации`,
+      text: `Начислено ${F.money2(item.accrued)} с ${F.date(item.asset.lastCap || today)}`,
+      accrual: item,
+    });
+  }
+
+  const all = C.signals(state.assets, state.operations, today);
+  const { shown } = C.splitSignals(all, state.settings.mutedSignals);
+  for (const s of shown) {
+    out.push({ level: s.level, kind: 'signal', title: s.asset.name, text: s.text, signal: s });
+  }
+
+  const line = adviceText(state, today);
+  if (line) out.push({ level: 'info', kind: 'advice', title: mascot.NAME, text: line.text, go: line.go });
+
+  return out;
 }
 
 // --------------------------------------------------------------------------
@@ -63,6 +136,105 @@ function advice(ctx) {
     h('span', { class: 'advice-text', text: line.text }),
     h('span', { class: 'row-chevron', text: '›' }),
   ]);
+}
+
+/**
+ * Шторка уведомлений. Каждое — со своим действием, а не просто текстом:
+ * «банк показывает на 3,96 ₽ больше» без кнопки «записать разницу»
+ * сообщает о проблеме и оставляет её решать вручную.
+ */
+function noticeSheet(ctx, items) {
+  const { refresh, today } = ctx;
+
+  U.sheet('Требует внимания', (api) => {
+    api.setFooter([U.button('Закрыть', () => api.close(), { kind: 'primary' })]);
+
+    if (!items.length) {
+      return [U.emptyState('Всё в порядке — приложению нечего сказать.')];
+    }
+
+    return items.map((it) => {
+      const act = [];
+
+      if (it.kind === 'accrual') {
+        act.push(U.button(`Записать ${F.money2(it.accrual.accrued)}`, async () => {
+          await store.mutate((draft) => {
+            draft.operations.push({
+              id: store.newId('op'),
+              date: today,
+              type: C.OP_INCOME,
+              amount: C.round2(it.accrual.accrued),
+              assetId: it.accrual.asset.id,
+              goalId: (it.accrual.asset.goalIds || [])[0] || null,
+              source: C.SOURCE_COMPUTED,
+              comment: 'Проценты, расчёт',
+            });
+            const asset = draft.assets.find((a) => a.id === it.accrual.asset.id);
+            if (asset) asset.lastCap = today;
+          });
+          api.close();
+          U.toast('Проценты записаны — сверьте с банком');
+          refresh();
+        }, { kind: 'primary', class: 'btn-wide' }));
+      }
+
+      if (it.kind === 'signal') {
+        const s = it.signal;
+        if (s.kind === 'bank-gap' && s.gap > 0) {
+          act.push(U.button(`Записать разницу ${F.money2(s.gap)}`, async () => {
+            await store.mutate((draft) => {
+              draft.operations.push({
+                id: store.newId('op'),
+                date: today,
+                type: C.OP_INCOME,
+                amount: s.gap,
+                assetId: s.asset.id,
+                goalId: (s.asset.goalIds || [])[0] || null,
+                source: C.SOURCE_COMPUTED,
+                comment: 'Разница со сверкой',
+              });
+            });
+            api.close();
+            U.toast(`Доход ${F.money2(s.gap)} записан`);
+            refresh();
+          }, { kind: 'primary', class: 'btn-wide' }));
+        }
+        act.push(U.button('Открыть актив', () => {
+          api.close();
+          forms.assetSheet(s.asset, { onDone: refresh });
+        }, { class: 'btn-wide' }));
+        act.push(U.button('Скрыть сигнал', async () => {
+          await store.mutate((draft) => {
+            const key = C.signalKey(s);
+            const kept = (draft.settings.mutedSignals || []).filter((m) => (m.key || m) !== key);
+            kept.push({ key, text: s.text });
+            draft.settings.mutedSignals = kept;
+          });
+          api.close();
+          U.toast('Сигнал скрыт — вернётся, если изменится');
+          refresh();
+        }, { class: 'btn-wide' }));
+      }
+
+      if (it.kind === 'advice') {
+        act.push(U.button('Посмотреть', () => {
+          api.close();
+          ctx.go(it.go);
+        }, { kind: 'primary', class: 'btn-wide' }));
+      }
+
+      return h('div', { class: `notice notice-${it.level}` }, [
+        h('div', { class: 'notice-head' }, [
+          statusIcon(it.level),
+          h('div', { class: 'notice-text' }, [
+            h('span', { class: 'notice-title', text: it.title }),
+            h('span', { class: 'notice-body', text: it.text }),
+          ]),
+        ]),
+        act.length ? h('div', { class: 'notice-acts' }, act) : null,
+      ]);
+    });
+  }, { focus: false });
 }
 
 function adviceText(state, today) {
@@ -135,7 +307,16 @@ function gettingStarted(ctx) {
   ];
 }
 
-function hero(state, worth, today) {
+/**
+ * Главная плитка: капитал, рост, кривая и разбивка.
+ *
+ * Кривая здесь — подложка под числом, а не график: значения с неё не читают
+ * и не должны. Весь график с сеткой и касанием живёт на своём экране;
+ * тут он отвечает на единственный вопрос — растёт или нет.
+ */
+function heroTile(ctx, worth) {
+  const { state, today } = ctx;
+
   // Изменение за день считается по записанным операциям, а не по переоценке:
   // «сегодня» здесь означает «сегодня я внёс», и это честнее, чем смешивать
   // собственные взносы с движением котировок.
@@ -143,15 +324,32 @@ function hero(state, worth, today) {
     .filter((op) => op.date === today)
     .reduce((sum, op) => sum + C.signed(op), 0);
 
-  return h('section', { class: 'hero' }, [
-    h('p', { class: 'hero-label', text: 'Мой капитал' }),
+  const points = capitalPoints(state, worth, today);
+  // Рост за весь известный период — то же, что показывает кривая, только
+  // числом. Без него наклон не с чем сопоставить: он зависит от масштаба.
+  const first = points.length > 1 ? points[0].y : null;
+  const growth = first ? ((worth.total - first) / first) * 100 : null;
+
+  return U.card([
+    h('div', { class: 'hero-top' }, [
+      h('p', { class: 'hero-label', text: 'Мой капитал' }),
+      // Период кривой. Без него наклон не с чем сопоставить: рост
+      // на одиннадцать процентов за месяц и за год означают разное.
+      points.length > 1
+        ? h('span', { class: 'hero-period', text: periodWord(points) })
+        : null,
+    ]),
     h('p', { class: 'hero-value', text: F.money(worth.total) }),
-    delta
-      ? h('p', { class: `hero-delta ${delta > 0 ? 'is-up' : 'is-down'}` }, [
-          h('span', { text: F.signedMoney(delta) }),
-          h('span', { class: 'hero-delta-word', text: 'сегодня' }),
-        ])
-      : h('p', { class: 'hero-delta is-quiet', text: 'сегодня записей ещё не было' }),
+    h('div', { class: 'hero-row' }, [
+      growth == null ? null : h('span', {
+        class: `hero-growth ${growth >= 0 ? 'is-up' : 'is-down'}`,
+        text: `${growth >= 0 ? '+' : ''}${F.percent(growth)}`,
+      }),
+      delta
+        ? h('span', { class: 'hero-delta-word', text: `${F.signedMoney(delta)} сегодня` })
+        : h('span', { class: 'hero-delta-word', text: 'сегодня записей ещё не было' }),
+    ]),
+    charts.spark(points, { height: 24 }),
     h('div', { class: 'hero-split' }, [
       h('div', {}, [
         h('span', { class: 'hero-split-label', text: 'Доступно' }),
@@ -162,30 +360,71 @@ function hero(state, worth, today) {
         h('span', { class: 'hero-split-value', text: F.money(worth.invested) }),
       ]),
     ]),
-  ]);
+  ], { class: 'card-hero' });
 }
 
-function quickAdd(ctx) {
+/** Сколько времени охватывает кривая — словами, а не датами. */
+function periodWord(points) {
+  const days = D.diffDays(points[points.length - 1].x, points[0].x);
+  if (days >= 640) return `${Math.round(days / 365)} года`;
+  if (days >= 300) return 'год';
+  if (days >= 45) return `${Math.round(days / 30)} мес.`;
+  return `${F.days(days)}`;
+}
+
+/**
+ * Точки капитала: снимки по месяцам плюс сегодняшняя.
+ *
+ * Снимок за текущий месяц перезаписывается по ходу дела, поэтому последняя
+ * точка заменяется на сегодняшнюю — без этого кривая отставала бы на месяц.
+ */
+function capitalPoints(state, worth, today) {
+  const points = [...state.netWorth]
+    .filter((r) => D.isValid(r.date))
+    .sort((a, b) => (a.date < b.date ? -1 : 1))
+    .map((r) => ({ x: r.date, y: r.total }));
+
+  if (points.length && points[points.length - 1].x === today) points.pop();
+  points.push({ x: today, y: worth.total });
+  return points;
+}
+
+/**
+ * Ряд круглых действий под главным числом.
+ *
+ * Прежде здесь была одна кнопка во всю ширину — «Внести 5 000 ₽» — и вторая
+ * строкой под ней. Полоса во всю ширину означает «действие тут одно»,
+ * а их четыре, и выделено среди них главное краской, а не размером.
+ *
+ * Подпись у главного — «Внести взнос», без суммы. Сумма живёт в настройках
+ * быстрого взноса и меняется; подпись кнопки от этого меняться не должна,
+ * иначе кнопка каждый раз оказывается новой и её приходится перечитывать.
+ * Сама сумма подписана мельче, второй строкой.
+ */
+function actionsRow(ctx) {
   const { state, refresh } = ctx;
   const { settings, assets, goals } = state;
   const amount = settings.quickAmount;
   const asset = assets.find((a) => a.id === settings.quickAssetId);
   const goal = goals.find((g) => g.id === settings.quickGoalId);
 
-  if (!amount || !asset) {
-    return h('div', { class: 'act' }, [
-      U.button('Добавить операцию', () => forms.operationSheet(null, { onDone: refresh }), {
-        kind: 'primary',
-        class: 'btn-wide',
-      }),
-    ]);
-  }
+  // Подпись одна и в одну строку. Вторая строка под кружком удваивала высоту
+  // ряда и ничего не добавляла: «Операция · любая», «Цель · новая» — это одно
+  // и то же слово, сказанное дважды.
+  const act = (label, icon, onClick, key) => h('button', {
+    class: `act-round ${key ? 'is-key' : ''}`.trim(),
+    type: 'button',
+    onclick: onClick,
+  }, [
+    h('span', { class: 'act-round-icon' }, [icon]),
+    h('span', { class: 'act-round-label', text: label }),
+  ]);
 
-  return h('div', { class: 'act' }, [
-    h('button', {
-      class: 'quick',
-      type: 'button',
-      onclick: async () => {
+  // Быстрый взнос не настроен — кружок ведёт в настройки, а не исчезает.
+  // Пропавшее действие невозможно найти: о том, что оно бывает, узнать
+  // больше неоткуда.
+  const quick = amount && asset
+    ? act(`Внести ${F.money(amount)}`, icons.icon('plus'), async () => {
         await store.mutate((draft) => {
           draft.operations.push({
             id: store.newId('op'),
@@ -202,16 +441,14 @@ function quickAdd(ctx) {
         mascot.celebrate();
         U.toast(`Взнос ${F.money(amount)} записан`);
         refresh();
-      },
-    }, [
-      h('span', { class: 'quick-amount', text: `Внести ${F.money(amount)}` }),
-      h('span', { class: 'quick-target', text: `${asset.name}${goal ? ` · ${goal.name}` : ''}` }),
-    ]),
-    h('button', {
-      class: 'quick-alt',
-      type: 'button',
-      onclick: () => forms.operationSheet(null, { onDone: refresh }),
-    }, ['Другая сумма или тип']),
+      }, true)
+    : act('Быстрый взнос', icons.icon('plus'), () => ctx.go('more/settings'), true);
+
+  return h('div', { class: 'acts-round' }, [
+    quick,
+    act('Операция', icons.icon('swap'), () => forms.operationSheet(null, { onDone: refresh })),
+    act('Цель', icons.icon('target'), () => forms.goalSheet(null, { onDone: refresh })),
+    act('Снимок', icons.icon('shot'), () => screenshotSheet({ onDone: refresh })),
   ]);
 }
 
@@ -273,7 +510,12 @@ function accruals(ctx) {
 }
 
 /**
- * Цели крупными карточками — все активные и только они.
+ * Цели — лентой внутри одной плитки.
+ *
+ * Активных целей бывает одна, а бывает пять, и вертикали под них на главной
+ * нет: экран держится тем, что не прокручивается. Прежде каждая цель занимала
+ * отдельную карточку во всю ширину, и при четырёх целях всё остальное — траты,
+ * дисциплина, операции — уезжало за нижний край.
  *
  * Порядок — тот, в каком цели расставлены руками на своём экране: главная
  * не решает за человека, что для него важнее.
@@ -282,38 +524,177 @@ function accruals(ctx) {
  * и место на первом экране такой цели не нужно; достигнутая не требует уже
  * ничего. И та и другая остаются на экране целей, где их видно целиком.
  */
-function goalCards(ctx) {
-  const { state, today } = ctx;
-  return C.orderedGoals(state.goals)
-    .filter((g) => g.status === C.GOAL_ACTIVE)
-    .map((goal) => goalCard(goal, state, today));
+function goalsTile(ctx) {
+  const { state, today, go } = ctx;
+  const active = C.orderedGoals(state.goals).filter((g) => g.status === C.GOAL_ACTIVE);
+
+  if (!active.length) {
+    return U.card([
+      h('p', { class: 'tile-label', text: 'Цели' }),
+      h('p', { class: 'tile-empty', text: 'ни одной активной' }),
+    ], { class: 'card-tile' });
+  }
+
+  const slides = active.map((goal) => {
+    const m = C.goalMetrics(goal, state.assets, state.operations, today);
+    const late = m.reserveDays != null && m.reserveDays < 0;
+    return h('button', {
+      class: 'goal-slide',
+      type: 'button',
+      onclick: () => go('goals'),
+    }, [
+      charts.ring(m.progress, { done: (m.progress || 0) >= 1 }),
+      h('span', { class: 'goal-slide-text' }, [
+        h('span', { class: 'goal-slide-name', text: goal.name }),
+        // Не «75,6 тыс из 180 тыс», а сколько осталось. Долю уже показывает
+        // кольцо, повторять её числами незачем, а вот остаток нигде больше
+        // не написан — и это единственное, что решает, хватит ли темпа.
+        // В плитку в половину экрана длинная пара сумм всё равно не влезает.
+        h('span', {
+          class: 'goal-slide-sub',
+          text: m.current >= m.target ? 'цель взята' : `ещё ${F.moneyShort(m.target - m.current)}`,
+        }),
+        h('span', {
+          class: `goal-slide-sub ${late ? 'is-late' : ''}`.trim(),
+          text: m.forecast ? F.dateShort(m.forecast) : 'темпа не хватает',
+        }),
+      ]),
+    ]);
+  });
+
+  const strip = h('div', { class: 'goal-strip' }, slides);
+
+  // Точки — единственный признак, что за краем есть ещё цели. Без них лента
+  // выглядит обычной плиткой, и листать её никто не догадается. При одной
+  // цели точек нет: точка в единственном числе ничего не сообщает.
+  const dots = active.length > 1
+    ? h('div', { class: 'goal-dots' }, active.map((_, i) =>
+        h('i', { class: i === 0 ? 'is-on' : '' })))
+    : null;
+
+  if (dots) {
+    strip.addEventListener('scroll', () => {
+      const at = Math.round(strip.scrollLeft / strip.clientWidth);
+      [...dots.children].forEach((d, i) => d.classList.toggle('is-on', i === at));
+    }, { passive: true });
+  }
+
+  return U.card([strip, dots], { class: 'card-tile card-goals' });
 }
 
-function goalCard(goal, state, today) {
-  const m = C.goalMetrics(goal, state.assets, state.operations, today);
-  const late = m.reserveDays != null && m.reserveDays < 0;
+/**
+ * Подушка: на сколько месяцев хватит мгновенных денег.
+ *
+ * Без выписки её не посчитать — нужен месячный расход. Тогда плитка честно
+ * говорит, чего не хватает, и ведёт туда, где это исправляется: пустое место
+ * на месте числа читается как поломка.
+ */
+function cushionTile(ctx) {
+  const { state, today, go } = ctx;
+
+  if (!state.spending.length) {
+    return h('button', {
+      class: 'card card-tile card-tile-btn',
+      type: 'button',
+      onclick: () => go('spending'),
+    }, [
+      h('p', { class: 'tile-label', text: 'Подушка' }),
+      h('p', { class: 'tile-empty', text: 'нужна выписка' }),
+      h('p', { class: 'tile-hint', text: 'по ней считается месячный расход' }),
+    ]);
+  }
+
+  const stats = C.spendStats(state.spending, today, state.settings.spendMonths || C.SPEND_MONTHS);
+  const months = C.cushionMonths(state.assets, state.operations, stats);
+
+  return h('button', {
+    class: 'card card-tile card-tile-btn',
+    type: 'button',
+    onclick: () => go('spending'),
+  }, [
+    h('p', { class: 'tile-label', text: 'Подушка' }),
+    h('p', { class: 'tile-value', text: months == null ? '—' : `${F.num(months, 1)} мес.` }),
+    h('p', { class: 'tile-hint', text: 'мгновенные деньги' }),
+  ]);
+}
+
+/**
+ * Последние операции.
+ *
+ * На месте, где прежде висели сигналы: сигналы теперь показываются только
+ * когда они есть, а это блок, которому есть что показать всегда. Две строки,
+ * а не пять: главный экран отвечает «что происходит», а не «что происходило».
+ */
+function opsTile(ctx) {
+  const { state, go } = ctx;
+  const recent = [...state.operations]
+    .filter((op) => D.isValid(op.date))
+    .sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0))
+    .slice(0, 2);
+
+  if (!recent.length) return null;
+
+  const assetName = (id) => state.assets.find((a) => a.id === id)?.name || 'без актива';
+  const goalName = (id) => state.goals.find((g) => g.id === id)?.name || null;
 
   return U.card([
-    h('div', { class: 'goal-line' }, [
-      h('span', { class: 'goal-line-name', text: goal.name }),
-      h('span', { class: 'goal-line-share', text: F.share(m.progress) }),
+    h('div', { class: 'tile-head' }, [
+      h('span', { class: 'tile-label', text: 'Последние операции' }),
+      h('button', { class: 'tile-more', type: 'button', onclick: () => go('journal') }, ['Все ›']),
     ]),
-    charts.progress(m.progress, { over: (m.progress || 0) >= 1 }),
-    h('div', { class: 'goal-line-foot' }, [
-      h('span', { text: `${F.money(m.current)} из ${F.money(m.target)}` }),
-      h('span', {
-        class: late ? 'is-late' : '',
-        text: m.forecast ? `прогноз ${F.dateShort(m.forecast)}` : 'темпа не хватает',
-      }),
-    ]),
-    m.needPerDay != null
-      ? h('p', { class: 'goal-line-hint' }, [
-          h('span', { text: `нужно ${F.money(m.needPerDay)}/день` }),
-          h('span', { class: 'quiet-line-dot', text: '·' }),
-          h('span', { text: `темп ${F.money(m.dailyGrowth)}` }),
-        ])
-      : null,
-  ], { class: 'card-goal' });
+    ...recent.map((op) => {
+      const sum = C.signed(op);
+      const goal = goalName(op.goalId);
+      return h('div', { class: 'op-line' }, [
+        h('span', { class: 'op-line-text' }, [
+          h('span', { class: 'op-line-name', text: `${op.type} · ${assetName(op.assetId)}` }),
+          h('span', {
+            class: 'op-line-sub',
+            text: [F.relativeDate(op.date, ctx.today), goal].filter(Boolean).join(' · '),
+          }),
+        ]),
+        h('span', {
+          class: `op-line-sum ${sum > 0 ? 'is-plus' : sum < 0 ? 'is-minus' : ''}`.trim(),
+          text: sum ? F.signedMoney(sum) : F.money(op.amount || 0),
+        }),
+      ]);
+    }),
+  ], { class: 'card-tile' });
+}
+
+/**
+ * Три числа в ряд: прожито, отложено, дисциплина.
+ *
+ * Порознь они заняли бы три строки сетки, а строк ровно столько, сколько
+ * помещается. Прожито и отложено без выписки не считаются — тогда в их
+ * колонках прочерк, а дисциплина остаётся: она считается по операциям.
+ */
+function trioTile(ctx) {
+  const { state, today, go } = ctx;
+  const stats = state.spending.length
+    ? C.spendStats(state.spending, today, state.settings.spendMonths || C.SPEND_MONTHS)
+    : null;
+  const { filled, elapsed, streak } = charts.ritual(state.operations, state.settings.quickGoalId, today);
+
+  const cell = (label, value, hint, extra) => h('div', { class: `trio-cell ${extra || ''}`.trim() }, [
+    h('span', { class: 'trio-label', text: label }),
+    h('span', { class: 'trio-value', text: value }),
+    h('span', { class: 'trio-hint', text: hint }),
+  ]);
+
+  return h('button', {
+    class: 'card card-tile card-tile-btn trio',
+    type: 'button',
+    onclick: () => go('spending'),
+  }, [
+    cell('Прожито', stats ? F.moneyShort(stats.spent) : '—',
+      stats ? `за ${stats.months} мес.` : 'нужна выписка'),
+    cell('Отложено', stats ? F.signedMoney(stats.free) : '—',
+      stats && stats.rate != null ? `${Math.round(stats.rate * 100)}% дохода` : 'нужна выписка',
+      stats && stats.free > 0 ? 'is-good' : ''),
+    cell('Дисциплина', `${filled} из ${elapsed}`,
+      `${streak} ${F.plural(streak, 'день', 'дня', 'дней')} подряд`),
+  ]);
 }
 
 /**
@@ -488,73 +869,5 @@ function hiddenSheet(ctx, hidden) {
       U.callout('Скрытый сигнал вернётся сам, если изменится формулировка: расхождение на копейку и расхождение на сто тысяч — разные сигналы, и второй не спрячется за первым.', 'info'),
     ];
   }, { focus: false });
-}
-
-function capitalChart(state, worth, today) {
-  // К истории добавляем сегодняшнюю точку: снимок за текущий месяц
-  // перезаписывается по ходу дела, и без неё график отставал бы на месяц.
-  const points = [...state.netWorth]
-    .filter((r) => D.isValid(r.date))
-    .sort((a, b) => (a.date < b.date ? -1 : 1))
-    .map((r) => ({ x: r.date, y: r.total }));
-
-  if (points.length && points[points.length - 1].x === today) points.pop();
-  points.push({ x: today, y: worth.total });
-
-  return U.card([
-    U.sectionTitle('Капитал'),
-    charts.line(points, {
-      label: 'Капитал',
-      hint: 'Первый снимок появится в конце месяца — графику нужны две точки',
-    }),
-  ]);
-}
-
-/**
- * Равновесие между жизнью и накоплением.
- *
- * Стоит после графика капитала намеренно: сначала «сколько накоплено»,
- * сразу следом «какой ценой». Порознь эти два числа успокаивают по очереди —
- * капитал растёт, значит всё хорошо, — а вместе задают настоящий вопрос.
- *
- * Без выписки карточки нет вовсе: приглашать загрузить её с главного экрана
- * каждый день значит превратить совет в рекламу. Позвать один раз может
- * раздел «Ещё», где это и живёт.
- */
-function balanceCard(ctx) {
-  const { state, today, go } = ctx;
-  if (!state.spending.length) return null;
-
-  const stats = C.spendStats(state.spending, today, state.settings.spendMonths || C.SPEND_MONTHS);
-  const cushion = C.cushionMonths(state.assets, state.operations, stats);
-  const contributed = C.contributedBetween(state.operations, stats.from, today);
-  const verdict = C.balanceVerdict(stats, cushion, contributed);
-
-  return U.card([
-    U.sectionTitle('Жизнь и накопления', U.button('Подробно', () => go('spending'))),
-    h('div', { class: 'grid-3' }, [
-      U.stat('Прожито', F.money(stats.spent), { hint: `за ${stats.months} мес.` }),
-      U.stat('Отложено', F.signedMoney(stats.free), {
-        hint: stats.rate == null ? 'нет доходов' : `${Math.round(stats.rate * 100)}% дохода`,
-      }),
-      U.stat('Подушка', cushion == null ? '—' : `${F.num(cushion, 1)} мес.`, { hint: 'мгновенные деньги' }),
-    ]),
-    U.callout(`${verdict.title}. ${verdict.text}`, verdict.level === 'ok' ? 'ok' : verdict.level === 'none' ? 'info' : 'warn'),
-  ]);
-}
-
-function ritualCard(state, today) {
-  const goalId = state.settings.quickGoalId;
-  const goal = state.goals.find((g) => g.id === goalId);
-  const { node, filled, elapsed, streak } = charts.ritual(state.operations, goalId, today);
-
-  return U.card([
-    U.sectionTitle('Дисциплина'),
-    h('div', { class: 'ritual-head' }, [
-      h('span', { class: 'ritual-streak', text: `${streak} ${F.plural(streak, 'день', 'дня', 'дней')} подряд` }),
-      h('span', { class: 'ritual-count', text: `${filled} из ${elapsed}` }),
-    ]),
-    node,
-  ]);
 }
 

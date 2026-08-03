@@ -49,8 +49,11 @@ const check = (label, ok, extra = '') => {
   console.log('\nПортфель → страница бумаги → карточка актива');
   await page.goto(`${URL}#/portfolio`, { waitUntil: 'networkidle' });
   await page.waitForTimeout(3500); // ждём, пока уйдёт тост
+  // Бумаги в портфеле перестали быть строками списка: у них свой узел
+  // со значком, названием и построчной доходностью. Ведёт он туда же —
+  // на страницу бумаги.
   await page.evaluate(() => {
-    const rows = [...document.querySelectorAll('.row')];
+    const rows = [...document.querySelectorAll('.paper')];
     rows.find((r) => r.textContent.includes('Сбербанк')).click();
   });
   await page.waitForTimeout(600);

@@ -33,7 +33,11 @@ const URL = 'http://127.0.0.1:8899/app/index.html';
   await p.waitForTimeout(900);
 
   const home = () => p.evaluate(() => ({
-    cards: [...document.querySelectorAll('.card-goal .goal-line-name')].map((x) => x.textContent.trim()),
+    // Цели на главной лежат лентой внутри одной плитки, а не карточками
+    // во всю ширину: при четырёх целях карточки выдавливали за нижний край
+    // всё остальное. Проверяется ровно то же — какие цели показаны
+    // и в каком порядке, — только слайды вместо карточек.
+    cards: [...document.querySelectorAll('.goal-slide-name')].map((x) => x.textContent.trim()),
     // Что бы ни попало в строки главной, целей среди них быть не должно.
     rows: [...document.querySelectorAll('.row-label span')].map((x) => x.textContent.trim()),
     titles: [...document.querySelectorAll('.section-title')].map((x) => x.textContent.trim()),

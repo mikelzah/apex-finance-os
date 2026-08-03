@@ -40,8 +40,16 @@ const check = (label, ok, extra = '') => {
     await page.waitForTimeout(250);
     return got;
   };
-  const tab = async (n) => {
-    await page.click(`.tabbar .tab:nth-child(${n})`);
+  // Разделов трое: «Сегодня», «Деньги», «Ещё». Между первым и вторым стоит
+  // кнопка записи — она не вкладка, поэтому по порядку в панели ходить
+  // нельзя, и вкладка выбирается по подписи.
+  const tab = async (label) => {
+    await page.click(`.tabbar .tab:has-text("${label}")`);
+    await page.waitForTimeout(500);
+  };
+  // Разрезы «Денег» — переключателем первой строкой экрана.
+  const part = async (label) => {
+    await page.click(`.segmented-wide .segment:has-text("${label}")`);
     await page.waitForTimeout(500);
   };
 
@@ -52,22 +60,21 @@ const check = (label, ok, extra = '') => {
   await page.waitForTimeout(400);
   let from = await scroll(400);
   check('«Портфель» прокрутился', from > 0, `${from} px`);
-  await tab(2); // Цели
+  await part('Цели');
   check('«Портфель» → «Цели»', (await y()) === 0, `было ${from}`);
 
   from = await scroll(300);
   check('«Цели» прокрутились', from > 0, `${from} px`);
-  // Четвёртой вкладкой стали «Траты»: журнал переехал внутрь портфеля.
-  await tab(4); // Траты
+  await part('Траты');
   check('«Цели» → «Траты»', (await y()) === 0, `было ${from}`);
 
   from = await scroll(300);
   check('«Траты» прокрутились', from > 0, `${from} px`);
-  await tab(1); // Главная
-  check('«Траты» → «Главная»', (await y()) === 0, `было ${from}`);
+  await tab('Сегодня');
+  check('«Траты» → «Сегодня»', (await y()) === 0, `было ${from}`);
 
   console.log('\nВложенный раздел');
-  await tab(5);
+  await tab('Ещё');
   // На демо-данных ни один вложенный раздел не длиннее экрана, а проверять
   // возврат прокрутки на непрокручиваемой странице — проверка ни о чём.
   // Поэтому длинную страницу делаем сами: операции по счёту.
@@ -86,7 +93,8 @@ const check = (label, ok, extra = '') => {
   });
   // Заходим на страницу самого счёта: длинной её делает список операций,
   // а список активов от них не растёт.
-  await tab(3); // Портфель
+  await tab('Деньги');
+  await part('Портфель');
   await page.waitForTimeout(400);
   await page.click('.row:has-text("Накопительный счёт")');
   await page.waitForTimeout(600);
@@ -98,17 +106,31 @@ const check = (label, ok, extra = '') => {
   check('назад в «Портфель»', (await y()) === 0, `было ${deep}`);
 
   console.log('\nПерерисовка того же экрана сохраняет положение');
-  await tab(1);
+  await tab('Сегодня');
   await page.waitForTimeout(3400); // ждём, пока уйдёт тост
   await scroll(260);
   const kept = await y();
-  await page.evaluate(() => document.querySelector('.quick').click());
+  await page.evaluate(() => document.querySelector('.act-round.is-key').click());
   await page.waitForTimeout(600);
   const after = await y();
-  check('запись взноса не выкидывает наверх', Math.abs(after - kept) <= 4, `${kept} → ${after}`);
+  // Сравниваем не с прежним положением, а с тем, докуда вообще можно
+  // прокрутить после перерисовки. Записанный взнос убирает с экрана фразу
+  // «столько-то дней без взносов» — она про то, что взносов не было, —
+  // и экран становится короче. Положение при этом упирается в новый предел,
+  // и разница со старым числом означала бы не потерю позиции, а лишь то,
+  // что прокручивать стало некуда.
+  const max = await page.evaluate(() => {
+    const s = document.getElementById('screen');
+    return s.scrollHeight - s.clientHeight;
+  });
+  const want = Math.min(kept, max);
+  check('запись взноса не выкидывает наверх', Math.abs(after - want) <= 4,
+    `${kept} → ${after}, предел ${max}`);
 
   // Капитал при этом действительно изменился — перерисовка была настоящей.
-  check('взнос записан', (await page.textContent('.hero-delta')).includes('+'));
+  // Изменение за день переехало в строку под числом: рядом с ним встала
+  // метка роста за период, и двум числам нужна одна строка на двоих.
+  check('взнос записан', (await page.textContent('.hero-row')).includes('+'));
 
   await browser.close();
   if (errors.length) { failed += 1; console.log(`\nОшибки: ${errors.join('; ')}`); }
