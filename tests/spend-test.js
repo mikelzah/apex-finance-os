@@ -203,21 +203,50 @@ const SBER = [
   // что оба числа доехали до главного экрана и посчитаны по выписке.
   await p.goto(`${URL}#/dashboard`, { waitUntil: 'networkidle' });
   await p.waitForTimeout(800);
-  const home = await p.evaluate(() => {
-    const text = (sel) => [...document.querySelectorAll(sel)]
-      .map((n) => n.textContent.replace(/\s+/g, ' ').trim());
+  const trio = () => p.evaluate(() => {
+    const cells = [...document.querySelectorAll('.trio-cell')].map((n) => ({
+      label: n.querySelector('.trio-label').textContent,
+      value: n.querySelector('.trio-value').textContent,
+      hint: n.querySelector('.trio-hint').textContent,
+      // Верх подписи, а не самой ячейки: колонки растянуты по высоте,
+      // и разъезжается в них именно содержимое.
+      top: Math.round(n.querySelector('.trio-label').getBoundingClientRect().top),
+    }));
     const tiles = [...document.querySelectorAll('.card')]
       .map((c) => c.textContent.replace(/\s+/g, ' ').trim());
-    return {
-      cushion: tiles.find((t) => t.startsWith('Подушка')) || null,
-      trio: text('.trio')[0] || null,
-    };
+    return { cells, cushion: tiles.find((t) => t.startsWith('Подушка')) || null };
   });
+  const home = await trio();
   console.log(`     подушка: ${home.cushion}`);
-  console.log(`     тройка:  ${home.trio}`);
+  home.cells.forEach((c) => console.log(`     ${c.label}: ${c.value} · ${c.hint} (верх ${c.top})`));
   check('подушка на главной', Boolean(home.cushion) && /мес\./.test(home.cushion), String(home.cushion));
   check('прожито и отложено на главной',
-    /Прожито/.test(home.trio || '') && /Отложено/.test(home.trio || ''), String(home.trio));
+    home.cells.some((c) => c.label === 'Прожито') && home.cells.some((c) => c.label === 'Отложено'),
+    home.cells.map((c) => c.label).join(', '));
+  check('отложено посчитано от дохода', /% дохода/.test(home.cells[1].hint), home.cells[1].hint);
+
+  // Три числа стоят в ряд, и подписи у них должны начинаться на одной
+  // высоте. Отступ между детьми карточки задан для стопки: в ряду он
+  // опускал второй и третий столбцы на двенадцать пикселей.
+  const tops = home.cells.map((c) => c.top);
+  check('подписи тройки на одной высоте', new Set(tops).size === 1, tops.join(' / '));
+
+  console.log('\n9. Выписка без доходов: отложено не выдумывается');
+  // Зарплату платят на другую карту, а выгружена эта: доходов в выписке
+  // нет вовсе. Разность «доход минус жизнь» тогда равна минус прожито —
+  // числу из соседней колонки со знаком, — и показывать её как ответ
+  // нельзя: экран сообщал бы об убытке, которого никто не считал.
+  await p.evaluate(async () => {
+    const store = await import('./js/store.js');
+    await store.mutate((d) => { d.spending = d.spending.filter((r) => r.kind !== 'Поступление'); });
+  });
+  await p.reload({ waitUntil: 'networkidle' });
+  await p.waitForTimeout(800);
+  const dry = await trio();
+  dry.cells.forEach((c) => console.log(`     ${c.label}: ${c.value} · ${c.hint}`));
+  check('прожито по-прежнему посчитано', /₽/.test(dry.cells[0].value), dry.cells[0].value);
+  check('отложено — прочерк', dry.cells[1].value === '—', dry.cells[1].value);
+  check('подпись называет нехватку', dry.cells[1].hint === 'в выписке нет доходов', dry.cells[1].hint);
 
   console.log(`\n  ошибок в консоли: ${errs.length}${errs.length ? ' — ' + errs.join(' | ') : ''}`);
   if (errs.length) bad += 1;

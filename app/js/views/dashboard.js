@@ -59,7 +59,7 @@ export function render(ctx) {
  * ровно на этой цифре.
  */
 function topBar(ctx) {
-  const items = noticeList(ctx);
+  const { items, hidden } = noticeList(ctx);
   const errors = items.filter((x) => x.level === 'error').length;
 
   return h('div', { class: 'top-bar' }, [
@@ -68,7 +68,7 @@ function topBar(ctx) {
       class: 'bell',
       type: 'button',
       'aria-label': items.length ? `Требует внимания: ${items.length}` : 'Ничего не требует внимания',
-      onclick: () => noticeSheet(ctx, items),
+      onclick: () => noticeSheet(ctx, items, hidden),
     }, [
       icons.icon('bell'),
       items.length
@@ -81,6 +81,10 @@ function topBar(ctx) {
 /**
  * Что показать под колокольчиком. Порядок — по цене вопроса: сперва то,
  * что стоит денег, потом то, что мешает считать, и только потом дисциплина.
+ *
+ * Скрытые сигналы возвращаются отдельным списком: счётчик их не считает —
+ * они на то и скрыты, — но найти их надо уметь, и другого места для этого
+ * на экране больше нет.
  */
 function noticeList(ctx) {
   const { state, today } = ctx;
@@ -98,7 +102,7 @@ function noticeList(ctx) {
   }
 
   const all = C.signals(state.assets, state.operations, today);
-  const { shown } = C.splitSignals(all, state.settings.mutedSignals);
+  const { shown, hidden } = C.splitSignals(all, state.settings.mutedSignals);
   for (const s of shown) {
     out.push({ level: s.level, kind: 'signal', title: s.asset.name, text: s.text, signal: s });
   }
@@ -106,54 +110,42 @@ function noticeList(ctx) {
   const line = adviceText(state, today);
   if (line) out.push({ level: 'info', kind: 'advice', title: mascot.NAME, text: line.text, go: line.go });
 
-  return out;
+  return { items: out, hidden };
 }
 
 // --------------------------------------------------------------------------
 
 /**
- * Одна фраза по делу от Кубыша.
- *
- * Ровно одна, и только когда есть что сказать. Приложение, которое советует
- * постоянно, перестают читать на третий день; приложение, которое молчит,
- * пока всё ровно, и говорит одну фразу, когда нет, — читают.
- *
- * Порядок правил — это порядок важности: сначала то, что стоит денег, потом
- * то, что мешает считать, и только потом дисциплина. Первое подошедшее
- * правило и есть фраза.
- */
-function advice(ctx) {
-  const { state, today, go } = ctx;
-  const line = adviceText(state, today);
-  if (!line) return null;
-
-  return h('button', {
-    class: 'advice',
-    type: 'button',
-    onclick: () => go(line.go),
-  }, [
-    mascot.portrait('advice-mascot'),
-    h('span', { class: 'advice-text', text: line.text }),
-    h('span', { class: 'row-chevron', text: '›' }),
-  ]);
-}
-
-/**
  * Шторка уведомлений. Каждое — со своим действием, а не просто текстом:
  * «банк показывает на 3,96 ₽ больше» без кнопки «записать разницу»
  * сообщает о проблеме и оставляет её решать вручную.
+ *
+ * Внизу — вход в список скрытых. Скрыть сигнал можно прямо отсюда, и без
+ * этой строки скрытое исчезало бы навсегда: на экране его больше нет,
+ * счётчик его не считает, а вспомнить, что оно было, неоткуда.
  */
-function noticeSheet(ctx, items) {
+function noticeSheet(ctx, items, hidden = []) {
   const { refresh, today } = ctx;
+
+  const foot = () => (hidden.length
+    ? h('button', {
+        class: 'notice-foot',
+        type: 'button',
+        onclick: () => hiddenSheet(ctx, hidden),
+      }, [
+        h('span', { text: `Скрытые сигналы: ${hidden.length}` }),
+        h('span', { class: 'row-chevron', text: '›' }),
+      ])
+    : null);
 
   U.sheet('Требует внимания', (api) => {
     api.setFooter([U.button('Закрыть', () => api.close(), { kind: 'primary' })]);
 
     if (!items.length) {
-      return [U.emptyState('Всё в порядке — приложению нечего сказать.')];
+      return [U.emptyState('Всё в порядке — приложению нечего сказать.'), foot()];
     }
 
-    return items.map((it) => {
+    return [...items.map((it) => {
       const act = [];
 
       if (it.kind === 'accrual') {
@@ -233,10 +225,21 @@ function noticeSheet(ctx, items) {
         ]),
         act.length ? h('div', { class: 'notice-acts' }, act) : null,
       ]);
-    });
+    }), foot()];
   }, { focus: false });
 }
 
+/**
+ * Одна фраза по делу от Кубыша.
+ *
+ * Ровно одна, и только когда есть что сказать. Приложение, которое советует
+ * постоянно, перестают читать на третий день; приложение, которое молчит,
+ * пока всё ровно, и говорит одну фразу, когда нет, — читают.
+ *
+ * Порядок правил — это порядок важности: сначала то, что стоит денег, потом
+ * то, что мешает считать, и только потом дисциплина. Первое подошедшее
+ * правило и есть фраза.
+ */
 function adviceText(state, today) {
   const alive = state.assets.filter((a) => a.status !== C.STATUS_SOLD);
 
@@ -453,63 +456,6 @@ function actionsRow(ctx) {
 }
 
 /**
- * Проценты не записываются молча: скрипт создавал операцию сам, здесь это
- * делает человек одним нажатием. Так остаётся момент, где сумму можно
- * сверить с приложением банка до того, как она попала в капитал.
- */
-function accruals(ctx) {
-  const { state, today, refresh } = ctx;
-  const pending = C.pendingAccruals(state.assets, state.operations, today);
-  const due = pending.filter((p) => p.fires);
-
-  if (due.length) {
-    return U.card(
-      due.map((item) =>
-        h('div', { class: 'accrual' }, [
-          h('div', { class: 'accrual-text' }, [
-            h('div', { class: 'accrual-title', text: `${item.asset.name}: день капитализации` }),
-            h('div', { class: 'accrual-sub', text: `Начислено ${F.money2(item.accrued)} с ${F.date(item.asset.lastCap || today)}` }),
-          ]),
-          U.button('Записать', async () => {
-            await store.mutate((draft) => {
-              draft.operations.push({
-                id: store.newId('op'),
-                date: today,
-                type: C.OP_INCOME,
-                amount: C.round2(item.accrued),
-                assetId: item.asset.id,
-                goalId: (item.asset.goalIds || [])[0] || null,
-                source: C.SOURCE_COMPUTED,
-                comment: 'Проценты, расчёт',
-              });
-              const asset = draft.assets.find((a) => a.id === item.asset.id);
-              if (asset) asset.lastCap = today;
-            });
-            U.toast('Проценты записаны — сверьте с банком');
-            refresh();
-          }, { kind: 'primary' }),
-        ]),
-      ),
-      { class: 'card-accrual' },
-    );
-  }
-
-  const growing = pending.filter((p) => C.round2(p.accrued) > 0);
-  if (!growing.length) return null;
-
-  const total = growing.reduce((s, p) => s + p.accrued, 0);
-  const next = growing[0].asset;
-  return h('p', { class: 'quiet-line' }, [
-    h('span', { text: `Накоплено процентов ${F.money2(total)}` }),
-    h('span', { class: 'quiet-line-dot', text: '·' }),
-    h('span', {
-      class: 'quiet-line-sub',
-      text: next.capDay ? `запишутся ${next.capDay}-го числа` : 'день капитализации не задан',
-    }),
-  ]);
-}
-
-/**
  * Цели — лентой внутри одной плитки.
  *
  * Активных целей бывает одна, а бывает пять, и вертикали под них на главной
@@ -676,6 +622,13 @@ function trioTile(ctx) {
     : null;
   const { filled, elapsed, streak } = charts.ritual(state.operations, state.settings.quickGoalId, today);
 
+  // Отложено — это доход минус жизнь, и без доходов такой разности нет:
+  // остаётся минус прожито, то есть число из соседней колонки со знаком.
+  // Выглядит оно ответом — «за месяц ушло в минус 7 651 ₽», — хотя говорит
+  // лишь о том, что доходы в выписку не попали: зарплата приходит в другой
+  // банк, а выгружена карта, которой платят.
+  const saved = stats && stats.income > 0;
+
   const cell = (label, value, hint, extra) => h('div', { class: `trio-cell ${extra || ''}`.trim() }, [
     h('span', { class: 'trio-label', text: label }),
     h('span', { class: 'trio-value', text: value }),
@@ -689,151 +642,16 @@ function trioTile(ctx) {
   }, [
     cell('Прожито', stats ? F.moneyShort(stats.spent) : '—',
       stats ? `за ${stats.months} мес.` : 'нужна выписка'),
-    cell('Отложено', stats ? F.signedMoney(stats.free) : '—',
-      stats && stats.rate != null ? `${Math.round(stats.rate * 100)}% дохода` : 'нужна выписка',
-      stats && stats.free > 0 ? 'is-good' : ''),
+    // Подпись под прочерком называет то, чего не хватает, и она разная:
+    // выписки нет вовсе или выписка есть, а доходов в ней нет. Прежде
+    // и там и там стояло «нужна выписка» — под уже посчитанным прожито
+    // это читалось как поломка.
+    cell('Отложено', saved ? F.signedMoney(stats.free) : '—',
+      saved ? `${Math.round(stats.rate * 100)}% дохода`
+        : stats ? 'в выписке нет доходов' : 'нужна выписка',
+      saved ? (stats.free > 0 ? 'is-good' : 'is-bad') : ''),
     cell('Дисциплина', `${filled} из ${elapsed}`,
       `${streak} ${F.plural(streak, 'день', 'дня', 'дней')} подряд`),
-  ]);
-}
-
-/**
- * Сигналы. Если всё спокойно, блок сворачивается в одну строку: пустая
- * карточка «Требует внимания: пусто» каждый день занимала бы экран,
- * ничего не сообщая.
- */
-function attention(ctx) {
-  const { state, today, refresh } = ctx;
-  const all = C.signals(state.assets, state.operations, today);
-  const { shown, hidden } = C.splitSignals(all, state.settings.mutedSignals);
-
-  if (!shown.length) {
-    const line = [h('span', { text: 'Всё в порядке — сигналов нет' })];
-    if (hidden.length) {
-      line.push(h('span', { class: 'quiet-line-dot', text: '·' }));
-      line.push(h('button', { class: 'link', type: 'button', onclick: () => hiddenSheet(ctx, hidden) },
-        [h('span', { text: `скрыто ${hidden.length}` })]));
-    }
-    return h('p', { class: 'quiet-line' }, line);
-  }
-
-  const errors = shown.filter((s) => s.level === 'error');
-  // Пока человек сам не свернул или не развернул блок, решает содержимое:
-  // ошибку прятать нельзя, предупреждение того не стоит. Как только выбор
-  // сделан, он сохраняется — иначе принятая ошибка раскрывала бы блок
-  // каждый день, и свернуть его было бы невозможно.
-  const pref = state.settings.signalsOpen;
-  const open = pref == null ? errors.length > 0 : Boolean(pref);
-
-  const items = h('div', { class: 'signals', hidden: !open },
-    shown.map((s) => signalRow(ctx, s)),
-  );
-
-  const toggle = h('button', {
-    class: 'disclosure',
-    type: 'button',
-    'aria-expanded': String(open),
-    onclick: (e) => {
-      items.hidden = !items.hidden;
-      e.currentTarget.setAttribute('aria-expanded', String(!items.hidden));
-      e.currentTarget.querySelector('.disclosure-chevron').textContent = items.hidden ? '⌄' : '⌃';
-      // Без перерисовки: она бы схлопнула только что раскрытый блок обратно
-      // в анимацию появления, а положение выбора и так уже на экране.
-      store.mutate((draft) => { draft.settings.signalsOpen = !items.hidden; });
-    },
-  }, [
-    statusIcon(errors.length ? 'error' : 'warn'),
-    h('span', { class: 'disclosure-label', text: `Требует внимания: ${shown.length}` }),
-    hidden.length ? h('span', { class: 'disclosure-hidden', text: `скрыто ${hidden.length}` }) : null,
-    h('span', { class: 'disclosure-chevron', text: open ? '⌃' : '⌄' }),
-  ]);
-
-  const foot = hidden.length
-    ? h('button', { class: 'signals-foot', type: 'button', onclick: () => hiddenSheet(ctx, hidden) }, [
-        h('span', { text: `Скрытые сигналы: ${hidden.length}` }),
-        h('span', { class: 'row-chevron', text: '›' }),
-      ])
-    : null;
-
-  return U.card([toggle, items, foot], { class: 'card-signals' });
-}
-
-/**
- * Строка сигнала: слева — переход к активу, справа — «скрыть».
- *
- * Две отдельные кнопки, а не одна: кнопку внутри кнопки браузер разбирать
- * не обязан, да и промахнуться пальцем по такому было бы легко.
- */
-function signalRow(ctx, s) {
-  const { refresh } = ctx;
-  return h('div', { class: `signal signal-${s.level}` }, [
-    h('div', { class: 'signal-row' }, [
-      h('button', {
-        class: 'signal-main',
-        type: 'button',
-        onclick: () => forms.assetSheet(s.asset, { onDone: refresh }),
-      }, [
-        statusIcon(s.level),
-        h('span', { class: 'signal-text' }, [
-          h('span', { class: 'signal-asset', text: s.asset.name }),
-          h('span', { class: 'signal-note', text: s.text }),
-        ]),
-      ]),
-      h('button', {
-        class: 'signal-mute',
-        type: 'button',
-        'aria-label': `Скрыть сигнал: ${s.asset.name}, ${s.text}`,
-        onclick: async () => {
-          await store.mutate((draft) => {
-            const key = C.signalKey(s);
-            const kept = (draft.settings.mutedSignals || []).filter((m) => (m.key || m) !== key);
-            kept.push({ key, text: s.text });
-            draft.settings.mutedSignals = kept;
-          });
-          U.toast('Сигнал скрыт — вернётся, если изменится');
-          refresh();
-        },
-      }, [h('span', { text: '✕' })]),
-    ]),
-    signalAction(ctx, s),
-  ]);
-}
-
-/**
- * Действие по сигналу, если оно однозначно.
- *
- * Пока такое одно: банк показывает больше, чем насчитало приложение. Разница
- * почти всегда — начисленные проценты, которые ещё не записаны, и закрыть её
- * можно только операцией «Доход»: приложение сравнивает банк с расчётом,
- * а не с прошлым значением сверки, поэтому переписать число сверки — не выход.
- *
- * Обратный случай — банк показывает меньше — кнопки не получает намеренно.
- * Там причина обычно другая: после сверки были взносы, а число осталось
- * старым. Записать расход на эту разницу значило бы стереть настоящие деньги,
- * и решать это должен человек, открыв карточку актива.
- */
-function signalAction(ctx, s) {
-  const { today, refresh } = ctx;
-  if (s.kind !== 'bank-gap' || !(s.gap > 0)) return null;
-
-  return h('div', { class: 'signal-actions' }, [
-    U.button(`Записать разницу ${F.money2(s.gap)}`, async () => {
-      await store.mutate((draft) => {
-        draft.operations.push({
-          id: store.newId('op'),
-          date: today,
-          type: C.OP_INCOME,
-          amount: s.gap,
-          assetId: s.asset.id,
-          goalId: (s.asset.goalIds || [])[0] || null,
-          source: C.SOURCE_COMPUTED,
-          comment: 'Разница со сверкой',
-        });
-      });
-      U.tap();
-      U.toast(`Доход ${F.money2(s.gap)} записан`);
-      refresh();
-    }, { kind: 'primary', class: 'btn-wide' }),
   ]);
 }
 

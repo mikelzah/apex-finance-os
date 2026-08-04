@@ -1,4 +1,12 @@
-// Скрытие сигналов: скрыть, вернуть, свернуть блок и чтобы выбор сохранялся.
+// Скрытие сигналов: скрыть, найти скрытое, вернуть — по одному и все сразу.
+//
+// Блока сигналов на главной больше нет: сигналы живут в шторке под
+// колокольчиком. Складка и память о ней проверялись здесь, пока блок был
+// на экране; в шторке сворачивать нечего. Осталось то, ради чего складка
+// и была: видно, что сигнал есть, его можно убрать — и убранное можно
+// найти. Последнее держится на единственной строке в подвале шторки:
+// счётчик скрытое не считает, на экране его нет, и без этой строки
+// скрытое становится потерянным.
 const { chromium } = require('playwright');
 const URL = 'http://127.0.0.1:8899/app/index.html';
 
@@ -26,74 +34,65 @@ const URL = 'http://127.0.0.1:8899/app/index.html';
       d.assets[1].goalIds = [g[0], g[1]];
       d.assets[0].bankBalance = 999999;
       d.settings.mutedSignals = [];
-      d.settings.signalsOpen = null;
     });
   });
   await p.reload({ waitUntil: 'networkidle' });
-  await p.waitForTimeout(800);
+  await p.waitForTimeout(900);
 
-  const state = () => p.evaluate(() => {
-    const dis = document.querySelector('.disclosure');
-    const items = document.querySelector('.signals');
-    return {
-      label: dis ? dis.querySelector('.disclosure-label').textContent : null,
-      hiddenTag: dis && dis.querySelector('.disclosure-hidden') ? dis.querySelector('.disclosure-hidden').textContent : null,
-      expanded: dis ? dis.getAttribute('aria-expanded') : null,
-      rows: document.querySelectorAll('.signal').length,
-      visible: items ? !items.hidden : false,
-      foot: document.querySelector('.signals-foot') ? document.querySelector('.signals-foot').textContent.trim() : null,
-      // Спокойных строк на экране несколько (проценты, ритуал) — нужна та,
-      // что про сигналы.
-      quiet: (() => {
-        const el = [...document.querySelectorAll('.quiet-line')].find((q) => /сигнал/.test(q.textContent));
-        return el ? el.textContent.trim() : null;
-      })(),
-      muted: null,
-    };
-  });
   const muted = () => p.evaluate(async () => (await import('./js/store.js')).getState().settings.mutedSignals);
+  const bell = () => p.evaluate(() => Number(document.querySelector('.bell-count')?.textContent || 0));
+  const openBell = async () => { await p.tap('.bell'); await p.waitForTimeout(500); };
+  // Сигнал — это уведомление с кнопкой «Скрыть сигнал»: в шторке рядом
+  // с ними лежат ещё день капитализации и фраза Кубыша.
+  const signalRows = () => p.locator('.notice', { has: p.locator('.btn', { hasText: 'Скрыть сигнал' }) });
 
-  console.log('\n1. Есть ошибки — блок раскрыт сам');
-  let s = await state();
-  console.log(`     «${s.label}», раскрыт ${s.expanded}, строк ${s.rows}`);
-  check('блок раскрыт', s.expanded === 'true' && s.visible);
-  const total = s.rows;
-  check('сигналы есть', total >= 3, String(total));
-  check('кнопки скрытия у каждого', (await p.locator('.signal-mute').count()) === total);
+  console.log('\n1. Сигналы есть — счётчик на колокольчике, сами они в шторке');
+  const count = await bell();
+  console.log(`     на колокольчике ${count}`);
+  check('счётчик показан', count >= 3, String(count));
+  await openBell();
+  const total = await signalRows().count();
+  console.log(`     сигналов в шторке ${total}`);
+  check('сигналы в шторке', total >= 3, String(total));
+  check('подвала со скрытыми пока нет', (await p.locator('.notice-foot').count()) === 0);
 
   console.log('\n2. Скрываем один');
-  await p.locator('.signal-mute').first().click();
-  await p.waitForTimeout(600);
-  s = await state();
-  console.log(`     «${s.label}», строк ${s.rows}, ярлык «${s.hiddenTag}», подвал «${s.foot}»`);
-  check('сигналов стало меньше', s.rows === total - 1, `${s.rows} было ${total}`);
-  check('счётчик в заголовке', /скрыто 1/.test(s.hiddenTag || ''), s.hiddenTag);
-  check('подвал со скрытыми', /Скрытые сигналы: 1/.test(s.foot || ''), s.foot);
-  check('скрытие сохранено', (await muted()).length === 1, JSON.stringify(await muted()));
-
-  console.log('\n3. Скрытие держится после перезагрузки');
-  await p.reload({ waitUntil: 'networkidle' });
+  await p.locator('.btn', { hasText: 'Скрыть сигнал' }).first().tap();
   await p.waitForTimeout(800);
-  s = await state();
-  check('строк столько же', s.rows === total - 1, String(s.rows));
+  check('скрытие сохранено', (await muted()).length === 1, JSON.stringify(await muted()));
+  console.log(`     на колокольчике было ${count}, стало ${await bell()}`);
+  check('счётчик убавился', (await bell()) === count - 1, String(await bell()));
+
+  console.log('\n3. Скрытие держится после перезагрузки, и скрытое видно в подвале');
+  await p.reload({ waitUntil: 'networkidle' });
+  await p.waitForTimeout(900);
+  await openBell();
+  check('сигналов на один меньше', (await signalRows().count()) === total - 1, String(await signalRows().count()));
+  const foot = (await p.locator('.notice-foot').textContent() || '').trim();
+  console.log(`     подвал: «${foot}»`);
+  check('подвал со скрытыми', /Скрытые сигналы: 1/.test(foot), foot);
 
   console.log('\n4. Возвращаем через список скрытых');
-  await p.click('.signals-foot');
+  await p.tap('.notice-foot');
   await p.waitForTimeout(600);
   const sheetRows = await p.locator('.sheet .row').count();
   check('в списке один скрытый', sheetRows === 1, String(sheetRows));
-  await p.locator('.sheet .row').first().click();
-  await p.waitForTimeout(700);
-  s = await state();
-  check('сигнал вернулся', s.rows === total, `${s.rows} vs ${total}`);
+  await p.locator('.sheet .row').first().tap();
+  await p.waitForTimeout(800);
   check('скрытых не осталось', (await muted()).length === 0);
+  check('счётчик вернулся', (await bell()) === count, String(await bell()));
+  await openBell();
+  check('сигнал вернулся в шторку', (await signalRows().count()) === total, String(await signalRows().count()));
 
   console.log('\n5. Изменившийся сигнал возвращается сам');
-  await p.locator('.signal-mute').first().click();
-  await p.waitForTimeout(600);
+  await p.locator('.btn', { hasText: 'Скрыть сигнал' }).first().tap();
+  await p.waitForTimeout(800);
   const before = (await muted())[0];
   console.log(`     скрыт: ${before.key} — «${before.text}»`);
-  const wasHiddenRows = (await state()).rows;
+  await p.reload({ waitUntil: 'networkidle' });
+  await p.waitForTimeout(900);
+  await openBell();
+  const wasHiddenRows = await signalRows().count();
   // Меняем расхождение: формулировка станет другой.
   await p.evaluate(async () => {
     const store = await import('./js/store.js');
@@ -103,50 +102,42 @@ const URL = 'http://127.0.0.1:8899/app/index.html';
     });
   });
   await p.reload({ waitUntil: 'networkidle' });
-  await p.waitForTimeout(800);
-  const after = await state();
-  console.log(`     строк было ${wasHiddenRows}, стало ${after.rows}`);
+  await p.waitForTimeout(900);
+  await openBell();
+  const after = await signalRows().count();
+  console.log(`     сигналов было ${wasHiddenRows}, стало ${after}`);
   if (/расхождение/.test(before.text)) {
-    check('расхождение вернулось после изменения', after.rows === wasHiddenRows + 1, `${after.rows}`);
+    check('расхождение вернулось после изменения', after === wasHiddenRows + 1, String(after));
   } else {
     check('скрыто не расхождение — проверка неприменима', true, `скрыт «${before.text}»`);
   }
 
-  console.log('\n6. Свёрнутое состояние держится, несмотря на ошибки');
+  console.log('\n6. Скрыть все — колокольчик гаснет, но скрытое находится');
   await p.evaluate(async () => {
     const store = await import('./js/store.js');
-    await store.mutate((d) => { d.settings.mutedSignals = []; d.settings.signalsOpen = null; });
+    await store.mutate((d) => { d.settings.mutedSignals = []; });
   });
   await p.reload({ waitUntil: 'networkidle' });
-  await p.waitForTimeout(800);
-  check('раскрыт по умолчанию (есть ошибки)', (await state()).expanded === 'true');
-  await p.click('.disclosure');
-  await p.waitForTimeout(500);
-  check('свернулся', (await state()).visible === false);
-  await p.reload({ waitUntil: 'networkidle' });
-  await p.waitForTimeout(800);
-  s = await state();
-  check('остался свёрнутым после перезагрузки', s.visible === false && s.expanded === 'false', `раскрыт ${s.expanded}`);
-
-  console.log('\n7. Скрыть все — блок уходит в спокойную строку');
-  await p.click('.disclosure');
-  await p.waitForTimeout(400);
-  let n = await p.locator('.signal-mute').count();
+  await p.waitForTimeout(900);
+  await openBell();
+  let n = await p.locator('.btn', { hasText: 'Скрыть сигнал' }).count();
   while (n > 0) {
-    await p.locator('.signal-mute').first().click();
-    await p.waitForTimeout(500);
-    n = await p.locator('.signal-mute').count();
+    await p.locator('.btn', { hasText: 'Скрыть сигнал' }).first().tap();
+    await p.waitForTimeout(700);
+    await openBell();
+    n = await p.locator('.btn', { hasText: 'Скрыть сигнал' }).count();
   }
-  s = await state();
-  console.log(`     спокойная строка: «${s.quiet}»`);
-  check('карточка сигналов ушла', s.label === null);
-  check('строка сообщает про скрытые', /скрыто/.test(s.quiet || ''), s.quiet);
-  await p.click('.quiet-line .link');
-  await p.waitForTimeout(500);
-  check('список скрытых открывается', (await p.locator('.sheet .row').count()) > 0);
-  await p.locator('.sheet-foot .btn-primary').click();
-  await p.waitForTimeout(700);
-  check('«показать все» вернуло сигналы', (await state()).rows > 0);
+  const hiddenCount = (await muted()).length;
+  console.log(`     скрыто ${hiddenCount}, на колокольчике ${await bell()}`);
+  check('скрыты все сигналы', hiddenCount >= 3, String(hiddenCount));
+  check('подвал со скрытыми на месте', /Скрытые сигналы/.test((await p.locator('.notice-foot').textContent() || '')));
+  await p.tap('.notice-foot');
+  await p.waitForTimeout(600);
+  check('список скрытых открывается', (await p.locator('.sheet .row').count()) === hiddenCount, String(await p.locator('.sheet .row').count()));
+  await p.locator('.sheet-foot .btn-primary').tap();
+  await p.waitForTimeout(800);
+  check('«показать все» вернуло сигналы', (await muted()).length === 0);
+  check('счётчик вернулся полностью', (await bell()) >= hiddenCount, String(await bell()));
 
   await c.close();
   await b.close();

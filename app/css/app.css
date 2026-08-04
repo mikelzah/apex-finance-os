@@ -277,15 +277,13 @@ body.is-locked .screen { overflow: hidden; }
 .segment,
 .figure-toggle,
 .tile-more,
-.linked-head,
-.signal-mute { position: relative; }
+.linked-head { position: relative; }
 
 .btn::after,
 .segment::after,
 .figure-toggle::after,
 .tile-more::after,
-.linked-head::after,
-.signal-mute::after {
+.linked-head::after {
   content: '';
   position: absolute;
   left: 0;
@@ -361,6 +359,27 @@ body.is-locked .screen { overflow: hidden; }
 .notice-title { display: block; font-size: var(--text-base); font-weight: var(--weight-semibold); }
 .notice-body { display: block; font-size: var(--text-sm); color: var(--ink-3); margin-top: 2px; line-height: var(--leading-snug); }
 .notice-acts { display: flex; flex-direction: column; gap: var(--space-2); margin-top: var(--space-3); }
+
+/* Вход в список скрытых — подвалом шторки уведомлений. Тише самих
+   уведомлений: это не то, что требует внимания, а то, что от него убрали. */
+.notice-foot {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  width: 100%;
+  min-height: var(--row-h);
+  margin-top: var(--space-1);
+  padding: var(--space-2) var(--space-1);
+  border: 0;
+  background: none;
+  color: var(--ink-3);
+  font-family: inherit;
+  font-size: var(--text-sm);
+  text-align: left;
+  cursor: pointer;
+}
+
+.notice-foot span:first-child { flex: 1; }
 
 .tile-pair {
   display: grid;
@@ -570,6 +589,10 @@ body.is-locked .screen { overflow: hidden; }
 
 /* Три числа в ряд, разделённые волосяной линией. */
 .trio { flex-direction: row; align-items: stretch; }
+/* Отступ между детьми блока задан для стопки и в ряду означает другое:
+   второй и третий столбцы уезжали вниз на двенадцать пикселей, и подписи
+   в ряду стояли на трёх разных высотах. */
+.trio > * + * { margin-top: 0; }
 .trio-cell { flex: 1; min-width: 0; padding: 0 var(--space-2); position: relative; }
 .trio-cell:first-child { padding-left: 0; }
 .trio-cell:last-child { padding-right: 0; }
@@ -599,6 +622,7 @@ body.is-locked .screen { overflow: hidden; }
   white-space: nowrap;
 }
 .trio-cell.is-good .trio-value { color: var(--good-ink); }
+.trio-cell.is-bad .trio-value { color: var(--critical-ink); }
 .trio-hint { display: block; font-size: var(--text-micro); color: var(--ink-3); line-height: 1.25; }
 
 /* -------------------------------------------------------------------------- */
@@ -831,7 +855,14 @@ body.is-locked .screen { overflow: hidden; }
   margin-bottom: var(--tile-gap);
 }
 
-.card > * + * { margin-top: var(--space-3); }
+/* Промежуток между содержимым блока — именно по умолчанию, а не поверх
+   всего: :where обнуляет вес правила, и собственный отступ элемента
+   перебивает его, где бы он ни был записан. Без этого правило выигрывало
+   у всей сетки плиток просто потому, что стоит в файле ниже: обнуление
+   в плитке капитала, четыре пикселя у искры, два у подписей под числами —
+   всё это было написано и ничего не работало, а плитки набирали
+   по двенадцать пикселей в каждом стыке. */
+:where(.card) > * + * { margin-top: var(--space-3); }
 
 /* Подпись над группой блоков. Не заголовок внутри блока, а надпись на поле:
    она называет то, что идёт следом, и потому набрана мелкими прописными —
@@ -857,17 +888,6 @@ body.is-locked .screen { overflow: hidden; }
   padding-top: var(--space-4);
   border-top: 1px solid var(--line);
 }
-/* Прежде здесь стояло border: 0 — при карточке без края это ничего
-   не значило. Теперь край есть у всех, и цель не исключение. */
-/* День капитализации — единственный блок, который просит нажать. Отмечен
-   не рамкой, а жёлтой полосой слева: рамка вокруг белого блока на сером
-   поле почти не видна, полоса видна сразу. */
-.card-accrual {
-  border-left: 3px solid var(--accent);
-  border-radius: var(--space-1) var(--block-radius) var(--block-radius) var(--space-1);
-}
-.card-signals { padding: var(--space-2) var(--space-3); }
-.card-signals > * + * { margin-top: var(--space-2); }
 /* Таблица распоряжается полем сама — карточка отдаёт ей всю ширину. */
 .card-table { padding: var(--space-4) 0; overflow: hidden; }
 .card-table > .section-title, .card-table > .callout { margin-left: var(--space-4); margin-right: var(--space-4); }
@@ -952,18 +972,6 @@ h3 {
 
 .empty { margin: 0; padding: var(--space-4) 0; color: var(--ink-3); font-size: var(--text-base); text-align: center; }
 .version { text-align: center; color: var(--ink-3); font-size: var(--text-xs); margin: var(--space-6) 0 0; }
-
-.quiet-line {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-2);
-  margin: 0 0 var(--space-3);
-  padding: 0 var(--space-1);
-  font-size: var(--text-sm);
-  color: var(--ink-3);
-}
-
-.quiet-line-sub, .quiet-line-dot { color: var(--ink-4); }
 
 /* -------------------------------------------------------------------------- */
 /* Плитки и строки                                                            */
@@ -1215,112 +1223,6 @@ h3 {
 .status-info { background: var(--sunken); color: var(--ink-2); }
 .status-ok { background: var(--good-wash); color: var(--good-ink); }
 
-.disclosure {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  width: 100%;
-  min-height: var(--row-h);
-  padding: var(--space-2) var(--space-1);
-  border: 0;
-  background: none;
-  color: var(--ink);
-  font-family: inherit;
-  font-size: var(--text-base);
-  cursor: pointer;
-  text-align: left;
-}
-
-.disclosure-label { flex: 1; }
-.disclosure-chevron {
-  color: var(--ink-3);
-  transition: transform var(--dur-fast) var(--ease-out);
-}
-.disclosure[aria-expanded='true'] .disclosure-chevron { transform: rotate(180deg); }
-
-.signals { display: flex; flex-direction: column; gap: var(--space-1); }
-
-/* Сигнал — не одна кнопка: переход к активу, «скрыть», иногда действие.
-   Фон и радиус живут на обёртке, чтобы всё читалось как одна плашка. */
-.signal {
-  border-radius: var(--radius-sm);
-  background: var(--sunken);
-  overflow: hidden;
-}
-
-.signal-row { display: flex; align-items: stretch; }
-
-/* Действие идёт отдельной строкой, а не третьей кнопкой в ряд: «Записать
-   разницу 3,96 ₽» рядом с названием актива и крестиком не помещается,
-   а резать подпись до «Записать» — терять смысл. */
-.signal-actions {
-  padding: 0 var(--space-3) var(--space-3);
-}
-
-.signal-main {
-  display: flex;
-  align-items: flex-start;
-  gap: var(--space-2);
-  flex: 1;
-  min-width: 0;
-  text-align: left;
-  padding: var(--space-3);
-  border: 0;
-  background: none;
-  color: var(--ink);
-  font-family: inherit;
-  cursor: pointer;
-}
-
-/* Разрушительного тут нет — сигнал только перестаёт показываться, — поэтому
-   крестик тихий. Зона нажатия всё равно во всю высоту плашки: промахнуться
-   по 44 пикселям сложнее, чем по иконке. */
-.signal-mute {
-  flex: none;
-  width: 2.75rem;
-  border: 0;
-  border-left: 1px solid var(--line-soft);
-  background: none;
-  color: var(--ink-3);
-  font-family: inherit;
-  font-size: var(--text-base);
-  cursor: pointer;
-  transition: color var(--dur-fast) var(--ease-out), background-color var(--dur-fast) var(--ease-out);
-}
-
-.signal-mute:active { color: var(--ink-2); background: var(--raised); }
-
-.signal-text { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
-.signal-asset { font-size: var(--text-base); font-weight: var(--weight-semibold); }
-.signal-note { font-size: var(--text-sm); color: var(--ink-3); }
-
-/* Счётчик скрытых в заголовке блока: он объясняет, почему сигналов меньше,
-   чем было. Без него убыль числа выглядела бы как потеря данных. */
-.disclosure-hidden {
-  flex: none;
-  font-size: var(--text-xs);
-  color: var(--ink-3);
-}
-
-.signals-foot {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  width: 100%;
-  min-height: var(--row-h);
-  margin-top: var(--space-1);
-  padding: var(--space-2) var(--space-1);
-  border: 0;
-  background: none;
-  color: var(--ink-3);
-  font-family: inherit;
-  font-size: var(--text-sm);
-  text-align: left;
-  cursor: pointer;
-}
-
-.signals-foot span:first-child { flex: 1; }
-
 /* Текстовая кнопка внутри строки. Подчёркивания нет: в спокойной строке
    акцентного цвета достаточно, а подчёркивание рядом с текстом шумит. */
 .link {
@@ -1366,11 +1268,6 @@ h3 {
 
 .banner-title { font-size: var(--text-base); font-weight: var(--weight-semibold); }
 .banner-sub { font-size: var(--text-xs); color: var(--ink-3); }
-
-.accrual { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); }
-.accrual-text { min-width: 0; }
-.accrual-title { font-size: var(--text-base); font-weight: var(--weight-semibold); }
-.accrual-sub { font-size: var(--text-sm); color: var(--ink-3); margin-top: 1px; }
 
 /* Оффлайн. Данные и так лежат в телефоне, поэтому это не тревога,
    а спокойная сноска: не обновятся только котировки. */
@@ -1726,30 +1623,6 @@ button.alloc-row { cursor: pointer; }
 .lock-title { margin: 0; font-size: var(--text-2xl); font-weight: var(--weight-bold); letter-spacing: var(--tracking-2xl); }
 .lock .btn { min-width: 12rem; }
 .lock-note { margin: 0; min-height: 1.2em; font-size: var(--text-sm); color: var(--ink-3); text-align: center; }
-
-/* Фраза от Кубыша. Не карточка и не плашка тревоги: это подсказка, а не
-   происшествие, и весить она должна как строка, а не как раздел. */
-.advice {
-  appearance: none;
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-  width: 100%;
-  margin-bottom: var(--space-3);
-  padding: var(--space-3) var(--space-4);
-  border: 0;
-  border-radius: var(--block-radius);
-  background: var(--card);
-  color: var(--ink-2);
-  font: inherit;
-  font-size: var(--text-sm);
-  text-align: left;
-  cursor: pointer;
-}
-
-.advice:active { filter: brightness(0.95); }
-.advice-mascot { width: 1.75rem; flex: none; }
-.advice-text { flex: 1; min-width: 0; }
 
 /* Пустое состояние — не серая надпись посреди белого поля. Такая надпись
    сообщает «здесь ничего нет» и на этом заканчивается, а экран продолжает
