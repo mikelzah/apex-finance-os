@@ -67,7 +67,14 @@ const ROUTES = [
     const p = await c.newPage();
     const errs = [];
     p.on('pageerror', (e) => errs.push(String(e)));
-    p.on('console', (m) => { if (m.type() === 'error') errs.push(m.text()); });
+    // Значок бумаги ищется файлом по тикеру, и файла чаще всего нет: облигаций
+    // и фондов тысячи, логотипов у них не бывает. Приложение рисует монограмму —
+    // это штатный вид, а не сбой, и ответ сервера здесь не ошибка.
+    p.on('console', (m) => {
+      if (m.type() !== 'error') return;
+      if (/404/.test(m.text()) && /icons\/tickers\//.test(m.location()?.url || '')) return;
+      errs.push(m.text());
+    });
 
     await p.goto(`${URL}#/dashboard`, { waitUntil: 'networkidle' });
     await p.waitForTimeout(700);

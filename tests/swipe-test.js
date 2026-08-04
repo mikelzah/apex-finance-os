@@ -124,7 +124,7 @@ const check = (label, ok, extra = '') => {
   await page.goto(`${URL}#/journal`, { waitUntil: 'networkidle' });
   await page.waitForTimeout(500);
   const before = await page.evaluate(() => document.querySelectorAll('.op').length);
-  await page.click('.screen-head .btn');
+  await page.click('.screen-head .head-round');
   await page.waitForTimeout(500);
   await page.fill('.sheet-body .control', '750');
   await page.click('.sheet-foot .btn-primary');
