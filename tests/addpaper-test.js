@@ -8,7 +8,16 @@ const URL = 'http://127.0.0.1:8899/app/index.html';
   const p = await c.newPage();
   const errs = [];
   p.on('pageerror', (e) => errs.push(String(e)));
-  p.on('console', (m) => { if (m.type() === 'error') errs.push(m.text()); });
+  // Значок бумаги ищется файлом по тикеру, и файла чаще всего нет: облигаций
+  // и фондов тысячи, логотипов у них не бывает. Отсутствие файла — штатное
+  // состояние, приложение рисует монограмму. Считать этот ответ сервера
+  // ошибкой значит требовать список «у кого значок есть», от которого
+  // в приложении сознательно отказались.
+  p.on('console', (m) => {
+    if (m.type() !== 'error') return;
+    if (/404/.test(m.text()) && /icons\/tickers\//.test(m.location()?.url || '')) return;
+    errs.push(m.text());
+  });
 
   let bad = 0;
   const check = (l, ok, d) => { console.log(`  ${ok ? 'ok  ' : 'FAIL'} ${l}${d ? ' — ' + d : ''}`); if (!ok) bad += 1; };
@@ -19,8 +28,11 @@ const URL = 'http://127.0.0.1:8899/app/index.html';
   await p.goto(`${URL}#/portfolio`, { waitUntil: 'networkidle' });
   await p.waitForTimeout(800);
 
+  // Действие раздела живёт в шапке раздела и подписано не текстом, а именем
+  // для скринридера: круг с плюсом узнаётся без слова, а слово никуда
+  // не делось — оно в aria-label и в заголовке шторки, которая открывается.
   console.log('\n1. Кнопка на экране портфеля');
-  const btn = p.locator('button:has-text("Добавить бумагу")');
+  const btn = p.locator('.screen-head .head-round[aria-label="Добавить бумагу"]');
   check('кнопка есть', (await btn.count()) === 1, String(await btn.count()));
 
   console.log('\n2. Форма открывается готовой под бумагу');

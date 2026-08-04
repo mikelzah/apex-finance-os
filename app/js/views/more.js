@@ -17,6 +17,15 @@ import * as S from '../statement.js';
 
 const { h } = U;
 
+/**
+ * Шапка раздела. Действия у неё нет: «Настройки» — это перечень входов,
+ * а не список, в который что-то добавляют. Круглый плюс здесь означал бы,
+ * что настройку можно завести, — а завести можно только то, что за ними.
+ */
+export function head() {
+  return U.screenHead('Настройки');
+}
+
 export function render(ctx) {
   switch (ctx.sub) {
     case 'assets': return assets(ctx);
@@ -91,11 +100,15 @@ function hub(ctx) {
       (() => {
         const found = C.dataHealth(state, today);
         const errors = found.filter((x) => x.level === 'error').length;
-        return U.row('Проверка данных', found.length ? String(found.length) : 'чисто', {
+        // Ошибка называет себя словом и краснеет. Прежде здесь стояло голое
+        // число и серая метка «ошибки» рядом: «2» с тем же весом, что «24»
+        // у категорий строкой ниже, — а это разные вещи, и одна из них
+        // означает, что цифрам в приложении верить нельзя.
+        return U.row('Проверка данных', errors ? '' : String(found.length || 'чисто'), {
           sub: 'находит то, что молча искажает цифры',
           onClick: () => ctx.go('more/health'),
-          tag: errors ? 'ошибки' : null,
-          tagClass: 'sell',
+          tag: errors ? `${errors} ${F.plural(errors, 'ошибка', 'ошибки', 'ошибок')}` : null,
+          tagClass: 'error',
         });
       })(),
       U.row('Категории трат', String(

@@ -8,7 +8,16 @@ const URL = 'http://127.0.0.1:8899/app/index.html';
   const p = await c.newPage();
   const errs = [];
   p.on('pageerror', (e) => errs.push(String(e)));
-  p.on('console', (m) => { if (m.type() === 'error') errs.push(m.text()); });
+  // Значок бумаги ищется файлом по тикеру, и у облигаций его нет по существу:
+  // облигаций тысячи, логотипов у них не бывает. Отсутствие файла — штатное
+  // состояние, приложение рисует вместо значка монограмму. Считать этот
+  // ответ сервера ошибкой значит требовать список «у кого значок есть»,
+  // от которого в приложении сознательно отказались.
+  p.on('console', (m) => {
+    if (m.type() !== 'error') return;
+    if (/404/.test(m.text()) && /icons\/tickers\//.test(m.location()?.url || '')) return;
+    errs.push(m.text());
+  });
   let bad = 0;
   const check = (l, ok, d) => { console.log(`  ${ok ? 'ok  ' : 'FAIL'} ${l}${d ? ' — ' + d : ''}`); if (!ok) bad += 1; };
   const near = (a, z, eps = 0.5) => Math.abs(a - z) <= eps;

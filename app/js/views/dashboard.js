@@ -35,13 +35,19 @@ export function render(ctx) {
 
   const worth = C.netWorth(state.assets, state.operations);
 
+  // Сетка, а не поток. Строки заданы явно, и пятая забирает всё, что осталось:
+  // иначе остаток экрана собирается внизу чёрной полосой, и экран выглядит
+  // недогруженным, хотя помещается ровно как надо. Плитке негде и уехать вниз —
+  // строки под неё в сетке просто нет.
   return [
-    topBar(ctx),
-    heroTile(ctx, worth),
-    actionsRow(ctx),
-    h('div', { class: 'tile-pair' }, [goalsTile(ctx), cushionTile(ctx)]),
-    opsTile(ctx),
-    trioTile(ctx),
+    h('div', { class: 'tile-grid' }, [
+      topBar(ctx),
+      heroTile(ctx, worth),
+      actionsRow(ctx),
+      h('div', { class: 'tile-pair' }, [goalsTile(ctx), cushionTile(ctx)]),
+      opsTile(ctx),
+      trioTile(ctx),
+    ]),
   ];
 }
 
@@ -109,51 +115,37 @@ function noticeList(ctx) {
   return out;
 }
 
-// --------------------------------------------------------------------------
-
-/**
- * Одна фраза по делу от Кубыша.
- *
- * Ровно одна, и только когда есть что сказать. Приложение, которое советует
- * постоянно, перестают читать на третий день; приложение, которое молчит,
- * пока всё ровно, и говорит одну фразу, когда нет, — читают.
- *
- * Порядок правил — это порядок важности: сначала то, что стоит денег, потом
- * то, что мешает считать, и только потом дисциплина. Первое подошедшее
- * правило и есть фраза.
- */
-function advice(ctx) {
-  const { state, today, go } = ctx;
-  const line = adviceText(state, today);
-  if (!line) return null;
-
-  return h('button', {
-    class: 'advice',
-    type: 'button',
-    onclick: () => go(line.go),
-  }, [
-    mascot.portrait('advice-mascot'),
-    h('span', { class: 'advice-text', text: line.text }),
-    h('span', { class: 'row-chevron', text: '›' }),
-  ]);
-}
-
 /**
  * Шторка уведомлений. Каждое — со своим действием, а не просто текстом:
  * «банк показывает на 3,96 ₽ больше» без кнопки «записать разницу»
  * сообщает о проблеме и оставляет её решать вручную.
  */
 function noticeSheet(ctx, items) {
-  const { refresh, today } = ctx;
+  const { state, refresh, today } = ctx;
 
   U.sheet('Требует внимания', (api) => {
     api.setFooter([U.button('Закрыть', () => api.close(), { kind: 'primary' })]);
 
+    // Скрытое, о котором нельзя вспомнить, — не скрытое, а потерянное.
+    // Строка стоит и на пустой шторке: «сигналов нет» при трёх скрытых —
+    // неправда, и разница между «всё в порядке» и «я сам велел молчать»
+    // держится ровно на ней.
+    const { hidden } = C.splitSignals(
+      C.signals(state.assets, state.operations, today),
+      state.settings.mutedSignals,
+    );
+    const hiddenRow = hidden.length
+      ? U.row('Скрытые сигналы', String(hidden.length), {
+          sub: 'вернутся сами, если изменится формулировка',
+          onClick: () => { api.close(); hiddenSheet(ctx, hidden); },
+        })
+      : null;
+
     if (!items.length) {
-      return [U.emptyState('Всё в порядке — приложению нечего сказать.')];
+      return [U.emptyState('Всё в порядке — приложению нечего сказать.'), hiddenRow];
     }
 
-    return items.map((it) => {
+    return [...items.map((it) => {
       const act = [];
 
       if (it.kind === 'accrual') {
@@ -233,7 +225,7 @@ function noticeSheet(ctx, items) {
         ]),
         act.length ? h('div', { class: 'notice-acts' }, act) : null,
       ]);
-    });
+    }), hiddenRow];
   }, { focus: false });
 }
 
@@ -335,9 +327,7 @@ function heroTile(ctx, worth) {
       h('p', { class: 'hero-label', text: 'Мой капитал' }),
       // Период кривой. Без него наклон не с чем сопоставить: рост
       // на одиннадцать процентов за месяц и за год означают разное.
-      points.length > 1
-        ? h('span', { class: 'hero-period', text: periodWord(points) })
-        : null,
+      points.length > 1 ? periodPicker(ctx, points) : null,
     ]),
     h('p', { class: 'hero-value', text: F.money(worth.total) }),
     h('div', { class: 'hero-row' }, [
@@ -363,13 +353,69 @@ function heroTile(ctx, worth) {
   ], { class: 'card-hero' });
 }
 
-/** Сколько времени охватывает кривая — словами, а не датами. */
-function periodWord(points) {
-  const days = D.diffDays(points[points.length - 1].x, points[0].x);
-  if (days >= 640) return `${Math.round(days / 365)} года`;
-  if (days >= 300) return 'год';
-  if (days >= 45) return `${Math.round(days / 30)} мес.`;
-  return `${F.days(days)}`;
+/**
+ * Окна кривой капитала. Не произвольное число месяцев, а четыре ступени:
+ * ползунок с любым значением между ними ничего не отвечает — вопрос
+ * «как идут дела» задают кварталом, полугодием, годом или всей жизнью счёта.
+ */
+const CAPITAL_WINDOWS = [
+  { months: 3, label: '3 месяца' },
+  { months: 6, label: '6 месяцев' },
+  { months: 12, label: 'год' },
+  { months: null, label: 'всё время' },
+];
+
+/**
+ * Выбор окна кривой.
+ *
+ * Шеврон здесь обязателен и обязан работать. Подпись «6 МЕСЯЦЕВ» без него —
+ * сообщение о том, что показано; со шевроном — обещание, что показанное можно
+ * сменить. Шеврон при неработающей подписи хуже обоих вариантов: по нему
+ * нажимают и не получают ничего.
+ */
+function periodPicker(ctx, points) {
+  const { state, refresh } = ctx;
+  const chosen = capitalWindow(state);
+
+  // Окно, за которое снимков нет вовсе, в списке не показывается: выбранное,
+  // оно дало бы ту же кривую, что и «всё время», и это читается как несработавший
+  // выбор. Последняя ступень остаётся всегда — она и есть «сколько есть».
+  const offered = CAPITAL_WINDOWS.filter((w) => w.months == null || hasDepth(state, w.months));
+
+  return h('button', {
+    class: 'hero-period',
+    type: 'button',
+    'aria-label': `Период кривой: ${chosen.label}`,
+    onclick: () => U.sheet('Период кривой', (api) => offered.map((w) =>
+      U.row(w.label, sameWindow(w.months, chosen.months) ? '✓' : '', {
+        onClick: async () => {
+          await store.mutate((draft) => { draft.settings.capitalWindow = w.months; });
+          api.close();
+          refresh();
+        },
+      })), { focus: false }),
+  }, [
+    // Подпись — выбранное окно, а не охват точек. Прежде здесь стоял охват,
+    // и он менялся сам по себе: появился снимок постарше — надпись стала
+    // другой, хотя человек ничего не трогал.
+    h('span', { text: chosen.label }),
+    h('span', { class: 'hero-period-chevron', text: '⌄' }),
+  ]);
+}
+
+/** Выбранное окно; по умолчанию полугодие — месяц шумит, год сглаживает. */
+function capitalWindow(state) {
+  const months = state.settings.capitalWindow === undefined ? 6 : state.settings.capitalWindow;
+  return CAPITAL_WINDOWS.find((w) => sameWindow(w.months, months)) || CAPITAL_WINDOWS[3];
+}
+
+const sameWindow = (a, b) => (a == null && b == null) || a === b;
+
+/** Есть ли снимки старше окна: иначе выбирать его нечего. */
+function hasDepth(state, months) {
+  const dates = state.netWorth.filter((r) => D.isValid(r.date)).map((r) => r.date);
+  if (!dates.length) return false;
+  return D.diffDays(D.today(), dates.sort()[0]) >= months * 30;
 }
 
 /**
@@ -377,12 +423,23 @@ function periodWord(points) {
  *
  * Снимок за текущий месяц перезаписывается по ходу дела, поэтому последняя
  * точка заменяется на сегодняшнюю — без этого кривая отставала бы на месяц.
+ *
+ * Окно отрезает начало, а не конец: кривая всегда упирается правым краем
+ * в сегодня. Хвост короче двух точек не отрезается вовсе — линия из одной
+ * точки не линия, и лучше показать больше, чем ничего.
  */
 function capitalPoints(state, worth, today) {
-  const points = [...state.netWorth]
+  let points = [...state.netWorth]
     .filter((r) => D.isValid(r.date))
     .sort((a, b) => (a.date < b.date ? -1 : 1))
     .map((r) => ({ x: r.date, y: r.total }));
+
+  const { months } = capitalWindow(state);
+  if (months != null) {
+    const from = D.addMonths(today, -months);
+    const inside = points.filter((p) => D.diffDays(p.x, from) >= 0);
+    if (inside.length >= 1) points = inside;
+  }
 
   if (points.length && points[points.length - 1].x === today) points.pop();
   points.push({ x: today, y: worth.total });
@@ -423,8 +480,13 @@ function actionsRow(ctx) {
   // Быстрый взнос не настроен — кружок ведёт в настройки, а не исчезает.
   // Пропавшее действие невозможно найти: о том, что оно бывает, узнать
   // больше неоткуда.
+  // Подпись — «Внести взнос», а не сумма. Сумма живёт в настройках быстрого
+  // взноса и меняется; подпись кнопки — нет. Кнопка, которая вчера звалась
+  // «Внести 500 ₽», а сегодня «Внести 5 000 ₽», перестаёт быть тем же местом,
+  // и её приходится каждый раз перечитывать. Сама сумма никуда не пропала:
+  // она в сообщении после нажатия и в настройках, где её и меняют.
   const quick = amount && asset
-    ? act(`Внести ${F.money(amount)}`, icons.icon('plus'), async () => {
+    ? act('Внести взнос', icons.icon('plus'), async () => {
         await store.mutate((draft) => {
           draft.operations.push({
             id: store.newId('op'),
@@ -615,8 +677,40 @@ function cushionTile(ctx) {
     h('p', { class: 'tile-label', text: 'Подушка' }),
     h('p', { class: 'tile-value', text: months == null ? '—' : `${F.num(months, 1)} мес.` }),
     h('p', { class: 'tile-hint', text: 'мгновенные деньги' }),
+    spendStrip(state, today),
   ]);
 }
+
+/**
+ * Столбики месячного расхода под числом подушки.
+ *
+ * Подушка — это частное от деления мгновенно доступного на месячный расход,
+ * и в плитке видно только результат деления. Столбики показывают знаменатель:
+ * из чего число получилось и в какую сторону оно поедет дальше.
+ *
+ * Меньше двух месяцев в данных — столбиков нет вовсе. Один столбик не ряд,
+ * он ничего не сравнивает и читается как обрубленный график.
+ */
+function spendStrip(state, today) {
+  const stats = C.spendStats(state.spending, today, STRIP_MONTHS);
+  const months = stats.perMonth;
+  if (months.length < 2) return null;
+
+  const top = Math.max(...months.map((m) => m.spent));
+  if (!top) return null;
+
+  const current = D.month(today);
+  return h('div', { class: 'tile-strip', 'aria-hidden': 'true' }, months.map((m) => h('i', {
+    // Текущий месяц не закрашен: он ещё идёт, и его столбик заведомо ниже
+    // прочих. Закрашенный наравне со всеми, он читался бы обвалом трат —
+    // каждое первое число месяца.
+    class: m.month === current ? '' : 'is-done',
+    style: { height: `${Math.round((m.spent / top) * 100)}%` },
+  })));
+}
+
+/** Сколько месяцев показывать столбиками. Больше не влезает в треть плитки. */
+const STRIP_MONTHS = 7;
 
 /**
  * Последние операции.
@@ -642,6 +736,7 @@ function opsTile(ctx) {
       h('span', { class: 'tile-label', text: 'Последние операции' }),
       h('button', { class: 'tile-more', type: 'button', onclick: () => go('journal') }, ['Все ›']),
     ]),
+
     ...recent.map((op) => {
       const sum = C.signed(op);
       const goal = goalName(op.goalId);
@@ -659,7 +754,7 @@ function opsTile(ctx) {
         }),
       ]);
     }),
-  ], { class: 'card-tile' });
+  ], { class: 'card-tile card-ops' });
 }
 
 /**
@@ -694,146 +789,6 @@ function trioTile(ctx) {
       stats && stats.free > 0 ? 'is-good' : ''),
     cell('Дисциплина', `${filled} из ${elapsed}`,
       `${streak} ${F.plural(streak, 'день', 'дня', 'дней')} подряд`),
-  ]);
-}
-
-/**
- * Сигналы. Если всё спокойно, блок сворачивается в одну строку: пустая
- * карточка «Требует внимания: пусто» каждый день занимала бы экран,
- * ничего не сообщая.
- */
-function attention(ctx) {
-  const { state, today, refresh } = ctx;
-  const all = C.signals(state.assets, state.operations, today);
-  const { shown, hidden } = C.splitSignals(all, state.settings.mutedSignals);
-
-  if (!shown.length) {
-    const line = [h('span', { text: 'Всё в порядке — сигналов нет' })];
-    if (hidden.length) {
-      line.push(h('span', { class: 'quiet-line-dot', text: '·' }));
-      line.push(h('button', { class: 'link', type: 'button', onclick: () => hiddenSheet(ctx, hidden) },
-        [h('span', { text: `скрыто ${hidden.length}` })]));
-    }
-    return h('p', { class: 'quiet-line' }, line);
-  }
-
-  const errors = shown.filter((s) => s.level === 'error');
-  // Пока человек сам не свернул или не развернул блок, решает содержимое:
-  // ошибку прятать нельзя, предупреждение того не стоит. Как только выбор
-  // сделан, он сохраняется — иначе принятая ошибка раскрывала бы блок
-  // каждый день, и свернуть его было бы невозможно.
-  const pref = state.settings.signalsOpen;
-  const open = pref == null ? errors.length > 0 : Boolean(pref);
-
-  const items = h('div', { class: 'signals', hidden: !open },
-    shown.map((s) => signalRow(ctx, s)),
-  );
-
-  const toggle = h('button', {
-    class: 'disclosure',
-    type: 'button',
-    'aria-expanded': String(open),
-    onclick: (e) => {
-      items.hidden = !items.hidden;
-      e.currentTarget.setAttribute('aria-expanded', String(!items.hidden));
-      e.currentTarget.querySelector('.disclosure-chevron').textContent = items.hidden ? '⌄' : '⌃';
-      // Без перерисовки: она бы схлопнула только что раскрытый блок обратно
-      // в анимацию появления, а положение выбора и так уже на экране.
-      store.mutate((draft) => { draft.settings.signalsOpen = !items.hidden; });
-    },
-  }, [
-    statusIcon(errors.length ? 'error' : 'warn'),
-    h('span', { class: 'disclosure-label', text: `Требует внимания: ${shown.length}` }),
-    hidden.length ? h('span', { class: 'disclosure-hidden', text: `скрыто ${hidden.length}` }) : null,
-    h('span', { class: 'disclosure-chevron', text: open ? '⌃' : '⌄' }),
-  ]);
-
-  const foot = hidden.length
-    ? h('button', { class: 'signals-foot', type: 'button', onclick: () => hiddenSheet(ctx, hidden) }, [
-        h('span', { text: `Скрытые сигналы: ${hidden.length}` }),
-        h('span', { class: 'row-chevron', text: '›' }),
-      ])
-    : null;
-
-  return U.card([toggle, items, foot], { class: 'card-signals' });
-}
-
-/**
- * Строка сигнала: слева — переход к активу, справа — «скрыть».
- *
- * Две отдельные кнопки, а не одна: кнопку внутри кнопки браузер разбирать
- * не обязан, да и промахнуться пальцем по такому было бы легко.
- */
-function signalRow(ctx, s) {
-  const { refresh } = ctx;
-  return h('div', { class: `signal signal-${s.level}` }, [
-    h('div', { class: 'signal-row' }, [
-      h('button', {
-        class: 'signal-main',
-        type: 'button',
-        onclick: () => forms.assetSheet(s.asset, { onDone: refresh }),
-      }, [
-        statusIcon(s.level),
-        h('span', { class: 'signal-text' }, [
-          h('span', { class: 'signal-asset', text: s.asset.name }),
-          h('span', { class: 'signal-note', text: s.text }),
-        ]),
-      ]),
-      h('button', {
-        class: 'signal-mute',
-        type: 'button',
-        'aria-label': `Скрыть сигнал: ${s.asset.name}, ${s.text}`,
-        onclick: async () => {
-          await store.mutate((draft) => {
-            const key = C.signalKey(s);
-            const kept = (draft.settings.mutedSignals || []).filter((m) => (m.key || m) !== key);
-            kept.push({ key, text: s.text });
-            draft.settings.mutedSignals = kept;
-          });
-          U.toast('Сигнал скрыт — вернётся, если изменится');
-          refresh();
-        },
-      }, [h('span', { text: '✕' })]),
-    ]),
-    signalAction(ctx, s),
-  ]);
-}
-
-/**
- * Действие по сигналу, если оно однозначно.
- *
- * Пока такое одно: банк показывает больше, чем насчитало приложение. Разница
- * почти всегда — начисленные проценты, которые ещё не записаны, и закрыть её
- * можно только операцией «Доход»: приложение сравнивает банк с расчётом,
- * а не с прошлым значением сверки, поэтому переписать число сверки — не выход.
- *
- * Обратный случай — банк показывает меньше — кнопки не получает намеренно.
- * Там причина обычно другая: после сверки были взносы, а число осталось
- * старым. Записать расход на эту разницу значило бы стереть настоящие деньги,
- * и решать это должен человек, открыв карточку актива.
- */
-function signalAction(ctx, s) {
-  const { today, refresh } = ctx;
-  if (s.kind !== 'bank-gap' || !(s.gap > 0)) return null;
-
-  return h('div', { class: 'signal-actions' }, [
-    U.button(`Записать разницу ${F.money2(s.gap)}`, async () => {
-      await store.mutate((draft) => {
-        draft.operations.push({
-          id: store.newId('op'),
-          date: today,
-          type: C.OP_INCOME,
-          amount: s.gap,
-          assetId: s.asset.id,
-          goalId: (s.asset.goalIds || [])[0] || null,
-          source: C.SOURCE_COMPUTED,
-          comment: 'Разница со сверкой',
-        });
-      });
-      U.tap();
-      U.toast(`Доход ${F.money2(s.gap)} записан`);
-      refresh();
-    }, { kind: 'primary', class: 'btn-wide' }),
   ]);
 }
 

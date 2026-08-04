@@ -17,6 +17,7 @@ import * as charts from '../charts.js';
 import * as store from '../store.js';
 import * as S from '../statement.js';
 import { importSheet, screenshotSheet } from '../import.js';
+import * as icons from '../icons.js';
 
 const { h } = U;
 
@@ -33,6 +34,22 @@ const WINDOWS = [
   [12, 'Год'],
 ];
 
+/**
+ * Заголовок — «Траты», как называется и раздел в панели.
+ *
+ * Было «Траты и жизнь». Прибавка честно описывала содержимое — здесь и расход,
+ * и подушка, и норма сбережений, — но заголовок экрана обязан совпадать
+ * с подписью раздела, из которого в него пришли. Два разных имени у одного
+ * места означают два места.
+ */
+export function head(ctx) {
+  return U.screenHead('Траты', U.roundAction(
+    'Загрузить выписку',
+    icons.icon('upload'),
+    () => sourceSheet(ctx),
+  ));
+}
+
 export function render(ctx) {
   const { state, today, refresh } = ctx;
   const months = state.settings.spendMonths || C.SPEND_MONTHS;
@@ -41,15 +58,9 @@ export function render(ctx) {
   const contributed = C.contributedBetween(state.operations, stats.from, today);
   const verdict = C.balanceVerdict(stats, cushion, contributed);
 
-  const head = h('div', { class: 'screen-head' }, [
-    h('h2', { text: 'Траты и жизнь' }),
-    U.button('Загрузить', () => sourceSheet(ctx), { kind: 'primary' }),
-  ]);
-
-  if (!state.spending.length) return [head, empty(ctx)];
+  if (!state.spending.length) return [empty(ctx)];
 
   return [
-    head,
     U.card([
       h('div', { class: 'segmented', role: 'tablist' }, WINDOWS.map(([value, label]) =>
         h('button', {

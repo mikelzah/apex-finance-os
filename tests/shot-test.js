@@ -128,7 +128,7 @@ const TBANK = `2 июля
   console.log('\n5. Повторная вставка того же текста');
   // Список записей закрыт, и кнопка из его заголовка ушла вместе с ним:
   // на заполненном экране путь идёт через «Загрузить» в шапке.
-  await p.locator('.btn:has-text("Загрузить")').first().click();
+  await p.locator('.head-round[aria-label="Загрузить выписку"]').first().click();
   await p.waitForTimeout(300);
   await p.locator('.row:has-text("Со скриншота")').click();
   await p.waitForTimeout(400);

@@ -46,7 +46,7 @@ const AGAIN = `КОИ —312,40 ₽
     const direct = p.locator('.btn:has-text("Со скриншота")').first();
     if (await direct.count() && await direct.isVisible()) await direct.click();
     else {
-      await p.locator('.btn:has-text("Загрузить")').first().click();
+      await p.locator('.head-round[aria-label="Загрузить выписку"]').first().click();
       await p.waitForTimeout(300);
       await p.locator('.row:has-text("Со скриншота")').click();
     }

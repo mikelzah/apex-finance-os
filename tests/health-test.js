@@ -96,7 +96,7 @@ const URL = 'http://127.0.0.1:8899/app/index.html';
     return r ? r.textContent.replace(/\s+/g, ' ').trim() : null;
   });
   console.log(`     ${hub}`);
-  check('строка есть и с ярлыком ошибок', /Проверка данных/.test(hub || '') && /ошибки/.test(hub || ''), hub);
+  check('строка есть и с ярлыком ошибок', /Проверка данных/.test(hub || '') && /\d+ ошибк/.test(hub || ''), hub);
 
   console.log('\n7. Чистые данные — пустое состояние с Кубышем');
   await p.evaluate(async () => {

@@ -50,29 +50,27 @@ const URL = 'http://127.0.0.1:8899/app/index.html';
   check('показаны только непустые классы', groups.length > 0 && groups.every((g) => g.sum && g.sum !== '0 ₽'),
     JSON.stringify(groups));
 
-  console.log('\n2а. Действия не налезают друг на друга');
-  // Кнопки встали в столбец, а не в строку: обновление котировок — действие
-  // служебное, и рядом с «Добавить бумагу» равным по весу оно читалось
-  // как выбор из равного. Исходная жалоба — «кнопки налезают» — проверяется
-  // ровно так же: ни один пиксель одной не попадает в прямоугольник другой.
+  console.log('\n2а. Действия портфеля не налезают друг на друга');
+  // Завести бумагу переехало в круглое действие шапки: главное действие
+  // раздела не может лежать под всем списком раздела — чтобы завести первую
+  // бумагу, приходилось пролистать те, которых ещё нет. Внизу осталось одно
+  // служебное действие, и налезать ему больше не на что. Исходная жалоба
+  // проверяется на том, что осталось: кнопка целиком внутри своей строки
+  // и не заезжает на панель разделов.
   const acts = await p.evaluate(() => {
+    const head = document.querySelector('.screen-head .head-round');
     const row = document.querySelector('.act');
-    if (!row) return null;
-    const btns = [...row.querySelectorAll('.btn')].map((b) => {
+    const btns = row ? [...row.querySelectorAll('.btn')].map((b) => {
       const r = b.getBoundingClientRect();
       return { text: b.textContent.trim(), x: Math.round(r.left), r: Math.round(r.right), y: Math.round(r.top), b: Math.round(r.bottom) };
-    });
-    return { btns, gap: btns.length === 2 ? Math.round(btns[1].y - btns[0].b) : null };
+    }) : [];
+    const bar = document.querySelector('.tabbar').getBoundingClientRect();
+    return { head: Boolean(head), headLabel: head?.getAttribute('aria-label') || null, btns, barTop: Math.round(bar.top) };
   });
-  console.log(`     ${acts.btns.map((x) => `«${x.text}» ${x.x}–${x.r} / ${x.y}–${x.b}`).join('  ')}`);
-  check('оба действия на месте', acts.btns.length === 2, acts.btns.map((x) => x.text).join(', '));
-  check('стоят в столбец', acts.btns[0].x === acts.btns[1].x, `${acts.btns[0].x} vs ${acts.btns[1].x}`);
-  check('не пересекаются, между ними просвет', acts.gap > 0, `${acts.gap} px`);
-  // Прямая проверка исходной жалобы: ни один пиксель одной кнопки не попадает
-  // в прямоугольник другой.
-  const overlap = Math.max(0, Math.min(acts.btns[0].r, acts.btns[1].r) - Math.max(acts.btns[0].x, acts.btns[1].x))
-    * Math.max(0, Math.min(acts.btns[0].b, acts.btns[1].b) - Math.max(acts.btns[0].y, acts.btns[1].y));
-  check('площадь наложения нулевая', overlap === 0, `${overlap} px²`);
+  console.log(`     шапка: «${acts.headLabel}»; внизу: ${acts.btns.map((x) => `«${x.text}» ${x.x}–${x.r} / ${x.y}–${x.b}`).join('  ') || '—'}`);
+  check('завести бумагу — круглым действием в шапке', acts.head && acts.headLabel === 'Добавить бумагу', String(acts.headLabel));
+  check('внизу осталось одно служебное действие', acts.btns.length === 1, acts.btns.map((x) => x.text).join(', '));
+  check('и это обновление котировок', /котировки/i.test(acts.btns[0]?.text || ''), acts.btns[0]?.text);
 
   console.log('\n3. Бумага открывается своей страницей');
   const firstRow = p.locator('.card:has(.section-sum) .paper').first();

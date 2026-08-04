@@ -8,8 +8,17 @@ import * as charts from '../charts.js';
 import * as forms from '../forms.js';
 import * as store from '../store.js';
 import * as reorder from '../reorder.js';
+import * as icons from '../icons.js';
 
 const { h } = U;
+
+export function head(ctx) {
+  return U.screenHead('Цели', U.roundAction(
+    'Добавить цель',
+    icons.icon('plus'),
+    () => forms.goalSheet(null, { onDone: ctx.refresh }),
+  ));
+}
 
 /**
  * Порядок целей задаёт человек, а не статус.
@@ -43,12 +52,6 @@ export function render(ctx) {
   }
 
   return [
-    // Заголовка здесь нет: экран назван переключателем разрезов, который
-    // стоит строкой выше, и второе «Цели» под ним ничего не добавляло бы.
-    // Осталось действие, прижатое вправо.
-    h('div', { class: 'screen-head is-end' }, [
-      U.button('Добавить цель', () => forms.goalSheet(null, { onDone: refresh }), { kind: 'primary' }),
-    ]),
     goals.length ? null : U.card([U.emptyState('Целей пока нет.')]),
     ...cards,
   ];

@@ -48,7 +48,16 @@ const URL = 'http://127.0.0.1:8899/app/index.html';
   check('низ панели у нижнего края экрана', g.barBottom >= 900 && g.barBottom <= 956, String(g.barBottom));
   check('элементов с position: fixed нет', g.fixedCount === 0, String(g.fixedCount));
 
+  // Главная помещается в экран целиком и не прокручивается вовсе — это
+  // её свойство по замыслу, а не случайность. Проверять на ней прокрутку
+  // содержимого нельзя: ноль сойдётся сам собой и ничего не докажет.
+  // Уходим на «Настройки» — единственный экран, длина которого не зависит
+  // от того, сколько у человека целей и бумаг.
+  await p.evaluate(() => { location.hash = '#/more'; });
+  await p.waitForTimeout(600);
+
   console.log('\n2. Прокручивается содержимое, а не страница');
+  g = await geom();
   // Переполнение у документа есть — оболочка выше вьюпорта. Важно не это,
   // а то, что прокрутить его нельзя: overflow: hidden запрещает прокрутку,
   // а не убирает переполнение.
@@ -87,6 +96,13 @@ const URL = 'http://127.0.0.1:8899/app/index.html';
   console.log(`     прокрутили на ${g.screenTop} из ${want}, панель ${g.barTop}–${g.barBottom}`);
   check('содержимое уехало', want > 0 && g.screenTop === want, `${g.screenTop} из ${want}`);
   check('панель на месте', g.barBottom === before, `${g.barBottom} было ${before}`);
+
+  console.log('\n3а. Главная не прокручивается вовсе');
+  await p.evaluate(() => { location.hash = '#/dashboard'; });
+  await p.waitForTimeout(700);
+  const home = await geom();
+  console.log(`     главная: содержимое ${home.screenScroll} px за краем`);
+  check('главная помещается в экран', home.screenScroll === 0, `${home.screenScroll} px`);
 
   console.log('\n4. Положение прокрутки живёт по правилам');
   await p.evaluate(() => { location.hash = '#/goals'; });

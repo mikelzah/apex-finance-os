@@ -45,14 +45,6 @@ let mode = 'list';
 let period = 'all';
 let query = '';
 
-/**
- * Кнопка «Добавить» отдана наружу: журнал живёт внутри портфеля, и его
- * заголовок делит строку с переключателем — своей шапки у него больше нет.
- */
-export function addButton(ctx) {
-  return U.button('Добавить', () => forms.operationSheet(null, { onDone: ctx.refresh }), { kind: 'primary' });
-}
-
 export function body(ctx) {
   const { state, today, refresh } = ctx;
 

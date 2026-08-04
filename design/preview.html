@@ -1,0 +1,3390 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Кубыш — направление переделки</title>
+<link rel="preload" href="../app/fonts/inter-subset.woff2" as="font" type="font/woff2" crossorigin>
+<style>
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url('../app/fonts/inter-subset.woff2') format('woff2');
+}
+
+/* ==========================================================================
+ * СТЕНД. Всё, что снаружи телефонных рамок, — только подача.
+ * ========================================================================== */
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  padding: 40px 32px 80px;
+  background: #eceef0;
+  color: #14161a;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  font-feature-settings: 'tnum' 0;
+}
+
+h1 { font-size: 30px; letter-spacing: -0.03em; margin: 0 0 8px; font-weight: 700; }
+.lede { color: #6a7078; font-size: 15px; line-height: 1.55; margin: 0 0 28px; max-width: 74ch; }
+.lede b { color: #14161a; font-weight: 600; }
+
+.bar { display: flex; gap: 8px; margin-bottom: 32px; flex-wrap: wrap; }
+.bar button {
+  appearance: none; border: 1px solid #d8dbe0; background: #fff; color: #14161a;
+  font: inherit; font-size: 14px; font-weight: 500; padding: 9px 18px;
+  border-radius: 999px; cursor: pointer; transition: all .15s;
+}
+.bar button.is-on { background: #14161a; color: #fff; border-color: #14161a; }
+
+.rail { display: flex; gap: 40px; align-items: flex-start; overflow-x: auto; padding-bottom: 24px; }
+
+figure { margin: 0; width: 393px; flex: none; }
+
+figcaption { margin-bottom: 14px; }
+.cap-kicker {
+  font-size: 11px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase;
+  color: #8a9098; display: block; margin-bottom: 4px;
+}
+.cap-title { font-size: 19px; font-weight: 700; letter-spacing: -0.02em; display: block; }
+.cap-note { font-size: 13.5px; line-height: 1.5; color: #6a7078; margin-top: 6px; display: block; }
+
+/* Рамка телефона: 393×852 — iPhone 15/16 в логических пикселях. */
+.phone {
+  width: 393px; height: 800px; border-radius: 46px; padding: 9px;
+  background: #101114; box-shadow: 0 24px 60px rgba(0,0,0,.22), 0 2px 6px rgba(0,0,0,.12);
+  position: relative;
+}
+.screenwrap {
+  width: 100%; height: 100%; border-radius: 38px; overflow: hidden;
+  position: relative; isolation: isolate;
+}
+.island {
+  position: absolute; top: 12px; left: 50%; transform: translateX(-50%);
+  width: 104px; height: 30px; border-radius: 999px; background: #101114; z-index: 40;
+}
+
+.legend { margin-top: 40px; max-width: 84ch; font-size: 14.5px; line-height: 1.65; color: #4a5058; }
+.legend h2 { font-size: 17px; margin: 28px 0 10px; color: #14161a; letter-spacing: -.01em; }
+.legend ul { padding-left: 20px; margin: 0; }
+.legend li { margin-bottom: 7px; }
+.legend b { color: #14161a; }
+
+/* ==========================================================================
+ * ОБЩЕЕ ДЛЯ ВСЕХ ТРЁХ ЭКРАНОВ
+ * ========================================================================== */
+
+.scr {
+  width: 100%; height: 100%; overflow-y: auto; overflow-x: hidden;
+  display: flex; flex-direction: column;
+  font-size: 15px; line-height: 1.45;
+  scrollbar-width: none;
+}
+.scr::-webkit-scrollbar { display: none; }
+.scr .flow { flex: 1; padding: 52px 16px 96px; }
+.num { font-variant-numeric: tabular-nums; }
+
+/* Полоса навигации у всех своя, но живёт одинаково — прижата к низу. */
+.nav {
+  position: sticky; bottom: 0; z-index: 30;
+  display: grid; grid-template-columns: repeat(5, 1fr);
+  padding: 8px 4px 22px;
+}
+.nav b {
+  display: flex; flex-direction: column; align-items: center; gap: 4px;
+  font-size: 10px; font-weight: 500; letter-spacing: .01em;
+}
+.nav svg { width: 24px; height: 24px; }
+
+
+/* ==========================================================================
+ * НАПРАВЛЕНИЕ A — «Витрина». Капитал становится предметом: жёлтая карта,
+ * под ней круглые действия. Язык флагманских банковских приложений.
+ * ========================================================================== */
+
+.dir-a {
+  --bg: #0e0f11;
+  --card: #17181b;
+  --card-2: #1f2125;
+  --ink: #fff;
+  --ink-2: #9aa0a8;
+  --ink-3: #6d737b;
+  --line: #26282d;
+  --acc: #ffdd2d;
+  --good: #3bd164;
+  --warn: #f2a93b;
+  --crit: #ff5c5c;
+  background: var(--bg); color: var(--ink);
+}
+.dir-a.is-light {
+  --bg: #f1f2f4; --card: #fff; --card-2: #f5f6f8;
+  --ink: #101114; --ink-2: #63696f; --ink-3: #8b9198; --line: #e6e8ea;
+  --good: #0c7c26; --warn: #8a6300; --crit: #d42a2a;
+}
+
+.dir-a .flow { padding: 52px 14px 96px; display: flex; flex-direction: column; gap: 12px; }
+
+.a-top { display: flex; align-items: center; gap: 10px; padding: 4px 4px 6px; }
+.a-ava {
+  width: 36px; height: 36px; border-radius: 999px; background: var(--acc);
+  display: grid; place-items: center; color: #101114; font-weight: 700; font-size: 14px;
+}
+.a-hello { flex: 1; font-size: 15px; font-weight: 600; letter-spacing: -.01em; }
+.a-bell { width: 36px; height: 36px; border-radius: 999px; background: var(--card); display: grid; place-items: center; color: var(--ink-2); position: relative; }
+.a-bell::after { content: ''; position: absolute; top: 8px; right: 9px; width: 7px; height: 7px; border-radius: 999px; background: var(--crit); border: 2px solid var(--card); }
+
+/* Главная карта. Жёлтая заливка, чёрный текст — единственный контраст
+   во всём наборе, который держит и цифру, и подпись. */
+.a-plate {
+  background: var(--acc); color: #101114;
+  border-radius: 26px; padding: 20px 20px 16px;
+  position: relative; overflow: hidden;
+}
+/* Блик мягкий и без кромки: жёсткий круг поверх суммы читается как сбой
+   отрисовки, а не как объём. */
+.a-plate::after {
+  content: ''; position: absolute; right: -70px; top: -110px;
+  width: 260px; height: 260px; border-radius: 999px;
+  background: radial-gradient(closest-side, rgba(255,255,255,.5), rgba(255,255,255,0));
+}
+.a-plate > * { position: relative; }
+.a-plate-lbl { font-size: 13px; font-weight: 600; opacity: .62; letter-spacing: .01em; }
+.a-plate-val { font-size: 40px; font-weight: 700; letter-spacing: -.038em; margin-top: 2px; line-height: 1.05; }
+.a-plate-chip {
+  display: inline-flex; align-items: center; gap: 5px; margin-top: 10px;
+  background: rgba(16,17,20,.1); border-radius: 999px; padding: 5px 11px;
+  font-size: 13px; font-weight: 600;
+}
+.a-plate-split {
+  display: flex; gap: 28px; margin-top: 18px; padding-top: 14px;
+  border-top: 1px solid rgba(16,17,20,.13);
+}
+.a-plate-split div { display: flex; flex-direction: column; gap: 2px; }
+.a-plate-split span { font-size: 12px; font-weight: 600; opacity: .6; }
+.a-plate-split strong { font-size: 17px; font-weight: 700; letter-spacing: -.02em; }
+
+/* Круглые действия под картой — узнаваемая деталь этого языка. */
+.a-acts { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; padding: 4px 0 2px; }
+.a-act { display: flex; flex-direction: column; align-items: center; gap: 7px; }
+.a-act i {
+  width: 52px; height: 52px; border-radius: 18px; background: var(--card);
+  display: grid; place-items: center; color: var(--ink);
+}
+.a-act.is-key i { background: var(--acc); color: #101114; }
+.a-act span { font-size: 11.5px; color: var(--ink-2); font-weight: 500; }
+
+.a-card { background: var(--card); border-radius: 20px; padding: 16px; }
+.a-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+.a-head h2 { font-size: 16px; font-weight: 700; letter-spacing: -.015em; margin: 0; }
+.a-head em { font-style: normal; font-size: 13px; color: var(--ink-3); font-weight: 500; }
+
+/* Совет: аватар зверя + фраза. Одна строка, одно действие. */
+.a-advice { display: flex; align-items: center; gap: 12px; background: var(--card); border-radius: 20px; padding: 13px 14px; }
+.a-advice .beast { width: 40px; height: 40px; border-radius: 14px; background: var(--acc); display: grid; place-items: center; flex: none; }
+.a-advice p { margin: 0; flex: 1; font-size: 14px; font-weight: 500; line-height: 1.35; }
+.a-advice .chev { color: var(--ink-3); font-size: 20px; }
+
+.a-goal-top { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 12px; }
+.a-goal-top b { font-size: 16px; font-weight: 700; letter-spacing: -.015em; }
+.a-goal-top span { font-size: 20px; font-weight: 700; letter-spacing: -.02em; }
+.a-track { height: 10px; border-radius: 999px; background: var(--card-2); overflow: hidden; }
+.a-track i { display: block; height: 100%; border-radius: 999px; background: var(--acc); }
+.a-goal-foot { display: flex; justify-content: space-between; margin-top: 11px; font-size: 13px; color: var(--ink-2); }
+.a-goal-hint { margin: 6px 0 0; font-size: 12.5px; color: var(--ink-3); }
+
+.a-sig { display: flex; align-items: center; gap: 11px; padding: 11px 0; border-top: 1px solid var(--line); }
+.a-sig:first-of-type { border-top: 0; padding-top: 0; }
+.a-dot { width: 34px; height: 34px; border-radius: 12px; display: grid; place-items: center; font-size: 15px; font-weight: 700; flex: none; }
+.a-dot.w { background: rgba(242,169,59,.16); color: var(--warn); }
+.a-dot.e { background: rgba(255,92,92,.18); color: var(--crit); }
+.a-sig-t { flex: 1; min-width: 0; }
+.a-sig-t b { display: block; font-size: 14px; font-weight: 600; }
+.a-sig-t span { display: block; font-size: 12.5px; color: var(--ink-2); margin-top: 1px; }
+.a-fix {
+  width: 100%; margin-top: 12px; border: 0; font: inherit; cursor: pointer;
+  background: var(--acc); color: #101114; font-weight: 600; font-size: 15px;
+  border-radius: 16px; padding: 14px;
+}
+
+.a-chart { margin: 4px -4px 0; }
+.a-readout { display: flex; justify-content: space-between; font-size: 12px; color: var(--ink-3); margin-top: 8px; }
+
+.a-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.a-stat { background: var(--card-2); border-radius: 14px; padding: 12px 11px; }
+.a-stat span { display: block; font-size: 11.5px; color: var(--ink-3); }
+.a-stat b { display: block; font-size: 16px; font-weight: 700; letter-spacing: -.02em; margin-top: 3px; }
+.a-stat.g b { color: var(--good); }
+
+.a-grid { display: grid; grid-template-columns: repeat(10, 1fr); gap: 4px; }
+.a-cell { aspect-ratio: 1; border-radius: 7px; background: var(--card-2); }
+.a-cell.on { background: var(--acc); }
+
+.dir-a .nav { background: var(--card); border-top: 1px solid var(--line); }
+.dir-a .nav b { color: var(--ink-3); }
+.dir-a .nav b.on { color: var(--ink); }
+
+
+/* ==========================================================================
+ * НАПРАВЛЕНИЕ B — «Система». Язык iOS: крупный заголовок, вложенные
+ * сгруппированные списки, волосяные линии, воздух. Цвет почти не участвует.
+ * ========================================================================== */
+
+.dir-b {
+  --bg: #f2f2f7;
+  --grp: #fff;
+  --ink: #000;
+  --ink-2: #3c3c43;
+  --ink-3: rgba(60,60,67,.6);
+  --sep: rgba(60,60,67,.2);
+  --acc: #ffcc00;
+  --link: #0f62d6;
+  --good: #0c7c26;
+  --crit: #d42a2a;
+  background: var(--bg); color: var(--ink);
+}
+.dir-b.is-dark {
+  --bg: #000; --grp: #1c1c1e; --ink: #fff; --ink-2: #ebebf5;
+  --ink-3: rgba(235,235,245,.6); --sep: rgba(84,84,88,.65);
+  --link: #ffdd2d; --good: #30d158; --crit: #ff453a;
+}
+
+.dir-b .flow { padding: 50px 0 96px; }
+
+.b-title { padding: 8px 20px 0; }
+.b-title h1 { font-size: 34px; font-weight: 700; letter-spacing: -.032em; margin: 0; }
+.b-title p { margin: 2px 0 0; font-size: 15px; color: var(--ink-3); }
+
+/* Главное число живёт в воздухе, без коробки. Так его читают как заголовок
+   документа, а не как ещё одну карточку. */
+.b-hero { padding: 22px 20px 18px; text-align: center; }
+.b-hero-lbl { font-size: 13px; color: var(--ink-3); letter-spacing: .01em; }
+.b-hero-val { font-size: 46px; font-weight: 700; letter-spacing: -.04em; line-height: 1.02; margin-top: 4px; }
+.b-hero-sub { font-size: 14px; color: var(--good); font-weight: 500; margin-top: 6px; }
+
+.b-seg {
+  display: grid; grid-template-columns: repeat(3, 1fr); gap: 2px;
+  margin: 0 20px 22px; background: rgba(118,118,128,.12); border-radius: 9px; padding: 2px;
+}
+.b-seg span {
+  text-align: center; font-size: 13px; font-weight: 500; padding: 6px 4px; border-radius: 7px;
+}
+.b-seg span.on { background: var(--grp); font-weight: 600; box-shadow: 0 1px 3px rgba(0,0,0,.12); }
+
+.b-lbl {
+  font-size: 13px; color: var(--ink-3); text-transform: uppercase; letter-spacing: .04em;
+  padding: 0 20px 7px; margin-top: 26px; font-weight: 500;
+}
+.b-lbl:first-of-type { margin-top: 0; }
+
+.b-grp { background: var(--grp); border-radius: 12px; margin: 0 16px; overflow: hidden; }
+.b-row { display: flex; align-items: center; gap: 12px; padding: 11px 16px; min-height: 46px; position: relative; }
+.b-row + .b-row::before {
+  content: ''; position: absolute; top: 0; left: 16px; right: 0; height: 1px; background: var(--sep); transform: scaleY(.5);
+}
+.b-row.pad + .b-row::before { left: 56px; }
+.b-ico { width: 29px; height: 29px; border-radius: 7px; display: grid; place-items: center; flex: none; color: #fff; }
+.b-txt { flex: 1; min-width: 0; }
+.b-txt b { display: block; font-size: 16px; font-weight: 400; letter-spacing: -.01em; }
+.b-txt small { display: block; font-size: 13px; color: var(--ink-3); margin-top: 1px; }
+.b-val { font-size: 16px; color: var(--ink-3); font-weight: 400; }
+.b-val.s { color: var(--ink); font-weight: 600; }
+.b-chev { color: rgba(60,60,67,.3); font-size: 17px; }
+.dir-b.is-dark .b-chev { color: rgba(235,235,245,.3); }
+
+.b-block { padding: 14px 16px 16px; }
+.b-goal-top { display: flex; justify-content: space-between; align-items: baseline; }
+.b-goal-top b { font-size: 17px; font-weight: 600; letter-spacing: -.015em; }
+.b-goal-top span { font-size: 15px; color: var(--ink-3); }
+.b-bar { height: 6px; border-radius: 999px; background: rgba(118,118,128,.16); margin-top: 12px; overflow: hidden; }
+.b-bar i { display: block; height: 100%; border-radius: 999px; background: var(--ink); }
+.dir-b.is-dark .b-bar i { background: var(--acc); }
+.b-goal-foot { display: flex; justify-content: space-between; margin-top: 9px; font-size: 13px; color: var(--ink-3); }
+
+.b-cta {
+  display: block; width: calc(100% - 32px); margin: 22px 16px 0; border: 0; font: inherit; cursor: pointer;
+  background: var(--acc); color: #000; font-weight: 600; font-size: 17px;
+  border-radius: 14px; padding: 15px; letter-spacing: -.01em;
+}
+.b-cta small { display: block; font-size: 13px; font-weight: 500; opacity: .6; margin-top: 2px; }
+
+.b-stats { display: flex; }
+.b-stats div { flex: 1; padding: 4px 8px; text-align: center; position: relative; }
+.b-stats div + div::before { content: ''; position: absolute; left: 0; top: 6px; bottom: 6px; width: 1px; background: var(--sep); transform: scaleX(.5); }
+.b-stats span { display: block; font-size: 12px; color: var(--ink-3); }
+.b-stats b { display: block; font-size: 19px; font-weight: 600; letter-spacing: -.02em; margin-top: 3px; }
+.b-stats small { display: block; font-size: 11px; color: var(--ink-3); margin-top: 2px; }
+
+.b-foot { font-size: 13px; color: var(--ink-3); padding: 8px 20px 0; line-height: 1.4; }
+
+.dir-b .nav { background: color-mix(in srgb, var(--grp) 82%, transparent); -webkit-backdrop-filter: blur(20px); backdrop-filter: blur(20px); border-top: 1px solid var(--sep); }
+.dir-b .nav b { color: var(--ink-3); }
+.dir-b .nav b.on { color: var(--link); }
+
+
+/* ==========================================================================
+ * НАПРАВЛЕНИЕ C — «Панель». Бенто-сетка: каждое число — плитка своего
+ * размера. Плотно, много данных сразу, без прокрутки за главным.
+ * ========================================================================== */
+
+.dir-c {
+  --bg: #08090b;
+  --tile: #121418;
+  --tile-2: #191c21;
+  --ink: #f4f6f8;
+  --ink-2: #8b939e;
+  --ink-3: #5d656f;
+  --line: #1e2227;
+  --acc: #ffdd2d;
+  --good: #4ade80;
+  --warn: #fbbf24;
+  --crit: #f87171;
+  background: var(--bg); color: var(--ink);
+}
+.dir-c.is-light {
+  --bg: #eef0f3; --tile: #fff; --tile-2: #f4f6f8;
+  --ink: #0b0d10; --ink-2: #5a626c; --ink-3: #8c949e; --line: #e3e6ea;
+  --good: #0c7c26; --warn: #8a6300; --crit: #d42a2a;
+}
+
+.dir-c .flow { padding: 50px 12px 96px; display: flex; flex-direction: column; gap: 8px; }
+
+.c-top { display: flex; align-items: center; justify-content: space-between; padding: 4px 4px 8px; }
+.c-top b { font-size: 17px; font-weight: 700; letter-spacing: -.02em; }
+.c-pills { display: flex; gap: 5px; }
+.c-pills span { font-size: 11.5px; font-weight: 600; padding: 5px 10px; border-radius: 999px; background: var(--tile); color: var(--ink-3); }
+.c-pills span.on { background: var(--acc); color: #08090b; }
+
+.c-bento { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.c-tile { background: var(--tile); border-radius: 18px; padding: 14px; border: 1px solid var(--line); position: relative; overflow: hidden; }
+.c-tile.wide { grid-column: 1 / -1; }
+.c-k { font-size: 11px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--ink-3); }
+.c-v { font-size: 22px; font-weight: 700; letter-spacing: -.025em; margin-top: 6px; }
+.c-s { font-size: 12px; color: var(--ink-2); margin-top: 3px; }
+.c-s.up { color: var(--good); font-weight: 600; }
+
+/* Главная плитка. Свечение — не украшение: оно единственное, что отделяет
+   её от остальных без увеличения кегля до нечитаемого. */
+.c-hero { grid-column: 1 / -1; padding: 18px 16px 12px; }
+.c-hero::before {
+  content: ''; position: absolute; inset: -40% 30% 40% -20%;
+  background: radial-gradient(closest-side, rgba(255,221,45,.16), transparent);
+  pointer-events: none;
+}
+.dir-c.is-light .c-hero::before { background: radial-gradient(closest-side, rgba(255,221,45,.4), transparent); }
+.c-hero > * { position: relative; }
+.c-hero-v { font-size: 38px; font-weight: 700; letter-spacing: -.038em; margin-top: 4px; line-height: 1.05; }
+.c-hero-row { display: flex; align-items: center; gap: 8px; margin-top: 8px; }
+.c-badge { font-size: 12px; font-weight: 700; padding: 4px 9px; border-radius: 7px; background: rgba(74,222,128,.15); color: var(--good); }
+.dir-c.is-light .c-badge { background: #e3f4e7; }
+.c-hero-note { font-size: 12px; color: var(--ink-3); }
+.c-spark { margin: 10px -4px -4px; display: block; }
+
+.c-split { display: flex; gap: 6px; margin-top: 14px; }
+.c-split div { flex: 1; background: var(--tile-2); border-radius: 12px; padding: 9px 11px; }
+.c-split span { font-size: 11px; color: var(--ink-3); font-weight: 600; }
+.c-split b { display: block; font-size: 15px; font-weight: 700; letter-spacing: -.02em; margin-top: 2px; }
+
+/* Кольцо цели: круг занимает вдвое меньше места, чем полоса, и читается
+   мгновенно на плитке в половину ширины. */
+.c-ring { display: flex; align-items: center; gap: 11px; }
+.c-ring svg { flex: none; }
+.c-ring-t { min-width: 0; }
+.c-ring-t b { display: block; font-size: 14px; font-weight: 700; letter-spacing: -.015em; }
+.c-ring-t span { display: block; font-size: 11px; color: var(--ink-2); margin-top: 3px; line-height: 1.35; }
+
+.c-alert { display: flex; align-items: center; gap: 10px; padding: 10px 0; border-top: 1px solid var(--line); }
+.c-alert:first-of-type { border-top: 0; padding-top: 2px; }
+.c-alert i { width: 6px; height: 6px; border-radius: 999px; flex: none; }
+.c-alert i.w { background: var(--warn); box-shadow: 0 0 0 4px rgba(251,191,36,.14); }
+.c-alert i.e { background: var(--crit); box-shadow: 0 0 0 4px rgba(248,113,113,.14); }
+.c-alert p { margin: 0; flex: 1; font-size: 12.5px; line-height: 1.35; }
+.c-alert p b { font-weight: 600; }
+.c-alert p span { color: var(--ink-2); }
+.c-alert em { font-style: normal; font-size: 11.5px; font-weight: 700; color: var(--acc); white-space: nowrap; }
+.dir-c.is-light .c-alert em { color: #0f62d6; }
+
+.c-strip { display: flex; gap: 3px; align-items: flex-end; height: 40px; margin-top: 10px; }
+.c-strip i { flex: 1; border-radius: 3px 3px 1px 1px; background: var(--tile-2); }
+.c-strip i.on { background: var(--acc); }
+
+/* Главное действие закреплено над навигацией: в панели прокрутка есть,
+   а кнопка «Внести» не должна за неё уезжать. */
+.c-cta {
+  position: sticky; bottom: 8px; z-index: 25;
+  width: 100%; border: 0; font: inherit; cursor: pointer; margin-top: 6px;
+  background: var(--acc); color: #08090b; font-weight: 700; font-size: 15px;
+  border-radius: 16px; padding: 15px; letter-spacing: -.01em;
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+  box-shadow: 0 8px 24px rgba(8,9,11,.55);
+}
+.dir-c.is-light .c-cta { box-shadow: 0 8px 24px rgba(11,13,16,.18); }
+
+.c-days { display: grid; grid-template-columns: repeat(15, 1fr); gap: 4px; }
+.c-days i { aspect-ratio: 1; border-radius: 5px; background: var(--tile-2); }
+.c-days i.on { background: var(--acc); }
+
+.dir-c .nav { background: var(--tile); border-top: 1px solid var(--line); }
+.dir-c .nav b { color: var(--ink-3); }
+.dir-c .nav b.on { color: var(--acc); }
+.dir-c.is-light .nav b.on { color: var(--ink); }
+
+
+/* ==========================================================================
+ * НАПРАВЛЕНИЕ D — КОМБО. Плитки из C, круглые действия из A, и главное
+ * условие: экран не прокручивается вовсе.
+ *
+ * Отсюда вся арифметика ниже. Полезная высота — 782 логических пикселя,
+ * из них 46 забирает статусная строка и 64 — навигация. На содержимое
+ * остаётся 672, и каждая плитка знает свою долю. Поэтому здесь нет
+ * ни одной «примерно такой» высоты: сетка задана строками, а не потоком,
+ * и лишняя плитка не уедет вниз — ей просто негде появиться.
+ * ========================================================================== */
+
+.dir-d {
+  --bg: #08090b;
+  --tile: #131519;
+  --tile-2: #1c1f24;
+  --ink: #f5f7f9;
+  --ink-2: #8d959f;
+  --ink-3: #5e666f;
+  --line: #1f2329;
+  /* Волосяная линия между строками одного списка. Отдельная ступень:
+     той же линией, что делит блоки, строки внутри блока делить нельзя —
+     список распадается на шесть отдельных карточек. */
+  --line-soft: #17191d;
+  /* Две разные роли у одной краски, и путать их нельзя.
+   * --acc — заливка: жёлтое пятно с чёрной подписью поверх.
+   * --acc-mark — штрих: линия графика, дуга кольца, полоса прогресса.
+   * На чёрном они совпадают, на белом расходятся: жёлтая линия толщиной
+   * в два пикселя на белом даёт 1,34:1 и не видна вовсе. Это же правило
+   * записано в tokens.css самого приложения. */
+  --acc: #ffdd2d;
+  --acc-mark: #ffdd2d;
+  --good: #4ade80;
+  --warn: #fbbf24;
+  --crit: #f87171;
+  background: var(--bg); color: var(--ink);
+}
+.dir-d.is-light {
+  --bg: #eceef1; --tile: #fff; --tile-2: #f3f5f7;
+  --ink: #0b0d10; --ink-2: #596069; --ink-3: #8b939c;
+  --line: #e4e7ea; --line-soft: #f0f2f4;
+  --acc-mark: #2b2b2b;
+  --good: #0c7c26; --warn: #8a6300; --crit: #d42a2a;
+}
+
+/* Сетка, а не поток: строки заданы явно, содержимое подстраивается
+   под них — иначе одна длинная подпись растянула бы экран и вернула
+   прокрутку, ради отсутствия которой всё и затевалось. */
+.dir-d .flow {
+  flex: 1; padding: 44px 12px 6px;
+  display: grid; gap: 6px;
+  grid-template-columns: 1fr 1fr;
+  /* Пятая строка — 1fr: она забирает всё, что осталось. Иначе короткий
+     вариант плитки оставляет чёрный провал над навигацией, и экран
+     выглядит недогруженным, хотя помещается как надо. */
+  grid-template-rows: 24px auto 60px auto 1fr auto;
+  align-content: start;
+}
+
+.d-top { grid-column: 1 / -1; display: flex; align-items: center; justify-content: space-between; padding: 0 2px; }
+.d-top b { font-size: 16px; font-weight: 700; letter-spacing: -.02em; }
+
+/* Колокольчик — вход в «Требует внимания». Счётчик на нём обязателен:
+ * колокольчик без числа сообщает, что уведомления в принципе бывают,
+ * а с числом — что их сейчас два. Разница между «можно зайти когда-нибудь»
+ * и «зайти сегодня» держится ровно на этой цифре.
+ *
+ * Красным он становится только при ошибке. Предупреждение красным —
+ * и через неделю красное перестают замечать вовсе. */
+.d-bell {
+  width: 30px; height: 30px; border-radius: 999px; background: var(--tile);
+  border: 1px solid var(--line); display: grid; place-items: center;
+  color: var(--ink-2); position: relative; flex: none;
+}
+.d-bell em {
+  position: absolute; top: -4px; right: -4px; min-width: 16px; height: 16px;
+  border-radius: 999px; background: var(--crit); color: #fff;
+  font-style: normal; font-size: 10px; font-weight: 700; line-height: 16px; text-align: center;
+  border: 2px solid var(--bg); padding: 0 2px;
+}
+
+.d-tile { background: var(--tile); border-radius: 18px; padding: 13px; border: 1px solid var(--line); position: relative; overflow: hidden; }
+.d-tile.wide { grid-column: 1 / -1; }
+.d-k { font-size: 10.5px; font-weight: 700; letter-spacing: .07em; text-transform: uppercase; color: var(--ink-3); }
+
+/* Главная плитка. Свечение — единственное, что отделяет её от прочих:
+   поднимать кегль дальше некуда, сумма и так во всю ширину. */
+.d-hero { grid-column: 1 / -1; padding: 13px 14px 9px; }
+.d-hero::before {
+  content: ''; position: absolute; inset: -50% 35% 45% -25%;
+  background: radial-gradient(closest-side, rgba(255,221,45,.17), transparent);
+  pointer-events: none;
+}
+.dir-d.is-light .d-hero::before { background: radial-gradient(closest-side, rgba(255,221,45,.45), transparent); }
+.d-hero > * { position: relative; }
+/* Период переехал сюда с исчезнувших пилюль. Без него график — линия
+   без масштаба: рост на восемнадцать процентов за месяц и за год
+   означают совершенно разное. */
+.d-hero .d-k { display: flex; justify-content: space-between; align-items: baseline; }
+.d-hero .d-k u { text-decoration: none; color: var(--ink-3); font-weight: 600; }
+.d-hero-v { font-size: 33px; font-weight: 700; letter-spacing: -.04em; margin-top: 2px; line-height: 1.04; }
+.d-hero-row { display: flex; align-items: center; gap: 8px; margin-top: 6px; }
+.d-badge { font-size: 11.5px; font-weight: 700; padding: 3px 8px; border-radius: 7px; background: rgba(74,222,128,.15); color: var(--good); }
+.dir-d.is-light .d-badge { background: #e3f4e7; }
+.d-note { font-size: 11.5px; color: var(--ink-3); }
+.d-spark { margin: 4px -3px -3px; display: block; }
+.d-split { display: flex; gap: 6px; margin-top: 9px; }
+.d-split div { flex: 1; background: var(--tile-2); border-radius: 11px; padding: 7px 10px; }
+.d-split span { font-size: 10px; font-weight: 700; letter-spacing: .06em; color: var(--ink-3); }
+.d-split b { display: block; font-size: 14.5px; font-weight: 700; letter-spacing: -.02em; margin-top: 1px; }
+
+/* Действия. Круглые, а не полосой во всю ширину: полоса — это одно
+   действие, а их четыре, и главное среди них выделено краской,
+   а не размером. */
+.d-acts { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; }
+.d-act { display: flex; flex-direction: column; align-items: center; gap: 5px; }
+.d-act i {
+  width: 40px; height: 40px; border-radius: 999px; background: var(--tile);
+  border: 1px solid var(--line); display: grid; place-items: center; color: var(--ink);
+}
+.d-act.key i { background: var(--acc); border-color: var(--acc); color: #08090b; }
+.d-act span { font-size: 10.5px; color: var(--ink-2); font-weight: 600; letter-spacing: -.01em; white-space: nowrap; }
+.d-act.key span { color: var(--ink); }
+
+/* Две плитки в строке одной высоты, а содержимое у них разного роста.
+   Поэтому обе — колонки с распределением: кольцо встаёт по центру,
+   а столбики подушки прижимаются к низу. Иначе под кольцом остаётся
+   пустая четверть плитки, и строка выглядит сломанной. */
+.d-pair { display: flex; flex-direction: column; justify-content: center; }
+
+/* Цели листаются внутри плитки.
+ *
+ * Активных целей бывает одна, а бывает пять, и вертикальной высоты
+ * под них здесь нет вовсе: экран не прокручивается, это его главное
+ * свойство. Поэтому цели уходят в горизонтальную ленту — плитка
+ * показывает одну, остальные достаются пальцем.
+ *
+ * Прилипание обязательно: без scroll-snap лента останавливается между
+ * целями, и на экране оказывается пол-кольца одной и пол-кольца другой.
+ */
+.d-goalbox { padding: 13px 0 7px; overflow: hidden; }
+.d-goals {
+  display: flex; overflow-x: auto; scroll-snap-type: x mandatory;
+  scrollbar-width: none; -webkit-overflow-scrolling: touch;
+}
+.d-goals::-webkit-scrollbar { display: none; }
+.d-goal { flex: 0 0 100%; scroll-snap-align: center; padding: 0 13px; }
+
+/* Точки — единственный признак, что за краем есть ещё цели. Без них
+   лента выглядит обычной плиткой, и листать её никто не догадается. */
+.d-dots { display: flex; justify-content: center; gap: 4px; margin-top: 6px; }
+.d-dots i { width: 5px; height: 5px; border-radius: 999px; background: var(--tile-2); }
+.d-dots i.on { background: var(--acc); }
+.dir-d.is-light .d-dots i { background: var(--line); }
+.dir-d.is-light .d-dots i.on { background: var(--ink); }
+
+.d-ring { display: flex; align-items: center; gap: 10px; }
+.d-ring svg { flex: none; }
+.d-ring-t { min-width: 0; }
+.d-ring-t b { display: block; font-size: 13.5px; font-weight: 700; letter-spacing: -.015em; }
+/* Переносить нечего: под кольцом ровно две строки, и третья ломает высоту
+   всей строки сетки. Поэтому перенос запрещён, а кегль взят такой, чтобы
+   самая длинная подпись — «152 из 400 тыс ₽» — влезала целиком. */
+.d-ring-t span {
+  display: block; font-size: 10px; color: var(--ink-2);
+  margin-top: 2px; line-height: 1.4; white-space: nowrap;
+}
+
+.d-v { font-size: 20px; font-weight: 700; letter-spacing: -.025em; margin-top: 4px; }
+.d-s { font-size: 10.5px; color: var(--ink-2); margin-top: 2px; }
+.d-strip { display: flex; gap: 3px; align-items: flex-end; height: 24px; margin-top: auto; padding-top: 8px; }
+.d-strip i { flex: 1; border-radius: 3px 3px 1px 1px; background: var(--tile-2); }
+.d-strip i.on { background: var(--acc-mark); }
+
+.d-alert { display: flex; align-items: center; gap: 9px; padding: 7px 0; border-top: 1px solid var(--line); }
+.d-alert:first-of-type { border-top: 0; padding-top: 2px; }
+.d-alert:last-of-type { padding-bottom: 1px; }
+.d-alert i { width: 6px; height: 6px; border-radius: 999px; flex: none; }
+.d-alert i.w { background: var(--warn); box-shadow: 0 0 0 4px rgba(251,191,36,.14); }
+.d-alert i.e { background: var(--crit); box-shadow: 0 0 0 4px rgba(248,113,113,.14); }
+.d-alert p { margin: 0; flex: 1; font-size: 12px; line-height: 1.3; }
+.d-alert p b { font-weight: 600; }
+.d-alert p span { color: var(--ink-2); }
+.d-alert em { font-style: normal; font-size: 10.5px; font-weight: 700; color: var(--acc); white-space: nowrap; letter-spacing: .04em; }
+.dir-d.is-light .d-alert em { color: #0f62d6; }
+
+/* --------------------------------------------------------------------------
+ * Освободившаяся плитка. Сигналы ушли в колокольчик, и на их месте —
+ * что-то одно из четырёх. Все четыре берут числа, которые приложение
+ * уже считает: ничего нового считать не придётся.
+ * -------------------------------------------------------------------------- */
+
+/* Плитка растянута под остаток высоты, поэтому содержимое центрируется:
+   прижатое к верху, оно оставляло бы пустую полосу снизу — то самое,
+   ради чего строку и сделали резиновой. */
+.d-slotbox { display: flex; flex-direction: column; justify-content: center; }
+.d-slot { display: none; }
+.d-slot.on { display: block; }
+
+/* 1. Ближайшие деньги. Единственный блок на экране, который смотрит вперёд,
+      а не назад: остальные показывают, как есть сейчас. */
+.d-pay { display: flex; align-items: center; gap: 9px; padding: 7px 0; border-top: 1px solid var(--line); }
+.d-pay:first-of-type { border-top: 0; padding-top: 2px; }
+.d-pay:last-of-type { padding-bottom: 1px; }
+.d-pay i {
+  width: 24px; height: 24px; border-radius: 8px; flex: none;
+  display: grid; place-items: center; background: var(--tile-2); color: var(--ink-2);
+}
+.d-pay p { margin: 0; flex: 1; min-width: 0; font-size: 12px; line-height: 1.3; }
+.d-pay p b { font-weight: 600; }
+.d-pay p span { display: block; color: var(--ink-3); font-size: 11px; }
+.d-pay strong { font-size: 13px; font-weight: 700; letter-spacing: -.02em; color: var(--good); white-space: nowrap; }
+
+/* 2. Портфель. Целая вкладка, у которой сейчас нет на главной ни строчки.
+      Полоса долей — самое короткое, чем она вообще может представиться. */
+.d-alloc { display: flex; height: 9px; border-radius: 999px; overflow: hidden; gap: 2px; margin: 6px 0 9px; }
+.d-alloc i { display: block; }
+.d-legend { display: flex; gap: 12px; flex-wrap: wrap; }
+.d-legend div { display: flex; align-items: center; gap: 5px; font-size: 11px; color: var(--ink-2); }
+.d-legend u { text-decoration: none; width: 7px; height: 7px; border-radius: 2px; }
+.d-legend b { color: var(--ink); font-weight: 600; }
+.d-gap {
+  margin-left: auto; font-size: 10px; font-weight: 700; letter-spacing: .04em;
+  padding: 2px 7px; border-radius: 6px; background: var(--tile-2); color: var(--ink-2);
+}
+
+/* 3. Последние операции. Журнал в двух строках. */
+.d-op { display: flex; align-items: center; gap: 9px; padding: 6px 0; border-top: 1px solid var(--line); }
+.d-op:first-of-type { border-top: 0; padding-top: 2px; }
+.d-op p { margin: 0; flex: 1; min-width: 0; font-size: 12px; }
+.d-op p span { display: block; color: var(--ink-3); font-size: 11px; }
+.d-op strong { font-size: 13px; font-weight: 700; letter-spacing: -.02em; white-space: nowrap; }
+.d-op strong.plus { color: var(--good); }
+
+/* 4. Совет. Зверь остаётся в приложении — без него оно теряет лицо,
+      а одна фраза в день стоит ровно одной строки. */
+.d-tip { display: flex; align-items: center; gap: 11px; }
+.d-tip .beast { width: 38px; height: 38px; border-radius: 13px; background: var(--acc); display: grid; place-items: center; flex: none; }
+.d-tip p { margin: 0; flex: 1; font-size: 12.5px; line-height: 1.35; font-weight: 500; }
+.d-tip .chev { color: var(--ink-3); font-size: 18px; }
+
+/* Нижняя плитка: три числа в ряд. Порознь они заняли бы две строки
+   сетки, а строк ровно столько, сколько помещается. */
+.d-trio { display: flex; align-items: center; }
+.d-trio > div { flex: 1; min-width: 0; position: relative; padding: 0 4px; }
+.d-trio > div + div::before { content: ''; position: absolute; left: 0; top: 2px; bottom: 2px; width: 1px; background: var(--line); }
+.d-trio span { display: block; font-size: 10px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--ink-3); }
+.d-trio b { display: block; font-size: 15px; font-weight: 700; letter-spacing: -.025em; margin-top: 3px; }
+.d-trio small { display: block; font-size: 10px; color: var(--ink-3); margin-top: 1px; }
+.d-trio .g b { color: var(--good); }
+/* Тридцать клеток в треть плитки не помещаются, а двенадцать врали бы
+   про «21 из 30». Поэтому здесь полоса доли, а календарь целиком —
+   на экране целей, где под него есть ширина. */
+.d-days { height: 5px; border-radius: 999px; background: var(--tile-2); margin-top: 6px; overflow: hidden; }
+.d-days i { display: block; height: 100%; border-radius: 999px; background: var(--acc-mark); }
+
+/* --------------------------------------------------------------------------
+ * ЭКРАН «ЦЕЛИ» в том же языке.
+ *
+ * Здесь прокрутка есть и должна быть: целей бывает сколько угодно, и вгонять
+ * список в экран нечестно — это не сводка, а перечень. Главная не листается
+ * потому, что отвечает на три вопроса; этот экран отвечает на один вопрос
+ * про каждую цель, и вопросов ровно столько, сколько целей.
+ * -------------------------------------------------------------------------- */
+
+.dir-d .flow.is-list {
+  display: block; padding: 44px 12px 12px;
+}
+
+.d-head { display: flex; align-items: center; justify-content: space-between; padding: 0 2px 10px; }
+.d-head h1 { font-size: 26px; font-weight: 700; letter-spacing: -.03em; margin: 0; }
+.d-add {
+  width: 34px; height: 34px; border-radius: 999px; background: var(--acc);
+  display: grid; place-items: center; color: #08090b; flex: none;
+}
+
+/* Карточка цели. Ничего сверх них на экране нет: ни сводки, ни фильтров.
+   Сумма всех целей — не то же самое, что капитал, и второе крупное число
+   рядом с ним читалось бы как противоречие; а перечень из четырёх строк
+   фильтровать незачем. */
+.d-goalcard {
+  background: var(--tile); border: 1px solid var(--line); border-radius: 18px;
+  padding: 13px; margin-top: 8px;
+}
+.d-goalcard.is-off { opacity: .62; }
+
+/* Ручка перетаскивания видима, а не угадывается. Порядок целей человек
+   задаёт руками, и в списке без ручки об этом невозможно догадаться —
+   долгое нажатие ничем себя не выдаёт. */
+.d-gh { display: flex; align-items: flex-start; gap: 9px; }
+/* Ручка нарисована, а не набрана символом: шрифт приложения — подмножество
+   Inter на 58 КБ, и брайлевских точек в нём нет. Символ бы просто исчез. */
+.d-grip { color: var(--ink-3); flex: none; margin-top: 3px; cursor: grab; display: block; }
+.d-gh-t { flex: 1; min-width: 0; }
+.d-gh-t b { display: block; font-size: 16px; font-weight: 700; letter-spacing: -.02em; }
+.d-gh-t span { display: block; font-size: 11.5px; color: var(--ink-3); margin-top: 1px; }
+.d-tag {
+  font-size: 10px; font-weight: 700; letter-spacing: .04em; padding: 3px 8px;
+  border-radius: 7px; white-space: nowrap; flex: none;
+}
+.d-tag.act { background: rgba(74,222,128,.15); color: var(--good); }
+.d-tag.pause { background: var(--tile-2); color: var(--ink-3); }
+.d-tag.done { background: var(--acc); color: #08090b; }
+.dir-d.is-light .d-tag.act { background: #e3f4e7; }
+
+.d-money { display: flex; align-items: center; gap: 13px; margin: 12px 0 0; }
+.d-money-t b { display: block; font-size: 20px; font-weight: 700; letter-spacing: -.03em; }
+.d-money-t span { display: block; font-size: 12px; color: var(--ink-3); margin-top: 1px; }
+
+/* Четыре метрики сеткой два на два — те же, что на экране сейчас.
+   В строку они не встают: подписи под ними длиннее самих чисел. */
+.d-metrics {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 1px;
+  background: var(--line); border-radius: 12px; overflow: hidden; margin-top: 12px;
+}
+.d-metrics div { background: var(--tile); padding: 9px 10px; }
+.d-metrics span { display: block; font-size: 10px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: var(--ink-3); }
+.d-metrics b { display: block; font-size: 15px; font-weight: 700; letter-spacing: -.02em; margin-top: 3px; }
+.d-metrics small { display: block; font-size: 10.5px; color: var(--ink-3); margin-top: 1px; }
+.d-metrics .bad b, .d-metrics .bad small { color: var(--crit); }
+
+/* Привязанные активы. Прогресс цели — это их сумма, и не показать их
+ * значит показать число, взявшееся ниоткуда. Но и держать их раскрытыми
+ * всегда неправильно: у четырёх целей это два десятка строк, сквозь
+ * которые до следующей цели надо пролистывать.
+ *
+ * Поэтому список свёрнут, а в свёрнутой строке стоит число активов:
+ * «Привязанные активы» без числа не отличает цель с пятью активами
+ * от цели, к которой не привязано ничего, — а это разные положения дел,
+ * и второе приложение считает ошибкой.
+ */
+.d-linked { margin-top: 11px; border-top: 1px solid var(--line); padding-top: 4px; }
+.d-linked-h {
+  display: flex; align-items: center; gap: 7px; width: 100%;
+  background: none; border: 0; padding: 7px 0 3px; font: inherit; cursor: pointer;
+  color: var(--ink-3); text-align: left;
+}
+.d-linked-h span { font-size: 10px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; }
+.d-linked-h em {
+  font-style: normal; font-size: 10px; font-weight: 700; color: var(--ink);
+  background: var(--tile-2); border-radius: 5px; padding: 1px 5px;
+}
+.d-linked-h svg { margin-left: auto; transition: transform var(--dur, 160ms) ease; }
+.d-linked-h[aria-expanded='true'] svg { transform: rotate(180deg); }
+.d-linked-h[aria-expanded='true'] { color: var(--ink-2); }
+
+.d-asset { display: flex; align-items: center; gap: 9px; padding: 6px 0; border-top: 1px solid var(--line); }
+.d-asset:first-of-type { border-top: 0; padding-top: 3px; }
+.d-asset i { width: 22px; height: 22px; border-radius: 7px; background: var(--tile-2); display: grid; place-items: center; color: var(--ink-2); flex: none; }
+.d-asset p { margin: 0; flex: 1; min-width: 0; font-size: 12.5px; font-weight: 500; }
+.d-asset p span { display: block; font-size: 10.5px; color: var(--ink-3); font-weight: 400; }
+.d-asset strong { font-size: 12.5px; font-weight: 700; letter-spacing: -.02em; white-space: nowrap; }
+
+/* --------------------------------------------------------------------------
+ * ЭКРАН «ПОРТФЕЛЬ».
+ *
+ * Порядок блоков не выбран заново, а взят из кода: сколько всего, что лежит,
+ * и только потом доли. Доли — это проверка плана, она нужна реже суммы,
+ * и потому идёт последней. Переставить их наверх значило бы отменить решение,
+ * которое в приложении уже принято и записано.
+ * -------------------------------------------------------------------------- */
+
+/* Разрезы «Портфель / Журнал». Это не фильтр, а два взгляда на одни деньги:
+   чем владею и как к этому пришёл. */
+.d-seg {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 3px; padding: 3px;
+  background: var(--tile); border: 1px solid var(--line); border-radius: 12px; margin-bottom: 8px;
+}
+.d-seg span { text-align: center; font-size: 12.5px; font-weight: 600; padding: 7px 4px; border-radius: 9px; color: var(--ink-3); }
+.d-seg span.on { background: var(--tile-2); color: var(--ink); }
+.dir-d.is-light .d-seg span.on { background: var(--bg); }
+
+/* Сравнение с ключевой. Доходность сама по себе не значит ни хорошо,
+   ни плохо: смысл появляется рядом с тем, что дал бы вклад. Отставание —
+   это риск, за который не заплатили, поэтому оно набрано краской. */
+.d-bench { font-size: 11.5px; color: var(--ink-3); margin-top: 7px; }
+.d-bench b { font-weight: 700; }
+.d-bench b.up { color: var(--good); }
+.d-bench b.down { color: var(--warn); }
+
+/* Группа класса: заголовок с суммой и доходностью, под ним бумаги.
+ *
+ * Доходность стоит и у класса, и у каждой бумаги внутри — это разные
+ * числа, и одно другое не заменяет. Класс отвечает «как идёт эта часть
+ * портфеля», бумага — «что именно её тянет». Класс «Акции +15,7%» может
+ * состоять из бумаги на +24,6% и бумаги на −7,3%, и по одному общему
+ * числу этого не увидеть никогда.
+ */
+.d-holdings { padding: 4px 13px 13px; }
+.d-grp { padding-top: 13px; }
+.d-grp + .d-grp { border-top: 1px solid var(--line); margin-top: 3px; }
+.d-grp-h { display: flex; align-items: baseline; gap: 8px; margin-bottom: 3px; }
+.d-grp-h b {
+  flex: 1; font-size: 10.5px; font-weight: 700; letter-spacing: .08em;
+  text-transform: uppercase; color: var(--ink-3);
+}
+.d-grp-h u { text-decoration: none; font-size: 13.5px; font-weight: 700; letter-spacing: -.02em; }
+.d-grp-h em { font-style: normal; font-size: 11.5px; font-weight: 700; }
+.d-grp-h em.up { color: var(--good); }
+.d-grp-h em.down { color: var(--crit); }
+
+/* Строка бумаги.
+ *
+ * Монограмма — не украшение: список из шести строк одинакового набора
+ * читается сканированием по левому краю, и цветная метка находит нужную
+ * бумагу быстрее, чем чтение названий. Шеврон стоит потому, что строка
+ * действительно ведёт на карточку бумаги, а не просто показывает число.
+ */
+.d-paper { display: flex; align-items: center; gap: 9px; padding: 9px 0; }
+.d-paper + .d-paper { border-top: 1px solid var(--line-soft); }
+/* Слот логотипа.
+ *
+ * Белая подложка одна на все бумаги: логотипы нарисованы под белый фон,
+ * и на тёмной плитке без неё половина из них исчезает. Это же делает
+ * список ровным — иначе каждая строка задаёт свой цвет фона.
+ *
+ * Логотипов у Мосбиржи нет: в описании бумаги 27 полей, и ни одного
+ * графического. Значит, картинка либо лежит в самом приложении, либо
+ * тянется со стороннего хоста — а второе сообщает этому хосту, чем
+ * человек владеет, и отменяет обещание «данные не уходят с устройства».
+ */
+.d-logo {
+  width: 36px; height: 36px; border-radius: 11px; flex: none;
+  display: grid; place-items: center; overflow: hidden;
+  background: #fff; box-shadow: inset 0 0 0 1px rgba(0,0,0,.06);
+}
+.dir-d.is-light .d-logo { box-shadow: inset 0 0 0 1px rgba(0,0,0,.08); }
+/* Пропорции у настоящих логотипов какие угодно: Газпром высокий, Норникель
+   широкий, ВИМ — вообще надпись на 176×42. Жёсткие 22×22 их расплющат,
+   поэтому задан только предельный размер, а сторону выбирает сам файл. */
+.d-logo img, .d-logo svg {
+  display: block; width: auto; height: auto;
+  max-width: 25px; max-height: 25px; object-fit: contain;
+}
+
+/* Запасной вариант для бумаги без логотипа. Их всегда будет большинство:
+   облигаций на Мосбирже тысячи, и рисовать значок каждой невозможно. */
+.d-mono {
+  width: 36px; height: 36px; border-radius: 11px; flex: none;
+  display: grid; place-items: center;
+  font-size: 10.5px; font-weight: 700; letter-spacing: .01em;
+  background: var(--tile-2); color: var(--ink-2);
+  background: color-mix(in srgb, var(--t, currentColor) 17%, transparent);
+  color: var(--t, var(--ink-2));
+}
+/* В светлой теме тон годится подложке, но не буквам: жёлтый и мятный
+   на бледной заливке того же тона дают около двух к одному. Тон затемняется
+   до знака, подложка остаётся прежней — так работает любой цвет набора,
+   а не только те, что случайно оказались тёмными. */
+.dir-d.is-light .d-mono {
+  background: color-mix(in srgb, var(--t, currentColor) 14%, #fff);
+  color: color-mix(in srgb, var(--t, currentColor) 45%, #000);
+}
+.d-paper-t { flex: 1; min-width: 0; }
+.d-paper-t b { display: block; font-size: 14px; font-weight: 600; letter-spacing: -.01em; }
+/* Подпись в одну строку. Перенос здесь читается как сбой вёрстки: «портфеля»
+   отдельной строкой под числом выглядит обрывком, а не продолжением. */
+.d-paper-t span {
+  display: block; font-size: 10px; color: var(--ink-3); margin-top: 2px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.d-paper-v { text-align: right; flex: none; }
+.d-paper-v b { display: block; font-size: 14px; font-weight: 700; letter-spacing: -.02em; }
+.d-paper-v em { display: block; font-style: normal; font-size: 11.5px; font-weight: 700; margin-top: 1px; }
+.d-paper-v em.up { color: var(--good); }
+.d-paper-v em.down { color: var(--crit); }
+.d-paper-c { color: var(--ink-3); flex: none; margin-left: -3px; }
+
+/* Строка доли. Полоса с меткой цели — самый короткий способ показать
+   «факт против плана»: два числа рядом требуют вычитания в уме,
+   а метка на полосе показывает разницу сразу. */
+.d-share + .d-share { margin-top: 11px; }
+.d-share-h { display: flex; align-items: baseline; gap: 8px; }
+.d-share-h b { font-size: 13px; font-weight: 600; flex: 1; }
+.d-share-h u { text-decoration: none; font-size: 12.5px; font-weight: 700; letter-spacing: -.02em; }
+.d-share-track { position: relative; height: 8px; border-radius: 999px; background: var(--tile-2); margin: 7px 0 5px; }
+.d-share-track i { display: block; height: 100%; border-radius: 999px; background: var(--acc-mark); }
+/* Метка цели стоит и на залитой части полосы, и на пустой, а цвета у них
+   противоположные. Одноцветная метка поэтому исчезает ровно в половине
+   случаев — как раз когда перекос есть и смотреть на неё нужнее всего.
+   Отсюда светлое ядро в тёмной обводке: оно видно на любом фоне. */
+.d-share-track u {
+  position: absolute; top: -3px; width: 2px; height: 14px; border-radius: 1px;
+  background: var(--tile); box-shadow: 0 0 0 1.5px var(--ink); text-decoration: none;
+}
+.d-share-f { display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--ink-3); }
+.d-share-f .act {
+  margin-left: auto; font-size: 10px; font-weight: 700; letter-spacing: .04em;
+  padding: 2px 7px; border-radius: 6px;
+}
+.d-share-f .act.ok { background: var(--tile-2); color: var(--ink-3); }
+/* Докупить и продать — разные назначения, и одинаковым цветом их набирать
+   нельзя: «докупить» жёлтое, как всякое действие в этом языке, «продать» —
+   оранжевое, потому что тянет за собой налог и обнуляет срок владения.
+   Два жёлтых пятна подряд читались бы как одно и то же. */
+.d-share-f .act.buy { background: rgba(255,221,45,.16); color: var(--acc); }
+.dir-d.is-light .d-share-f .act.buy { background: #fff3bd; color: #6b5500; }
+.d-share-f .act.sell { background: rgba(251,146,60,.18); color: #fb923c; }
+.dir-d.is-light .d-share-f .act.sell { background: #fdead4; color: #9a4b00; }
+
+/* План довложения. «Продать» — плохой совет по умолчанию: продажа тянет
+   налог и обнуляет срок владения ради льготы, докупка не делает ни того,
+   ни другого. Поэтому план здесь ровно один и он про докупку. */
+.d-plan { background: var(--tile-2); border-radius: 13px; padding: 11px 12px; margin-top: 13px; }
+.d-plan-h { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 7px; }
+.d-plan-h b { font-size: 12.5px; font-weight: 700; }
+.d-plan-h u { text-decoration: none; font-size: 14px; font-weight: 700; letter-spacing: -.02em; }
+.d-plan-r { display: flex; justify-content: space-between; font-size: 11.5px; color: var(--ink-2); padding: 3px 0; }
+.d-plan-r b { color: var(--ink); font-weight: 600; }
+
+/* Служебное действие. Обновление котировок — не то же, что завести бумагу,
+   и вес у него другой: обводка вместо заливки. */
+.d-ghost {
+  width: 100%; border: 1px solid var(--line); background: none; color: var(--ink-2);
+  font: inherit; font-size: 13px; font-weight: 600; border-radius: 14px; padding: 12px;
+  cursor: pointer; margin-top: 8px; display: flex; align-items: center; justify-content: center; gap: 7px;
+}
+
+/* --------------------------------------------------------------------------
+ * ФОРМЫ. Шторка снизу.
+ *
+ * Через них проходит каждое изменение данных, и потому здесь важнее всего
+ * не красота, а три вещи: видно, куда нажимать; видно, что получится;
+ * и низ со «Сохранить» не уезжает за клавиатуру.
+ * -------------------------------------------------------------------------- */
+
+.d-scrim {
+  position: absolute; inset: 0; z-index: 40;
+  background: rgba(4, 5, 7, .62);
+  -webkit-backdrop-filter: blur(2px); backdrop-filter: blur(2px);
+}
+.d-scrim.is-light { background: rgba(20, 22, 26, .38); }
+
+.d-sheet {
+  position: absolute; left: 0; right: 0; bottom: 0; z-index: 41;
+  max-height: 88%; display: flex; flex-direction: column;
+  background: var(--bg); border-radius: 22px 22px 0 0;
+  box-shadow: 0 -12px 40px rgba(0, 0, 0, .5);
+}
+.d-sheet.is-light { box-shadow: 0 -12px 40px rgba(20, 22, 26, .18); }
+
+/* Полоска-ухват. Не украшение: она единственная говорит, что шторку
+   можно смахнуть вниз, а не только закрыть кнопкой. */
+.d-grab { width: 36px; height: 4px; border-radius: 999px; background: var(--line); margin: 8px auto 0; flex: none; }
+.d-sheet-h { padding: 12px 16px 10px; flex: none; }
+.d-sheet-h b { font-size: 19px; font-weight: 700; letter-spacing: -.025em; }
+.d-sheet-h span { display: block; font-size: 12px; color: var(--ink-3); margin-top: 2px; }
+
+.d-sheet-b { flex: 1; overflow-y: auto; padding: 2px 16px 16px; scrollbar-width: none; }
+.d-sheet-b::-webkit-scrollbar { display: none; }
+
+/* Низ прижат и не прокручивается вместе с полями: «Сохранить», уехавшее
+   за край длинной формы, ищут прокруткой каждый раз. */
+.d-sheet-f {
+  flex: none; display: flex; gap: 8px; padding: 12px 16px;
+  padding-bottom: calc(12px + 14px);
+  border-top: 1px solid var(--line); background: var(--bg);
+}
+
+.d-fld + .d-fld, .d-fld + .d-grp2, .d-grp2 + .d-fld, .d-grp2 + .d-grp2 { margin-top: 14px; }
+.d-fld-l { display: block; font-size: 12px; font-weight: 600; color: var(--ink-2); margin-bottom: 6px; }
+/* Значение в одну строку. Перенос внутри поля делает его выше соседнего,
+   и пара полей в ряд перестаёт читаться как пара. */
+.d-ctrl {
+  display: flex; align-items: center; width: 100%; min-height: 46px;
+  padding: 0 13px; border-radius: 12px; font-size: 15.5px;
+  background: var(--tile); border: 1px solid var(--line); color: var(--ink);
+  white-space: nowrap; overflow: hidden;
+}
+.d-ctrl.ph { color: var(--ink-3); }
+/* Поле в фокусе обведено акцентом, а не только подсвечено фоном: на солнце
+   разницу в фоне не видно вовсе, а рамку видно. */
+.d-ctrl.is-focus { border-color: var(--acc-mark); box-shadow: 0 0 0 3px color-mix(in srgb, var(--acc-mark) 18%, transparent); }
+.d-ctrl.is-bad { border-color: var(--crit); }
+.d-ctrl.big { font-size: 26px; font-weight: 700; letter-spacing: -.03em; min-height: 58px; }
+.d-ctrl svg { margin-left: auto; color: var(--ink-3); flex: none; }
+.d-hint { display: block; font-size: 11.5px; line-height: 1.4; color: var(--ink-3); margin-top: 5px; }
+.d-hint.bad { color: var(--crit); }
+
+.d-two { display: flex; gap: 8px; }
+.d-two > * { flex: 1; min-width: 0; }
+
+/* Складка. У вклада нет режима торгов, у акции — дня капитализации:
+   форма на сорок полей проходима только тогда, когда открыта та половина,
+   которая относится к этому активу. */
+.d-grp2 { border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
+.d-grp2-h {
+  display: flex; align-items: center; gap: 8px; width: 100%;
+  padding: 12px 13px; background: var(--tile); border: 0; font: inherit;
+  color: var(--ink); cursor: pointer; text-align: left;
+}
+.d-grp2-h b { flex: 1; font-size: 14px; font-weight: 600; }
+.d-grp2-h em { font-style: normal; font-size: 11px; color: var(--ink-3); }
+.d-grp2-h svg { color: var(--ink-3); transition: transform 160ms ease; }
+.d-grp2-h[aria-expanded='true'] svg { transform: rotate(180deg); }
+.d-grp2-b { padding: 2px 13px 13px; border-top: 1px solid var(--line); }
+.d-grp2-b > .d-fld:first-child { margin-top: 12px; }
+
+.d-check2 { display: flex; align-items: center; gap: 10px; padding: 9px 0; }
+.d-box {
+  width: 21px; height: 21px; border-radius: 6px; flex: none;
+  border: 1.5px solid var(--line); display: grid; place-items: center; color: transparent;
+}
+.d-box.on { background: var(--acc); border-color: var(--acc); color: #08090b; }
+.d-check2 span { font-size: 14px; }
+
+.d-note { border-radius: 11px; padding: 10px 12px; font-size: 11.5px; line-height: 1.45; margin-top: 12px; }
+.d-note.info { background: var(--tile-2); color: var(--ink-2); }
+.d-note.warn { background: rgba(251,191,36,.13); color: var(--warn); }
+.dir-d.is-light .d-note.warn { background: #fdf2d8; }
+
+/* Выбор источника. Два пути неравны, и вид это показывает: выписка точна
+   и полна, снимок удобен и приблизителен. Поэтому выписка стоит первой
+   и подписана «точно и целиком», а снимок честно назван способом
+   для одной-двух операций. */
+.d-pick {
+  display: flex; align-items: center; gap: 12px; width: 100%;
+  padding: 14px 13px; border-radius: 13px; text-align: left;
+  background: var(--tile); border: 1px solid var(--line); color: var(--ink);
+  font: inherit; cursor: pointer;
+}
+.d-pick + .d-pick { margin-top: 8px; }
+.d-pick i {
+  width: 38px; height: 38px; border-radius: 12px; flex: none;
+  display: grid; place-items: center; background: var(--tile-2); color: var(--ink-2);
+}
+.d-pick.key i { background: var(--acc); color: #08090b; }
+.d-pick b { display: block; font-size: 15px; font-weight: 600; }
+.d-pick span { display: block; font-size: 11.5px; color: var(--ink-3); margin-top: 2px; }
+.d-pick div { flex: 1; min-width: 0; }
+.d-pick > svg { color: var(--ink-3); flex: none; }
+
+.d-btn {
+  flex: 1; border: 1px solid var(--line); background: var(--tile); color: var(--ink);
+  font: inherit; font-size: 15px; font-weight: 600; border-radius: 13px; padding: 13px;
+  cursor: pointer; letter-spacing: -.01em;
+}
+.d-btn.pri { background: var(--acc); border-color: var(--acc); color: #08090b; font-weight: 700; }
+.d-btn.dan { color: var(--crit); border-color: var(--line); flex: 0 0 auto; padding: 13px 18px; }
+
+/* --------------------------------------------------------------------------
+ * ЭКРАН «НАСТРОЙКИ». Бывшее «Ещё».
+ *
+ * Вложенный экран настроек разобран на группы: «Настройки → Настройки» —
+ * не путь, а тупик. Всё, что там было, осталось и поднялось на уровень выше.
+ * -------------------------------------------------------------------------- */
+
+/* Переключатель. Строка со значением ведёт на выбор, строка с переключателем
+   меняется на месте — и по виду должно быть понятно, что произойдёт,
+   до нажатия, а не после. */
+.d-sw {
+  width: 42px; height: 25px; border-radius: 999px; flex: none;
+  background: var(--tile-2); border: 1px solid var(--line);
+  display: flex; align-items: center; padding: 2px; transition: background 160ms ease;
+}
+.d-sw i { width: 19px; height: 19px; border-radius: 999px; background: var(--ink-3); transition: all 160ms ease; }
+.d-sw.on { background: var(--acc); border-color: var(--acc); justify-content: flex-end; }
+.d-sw.on i { background: #08090b; }
+
+.d-tag.err { background: rgba(248,113,113,.16); color: var(--crit); }
+.d-tag.warn { background: rgba(251,191,36,.16); color: var(--warn); }
+.dir-d.is-light .d-tag.err { background: #fbe4e4; }
+.dir-d.is-light .d-tag.warn { background: #fdf2d8; }
+
+.d-fill {
+  width: 100%; border: 0; background: var(--acc); color: #08090b;
+  font: inherit; font-size: 14.5px; font-weight: 700; border-radius: 13px; padding: 13px;
+  cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px;
+}
+
+/* Панель разделов: Главная, Цели, Портфель, Траты, Настройки.
+ *
+ * Пять вкладок — решение автора приложения. В нынешнем коде их три
+ * («Сегодня», «Деньги», «Ещё») с кнопкой записи между первым и вторым,
+ * а разрезы живут внутри «Денег». Здесь сознательно возвращены пять:
+ * по разделу на каждый разрез, без промежуточного уровня.
+ */
+.dir-d .nav { background: var(--tile); border-top: 1px solid var(--line); padding: 6px 4px 15px; }
+.dir-d .nav b { color: var(--ink-3); }
+.dir-d .nav b.on { color: var(--acc); }
+.dir-d.is-light .nav b.on { color: var(--ink); }
+
+/* --------------------------------------------------------------------------
+ * ЭКРАН «ТРАТЫ».
+ *
+ * Отвечает на вопрос, которого нет больше нигде: какой ценой даются
+ * накопления. Портфель показывает результат, журнал — движения капитала,
+ * а расходы на жизнь до него были слепым пятном.
+ *
+ * Всё считается по выписке. Ничего не спрашивается «примерно»: придуманный
+ * средний расход даёт придуманную подушку, а на неё потом опираются.
+ * -------------------------------------------------------------------------- */
+
+.d-win { display: grid; grid-template-columns: repeat(4, 1fr); gap: 2px; padding: 3px;
+  background: var(--tile-2); border-radius: 11px; margin-bottom: 12px; }
+.d-win span { text-align: center; font-size: 11.5px; font-weight: 600; padding: 6px 2px; border-radius: 8px; color: var(--ink-3); }
+.d-win span.on { background: var(--tile); color: var(--ink); }
+.dir-d.is-light .d-win span.on { background: #fff; }
+
+.d-trio3 { display: flex; }
+.d-trio3 > div { flex: 1; min-width: 0; position: relative; padding: 0 6px; }
+.d-trio3 > div + div::before { content: ''; position: absolute; left: 0; top: 2px; bottom: 2px; width: 1px; background: var(--line); }
+.d-trio3 span { display: block; font-size: 10px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--ink-3); }
+.d-trio3 b { display: block; font-size: 16px; font-weight: 700; letter-spacing: -.025em; margin-top: 3px; }
+.d-trio3 small { display: block; font-size: 10px; color: var(--ink-3); margin-top: 1px; }
+.d-trio3 .g b { color: var(--good); }
+
+/* Крупное число блока — «останется», «в месяц». Оно тут одно на карточку,
+   и потому набрано вдвое крупнее строк под ним. */
+.d-big { font-size: 30px; font-weight: 700; letter-spacing: -.035em; line-height: 1.05; margin-top: 4px; }
+.d-big.bad { color: var(--crit); }
+.d-big.warn { color: var(--warn); }
+.d-big-h { font-size: 11.5px; color: var(--ink-3); margin-top: 4px; }
+
+.d-line { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-top: 1px solid var(--line-soft); }
+.d-line:first-of-type { border-top: 0; }
+.d-line p { margin: 0; flex: 1; min-width: 0; font-size: 12.5px; }
+.d-line p span { display: block; font-size: 10.5px; color: var(--ink-3); margin-top: 1px; }
+.d-line strong { font-size: 13px; font-weight: 700; letter-spacing: -.02em; white-space: nowrap; }
+.d-line strong.plus { color: var(--good); }
+
+/* Замечание словами. Только когда есть что сказать — блок «всё в порядке»
+   каждый день перестают читать на третий. */
+.d-say { border-radius: 12px; padding: 10px 12px; font-size: 12px; line-height: 1.4; margin-top: 12px; }
+.d-say.ok { background: rgba(74,222,128,.11); color: var(--good); }
+.d-say.warn { background: rgba(251,191,36,.13); color: var(--warn); }
+.d-say.info { background: var(--tile-2); color: var(--ink-2); }
+.dir-d.is-light .d-say.ok { background: #e6f5ea; }
+.dir-d.is-light .d-say.warn { background: #fdf2d8; }
+.d-say b { font-weight: 700; }
+
+/* Полоса категории — она же раскрывающаяся группа. Доля показана длиной,
+   а не только числом: сравнить пять процентов с двенадцатью глазами тяжело,
+   а две полосы — мгновенно. */
+.d-cat { width: 100%; background: none; border: 0; padding: 9px 0 8px; font: inherit; color: inherit; cursor: pointer; text-align: left; border-top: 1px solid var(--line-soft); }
+.d-cat:first-of-type { border-top: 0; }
+.d-cat-h { display: flex; align-items: baseline; gap: 8px; }
+.d-cat-h b { flex: 1; font-size: 13px; font-weight: 600; }
+.d-cat-h u { text-decoration: none; font-size: 13px; font-weight: 700; letter-spacing: -.02em; }
+.d-cat-h em { font-style: normal; font-size: 11px; color: var(--ink-3); font-weight: 600; min-width: 26px; text-align: right; }
+.d-cat-t { height: 6px; border-radius: 999px; background: var(--tile-2); margin-top: 7px; overflow: hidden; }
+.d-cat-t i { display: block; height: 100%; border-radius: 999px; background: var(--acc-mark); }
+
+.d-op2 { display: flex; align-items: center; gap: 10px; padding: 7px 0 7px 12px; border-top: 1px solid var(--line-soft); }
+.d-op2 p { margin: 0; flex: 1; min-width: 0; font-size: 12px; }
+.d-op2 p span { display: block; font-size: 10.5px; color: var(--ink-3); margin-top: 1px; }
+.d-op2 strong { font-size: 12.5px; font-weight: 700; letter-spacing: -.02em; white-space: nowrap; }
+
+.d-search {
+  display: flex; align-items: center; gap: 8px; background: var(--tile-2);
+  border-radius: 11px; padding: 9px 11px; margin: 2px 0 10px; color: var(--ink-3); font-size: 13px;
+}
+
+</style>
+</head>
+<body>
+
+<h1>Кубыш: выбранное направление</h1>
+<p class="lede">
+  <b>Плитки из C, круглые действия из A, экран не прокручивается.</b>
+  Ниже — комбо, под ним три исходных направления для сравнения.
+  Данные и функции те же самые: <b>ни одна возможность не убрана</b>.
+</p>
+
+<div class="bar">
+  <button type="button" data-t="dark" class="is-on">Тёмная</button>
+  <button type="button" data-t="light">Светлая</button>
+</div>
+
+<div class="rail" style="margin-bottom:56px">
+
+  <!-- ================================================================== D -->
+  <figure>
+    <figcaption>
+      <span class="cap-kicker">Комбо A + C</span>
+      <span class="cap-title">Панель с действиями</span>
+      <span class="cap-note">Бенто-сетка, круглое «Внести» вместо полосы, и ничего за нижним краем: экран не прокручивается вовсе.</span>
+      <span class="cap-note" style="margin-top:10px"><b style="color:#14161a">Что вместо сигналов</b> — они ушли в колокольчик:</span>
+    </figcaption>
+    <div class="bar" id="slots" style="margin-bottom:14px">
+      <button type="button" data-slot="pay">Ближайшие деньги</button>
+      <button type="button" data-slot="alloc">Портфель</button>
+      <button type="button" data-slot="ops" class="is-on">Операции</button>
+      <button type="button" data-slot="tip">Совет</button>
+    </div>
+    <div class="phone">
+      <div class="island"></div>
+      <div class="screenwrap">
+        <div class="scr dir-d" id="pd">
+          <div class="flow">
+
+            <div class="d-top">
+              <b>Кубыш</b>
+              <div class="d-bell">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8.5a6 6 0 1 0-12 0c0 6-2 7.5-2 7.5h16s-2-1.5-2-7.5"/><path d="M13.7 19.5a2 2 0 0 1-3.4 0"/></svg>
+                <em>2</em>
+              </div>
+            </div>
+
+            <div class="d-tile d-hero">
+              <div class="d-k"><span>Мой капитал</span><u>6 месяцев ⌄</u></div>
+              <div class="d-hero-v num">3 418 920 ₽</div>
+              <div class="d-hero-row">
+                <span class="d-badge num">+18,4%</span>
+                <span class="d-note num">+15 000 ₽ сегодня</span>
+              </div>
+              <svg class="d-spark" viewBox="0 0 320 32" width="100%" height="26" preserveAspectRatio="none">
+                <defs><linearGradient id="gd" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stop-color="var(--acc-mark)" stop-opacity=".22"/>
+                  <stop offset="100%" stop-color="var(--acc-mark)" stop-opacity="0"/>
+                </linearGradient></defs>
+                <path d="M4 26 L57 24 L110 22 L163 17 L216 13 L269 8 L316 3 L316 30 L4 30 Z" fill="url(#gd)"/>
+                <path d="M4 26 L57 24 L110 22 L163 17 L216 13 L269 8 L316 3" fill="none" stroke="var(--acc-mark)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+              <div class="d-split">
+                <div><span>ДОСТУПНО</span><b class="num">642 300 ₽</b></div>
+                <div><span>ИНВЕСТИЦИИ</span><b class="num">2 776 620 ₽</b></div>
+              </div>
+            </div>
+
+            <div class="d-acts">
+              <div class="d-act key">
+                <i><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></i>
+                <span>Внести взнос</span>
+              </div>
+              <div class="d-act">
+                <i><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3v12M17 15l-4-4M17 15l4-4M7 21V9M7 9 3 13M7 9l4 4"/></svg></i>
+                <span>Операция</span>
+              </div>
+              <div class="d-act">
+                <i><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="4"/><circle cx="12" cy="12" r=".9" fill="currentColor" stroke="none"/></svg></i>
+                <span>Цель</span>
+              </div>
+              <div class="d-act">
+                <i><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2.5"/><path d="M3 9h18M8 14h4"/></svg></i>
+                <span>Снимок</span>
+              </div>
+            </div>
+
+            <div class="d-tile d-pair d-goalbox">
+              <div class="d-goals" id="goals">
+
+                <div class="d-goal">
+                  <div class="d-ring">
+                    <svg width="50" height="50" viewBox="0 0 58 58">
+                      <circle cx="29" cy="29" r="24" fill="none" stroke="var(--tile-2)" stroke-width="7"/>
+                      <circle cx="29" cy="29" r="24" fill="none" stroke="var(--acc-mark)" stroke-width="7"
+                              stroke-linecap="round" stroke-dasharray="150.8 150.8" stroke-dashoffset="54.3"
+                              transform="rotate(-90 29 29)"/>
+                      <text x="29" y="34" text-anchor="middle" font-size="16" font-weight="700" fill="var(--ink)" font-family="Inter">64%</text>
+                    </svg>
+                    <div class="d-ring-t">
+                      <b>Квартира</b>
+                      <span class="num">1,92 из 3 млн ₽<br>март 2027</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="d-goal">
+                  <div class="d-ring">
+                    <svg width="50" height="50" viewBox="0 0 58 58">
+                      <circle cx="29" cy="29" r="24" fill="none" stroke="var(--tile-2)" stroke-width="7"/>
+                      <circle cx="29" cy="29" r="24" fill="none" stroke="var(--acc-mark)" stroke-width="7"
+                              stroke-linecap="round" stroke-dasharray="150.8 150.8" stroke-dashoffset="93.5"
+                              transform="rotate(-90 29 29)"/>
+                      <text x="29" y="34" text-anchor="middle" font-size="16" font-weight="700" fill="var(--ink)" font-family="Inter">38%</text>
+                    </svg>
+                    <div class="d-ring-t">
+                      <b>Отпуск</b>
+                      <span class="num">152 из 400 тыс ₽<br>июнь 2026</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="d-goal">
+                  <div class="d-ring">
+                    <svg width="50" height="50" viewBox="0 0 58 58">
+                      <circle cx="29" cy="29" r="24" fill="none" stroke="var(--tile-2)" stroke-width="7"/>
+                      <circle cx="29" cy="29" r="24" fill="none" stroke="var(--acc-mark)" stroke-width="7"
+                              stroke-linecap="round" stroke-dasharray="150.8 150.8" stroke-dashoffset="132.7"
+                              transform="rotate(-90 29 29)"/>
+                      <text x="29" y="34" text-anchor="middle" font-size="16" font-weight="700" fill="var(--ink)" font-family="Inter">12%</text>
+                    </svg>
+                    <div class="d-ring-t">
+                      <b>Подушка ×12</b>
+                      <span class="num">108 из 900 тыс ₽<br>темпа не хватает</span>
+                    </div>
+                  </div>
+                </div>
+
+              </div>
+              <div class="d-dots" id="dots"><i class="on"></i><i></i><i></i></div>
+            </div>
+
+            <div class="d-tile d-pair">
+              <div class="d-k">Подушка</div>
+              <div class="d-v num">7,9 мес.</div>
+              <div class="d-s">мгновенные деньги</div>
+              <div class="d-strip">
+                <i class="on" style="height:40%"></i><i class="on" style="height:55%"></i><i class="on" style="height:48%"></i>
+                <i class="on" style="height:70%"></i><i class="on" style="height:64%"></i><i class="on" style="height:88%"></i>
+                <i style="height:100%"></i>
+              </div>
+            </div>
+
+            <div class="d-tile wide d-slotbox">
+
+              <!-- 1. Ближайшие деньги -->
+              <div class="d-slot" data-slot="pay">
+                <div class="d-k" style="margin-bottom:6px">Ближайшие поступления</div>
+                <div class="d-pay">
+                  <i><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="2.5"/><path d="M3 10h18M8 3v4M16 3v4"/></svg></i>
+                  <p><b>ОФЗ 26238</b><span>купон, послезавтра</span></p>
+                  <strong class="num">+4 380 ₽</strong>
+                </div>
+                <div class="d-pay">
+                  <i><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 3v18M17 7.5c0-2-2.2-3-5-3s-5 .9-5 2.8c0 4.4 10 2.2 10 6.4 0 2-2.2 2.9-5 2.9s-5-1-5-3"/></svg></i>
+                  <p><b>Вклад 3 месяца</b><span class="num">капитализация 5 августа</span></p>
+                  <strong class="num">+1 240 ₽</strong>
+                </div>
+              </div>
+
+              <!-- 2. Портфель -->
+              <div class="d-slot" data-slot="alloc">
+                <div class="d-k" style="display:flex;align-items:center">Портфель · факт против цели <span class="d-gap">ДОКУПИТЬ 2</span></div>
+                <div class="d-alloc">
+                  <i style="width:44%;background:var(--acc-mark)"></i>
+                  <i style="width:28%;background:var(--ink-3)"></i>
+                  <i style="width:18%;background:var(--tile-2)"></i>
+                  <i style="width:10%;background:var(--tile-2);opacity:.55"></i>
+                </div>
+                <div class="d-legend">
+                  <div><u style="background:var(--acc-mark)"></u>Облигации <b class="num">44%</b></div>
+                  <div><u style="background:var(--ink-3)"></u>Акции <b class="num">28%</b></div>
+                  <div><u style="background:var(--tile-2)"></u>Вклады <b class="num">18%</b></div>
+                </div>
+              </div>
+
+              <!-- 3. Последние операции -->
+              <div class="d-slot on" data-slot="ops">
+                <div class="d-k" style="display:flex;align-items:center;margin-bottom:5px">
+                  Последние операции <span class="d-gap">ВСЕ ›</span>
+                </div>
+                <div class="d-op">
+                  <p><b>Взнос · Накопительный счёт</b><span>сегодня · Квартира</span></p>
+                  <strong class="plus num">+15 000 ₽</strong>
+                </div>
+                <div class="d-op">
+                  <p><b>Покупка · ОФЗ 26238</b><span>вчера · 12 шт.</span></p>
+                  <strong class="num">−9 840 ₽</strong>
+                </div>
+              </div>
+
+              <!-- 4. Совет Кубыша -->
+              <div class="d-slot" data-slot="tip">
+                <div class="d-tip">
+                  <div class="beast">
+                    <svg viewBox="0 0 40 48" width="21" height="25">
+                      <ellipse cx="20" cy="24" rx="12" ry="12.5" fill="#101114"/>
+                      <circle cx="16" cy="22.5" r="3.6" fill="#fff"/><circle cx="24" cy="22.5" r="3.6" fill="#fff"/>
+                      <circle cx="16.7" cy="23" r="1.8" fill="#101114"/><circle cx="24.7" cy="23" r="1.8" fill="#101114"/>
+                      <path d="M16.5 29 C18.2 30.8 21.8 30.8 23.5 29" stroke="#fff" stroke-width="1.6" fill="none" stroke-linecap="round"/>
+                    </svg>
+                  </div>
+                  <p class="num">ОФЗ 26238: до льготы 41 день — продавать сейчас невыгодно</p>
+                  <span class="chev">›</span>
+                </div>
+              </div>
+
+            </div>
+
+            <div class="d-tile wide">
+              <div class="d-trio">
+                <div><span>Прожито</span><b class="num">486 200</b><small>за 6 мес.</small></div>
+                <div class="g"><span>Отложено</span><b class="num">+214 000</b><small>31% дохода</small></div>
+                <div>
+                  <span>Дисциплина</span><b class="num">21 из 30</b>
+                  <div class="d-days"><i style="width:70%"></i></div>
+                </div>
+              </div>
+            </div>
+
+          </div>
+
+          <nav class="nav">
+            <b class="on"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 10.6 12 3.5l8.5 7.1V20a.9.9 0 0 1-.9.9h-4.4v-5.6H8.8v5.6H4.4a.9.9 0 0 1-.9-.9z"/></svg>Главная</b>
+            <b><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="4"/></svg>Цели</b>
+            <b><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M5.5 20V13.5M12 20V5M18.5 20v-9.5"/></svg>Портфель</b>
+            <b><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M3.8 8.6h16.4v9.9a1.6 1.6 0 0 1-1.6 1.6H5.4a1.6 1.6 0 0 1-1.6-1.6z"/><path d="M6.6 8.6V5.9a1.6 1.6 0 0 1 1.6-1.6h7.6a1.6 1.6 0 0 1 1.6 1.6v2.7"/></svg>Траты</b>
+            <b><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M6 12h.01M12 12h.01M18 12h.01"/></svg>Настройки</b>
+          </nav>
+        </div>
+      </div>
+    </div>
+  </figure>
+
+</div>
+
+<h1 style="font-size:22px;margin-bottom:6px">Экран «Цели»</h1>
+<p class="lede">
+  Тот же язык, но список, а не сводка: <b>здесь прокрутка есть и должна быть</b> —
+  целей бывает сколько угодно. Всё, что экран умеет сейчас, на месте: порядок
+  перетаскиванием, статусы, четыре метрики, привязанные активы.
+</p>
+
+<div class="rail" style="margin-bottom:56px">
+  <figure>
+    <figcaption>
+      <span class="cap-kicker">Экран 2 из 6</span>
+      <span class="cap-title">Цели</span>
+      <span class="cap-note">Только карточки целей, в порядке, заданном руками. Ничего сверх них.</span>
+    </figcaption>
+    <div class="phone">
+      <div class="island"></div>
+      <div class="screenwrap">
+        <div class="scr dir-d" id="pg">
+          <div class="flow is-list">
+
+            <div class="d-head">
+              <h1>Цели</h1>
+              <div class="d-add">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+              </div>
+            </div>
+
+            <!-- Цель 1: активная, в графике -->
+            <div class="d-goalcard">
+              <div class="d-gh">
+                <svg class="d-grip" width="10" height="16" viewBox="0 0 10 16" fill="currentColor" aria-hidden="true"><circle cx="2" cy="3" r="1.4"/><circle cx="8" cy="3" r="1.4"/><circle cx="2" cy="8" r="1.4"/><circle cx="8" cy="8" r="1.4"/><circle cx="2" cy="13" r="1.4"/><circle cx="8" cy="13" r="1.4"/></svg>
+                <div class="d-gh-t">
+                  <b>Квартира</b>
+                  <span>до 1 марта 2027</span>
+                </div>
+                <span class="d-tag act">АКТИВНА</span>
+              </div>
+
+              <div class="d-money">
+                <svg width="54" height="54" viewBox="0 0 58 58">
+                  <circle cx="29" cy="29" r="24" fill="none" stroke="var(--tile-2)" stroke-width="7"/>
+                  <circle cx="29" cy="29" r="24" fill="none" stroke="var(--acc-mark)" stroke-width="7"
+                          stroke-linecap="round" stroke-dasharray="150.8 150.8" stroke-dashoffset="54.3"
+                          transform="rotate(-90 29 29)"/>
+                  <text x="29" y="34" text-anchor="middle" font-size="16" font-weight="700" fill="var(--ink)" font-family="Inter">64%</text>
+                </svg>
+                <div class="d-money-t">
+                  <b class="num">1 920 000 ₽</b>
+                  <span class="num">из 3 000 000 ₽</span>
+                </div>
+              </div>
+
+              <div class="d-metrics">
+                <div><span>Нужно в день</span><b class="num">4 100 ₽</b><small class="num">осталось 573 дня</small></div>
+                <div><span>Дневной прирост</span><b class="num">3 640 ₽</b><small>план плюс проценты</small></div>
+                <div><span>Выполнение плана</span><b class="num">82%</b><small>взносы за этот месяц</small></div>
+                <div><span>Прогноз закрытия</span><b>март 2027</b><small class="num">запас 12 дней</small></div>
+              </div>
+
+              <div class="d-linked">
+                <button class="d-linked-h" type="button" aria-expanded="false">
+                  <span>Привязанные активы</span><em>2</em>
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+                </button>
+                <div class="d-assets" hidden>
+                  <div class="d-asset">
+                    <i><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 3v18M17 7.5c0-2-2.2-3-5-3s-5 .9-5 2.8c0 4.4 10 2.2 10 6.4 0 2-2.2 2.9-5 2.9s-5-1-5-3"/></svg></i>
+                    <p>Накопительный счёт<span>Счёт · в 2 целях</span></p>
+                    <strong class="num">642 300 ₽</strong>
+                  </div>
+                  <div class="d-asset">
+                    <i><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round"><path d="M6 3h8l4 4v14H6z"/><path d="M14 3v4h4"/></svg></i>
+                    <p>ОФЗ 26238<span>Облигация</span></p>
+                    <strong class="num">1 277 700 ₽</strong>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Цель 2: активная, темпа не хватает -->
+            <div class="d-goalcard">
+              <div class="d-gh">
+                <svg class="d-grip" width="10" height="16" viewBox="0 0 10 16" fill="currentColor" aria-hidden="true"><circle cx="2" cy="3" r="1.4"/><circle cx="8" cy="3" r="1.4"/><circle cx="2" cy="8" r="1.4"/><circle cx="8" cy="8" r="1.4"/><circle cx="2" cy="13" r="1.4"/><circle cx="8" cy="13" r="1.4"/></svg>
+                <div class="d-gh-t">
+                  <b>Отпуск</b>
+                  <span>до 1 июня 2026</span>
+                </div>
+                <span class="d-tag act">АКТИВНА</span>
+              </div>
+
+              <div class="d-money">
+                <svg width="54" height="54" viewBox="0 0 58 58">
+                  <circle cx="29" cy="29" r="24" fill="none" stroke="var(--tile-2)" stroke-width="7"/>
+                  <circle cx="29" cy="29" r="24" fill="none" stroke="var(--acc-mark)" stroke-width="7"
+                          stroke-linecap="round" stroke-dasharray="150.8 150.8" stroke-dashoffset="93.5"
+                          transform="rotate(-90 29 29)"/>
+                  <text x="29" y="34" text-anchor="middle" font-size="16" font-weight="700" fill="var(--ink)" font-family="Inter">38%</text>
+                </svg>
+                <div class="d-money-t">
+                  <b class="num">152 000 ₽</b>
+                  <span class="num">из 400 000 ₽</span>
+                </div>
+              </div>
+
+              <div class="d-metrics">
+                <div><span>Нужно в день</span><b class="num">812 ₽</b><small class="num">осталось 305 дней</small></div>
+                <div><span>Дневной прирост</span><b class="num">430 ₽</b><small>план плюс проценты</small></div>
+                <div><span>Выполнение плана</span><b class="num">44%</b><small>взносы за этот месяц</small></div>
+                <div class="bad"><span>Прогноз закрытия</span><b>ноябрь 2026</b><small class="num">опоздание на 158 дней</small></div>
+              </div>
+
+              <div class="d-linked">
+                <button class="d-linked-h" type="button" aria-expanded="false">
+                  <span>Привязанные активы</span><em>1</em>
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+                </button>
+                <div class="d-assets" hidden>
+                  <div class="d-asset">
+                    <i><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 3v18M17 7.5c0-2-2.2-3-5-3s-5 .9-5 2.8c0 4.4 10 2.2 10 6.4 0 2-2.2 2.9-5 2.9s-5-1-5-3"/></svg></i>
+                    <p>Накопительный счёт<span>Счёт · в 2 целях</span></p>
+                    <strong class="num">152 000 ₽</strong>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Цель 3: на паузе -->
+            <div class="d-goalcard is-off">
+              <div class="d-gh">
+                <svg class="d-grip" width="10" height="16" viewBox="0 0 10 16" fill="currentColor" aria-hidden="true"><circle cx="2" cy="3" r="1.4"/><circle cx="8" cy="3" r="1.4"/><circle cx="2" cy="8" r="1.4"/><circle cx="8" cy="8" r="1.4"/><circle cx="2" cy="13" r="1.4"/><circle cx="8" cy="13" r="1.4"/></svg>
+                <div class="d-gh-t">
+                  <b>Машина</b>
+                  <span>без срока</span>
+                </div>
+                <span class="d-tag pause">НА ПАУЗЕ</span>
+              </div>
+
+              <div class="d-money">
+                <svg width="54" height="54" viewBox="0 0 58 58">
+                  <circle cx="29" cy="29" r="24" fill="none" stroke="var(--tile-2)" stroke-width="7"/>
+                  <circle cx="29" cy="29" r="24" fill="none" stroke="var(--ink-3)" stroke-width="7"
+                          stroke-linecap="round" stroke-dasharray="150.8 150.8" stroke-dashoffset="132.7"
+                          transform="rotate(-90 29 29)"/>
+                  <text x="29" y="34" text-anchor="middle" font-size="16" font-weight="700" fill="var(--ink)" font-family="Inter">12%</text>
+                </svg>
+                <div class="d-money-t">
+                  <b class="num">108 000 ₽</b>
+                  <span class="num">из 900 000 ₽</span>
+                </div>
+              </div>
+
+              <div class="d-metrics">
+                <div><span>Нужно в день</span><b>—</b><small>срок не задан</small></div>
+                <div><span>Дневной прирост</span><b class="num">0 ₽</b><small>взносы приостановлены</small></div>
+                <div><span>Выполнение плана</span><b>—</b><small>плана нет</small></div>
+                <div><span>Прогноз закрытия</span><b>не наберётся</b><small>срок не задан</small></div>
+              </div>
+
+              <div class="d-linked">
+                <button class="d-linked-h" type="button" aria-expanded="false">
+                  <span>Привязанные активы</span><em>1</em>
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+                </button>
+                <div class="d-assets" hidden>
+                  <div class="d-asset">
+                    <i><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 3v18M17 7.5c0-2-2.2-3-5-3s-5 .9-5 2.8c0 4.4 10 2.2 10 6.4 0 2-2.2 2.9-5 2.9s-5-1-5-3"/></svg></i>
+                    <p>Вклад 3 месяца<span>Вклад</span></p>
+                    <strong class="num">108 000 ₽</strong>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Цель 4: достигнута -->
+            <div class="d-goalcard is-off">
+              <div class="d-gh">
+                <svg class="d-grip" width="10" height="16" viewBox="0 0 10 16" fill="currentColor" aria-hidden="true"><circle cx="2" cy="3" r="1.4"/><circle cx="8" cy="3" r="1.4"/><circle cx="2" cy="8" r="1.4"/><circle cx="8" cy="8" r="1.4"/><circle cx="2" cy="13" r="1.4"/><circle cx="8" cy="13" r="1.4"/></svg>
+                <div class="d-gh-t">
+                  <b>Подушка на полгода</b>
+                  <span class="num">закрыта 14 июня 2025</span>
+                </div>
+                <span class="d-tag done">ДОСТИГНУТА</span>
+              </div>
+
+              <div class="d-money">
+                <svg width="54" height="54" viewBox="0 0 58 58">
+                  <circle cx="29" cy="29" r="24" fill="none" stroke="var(--acc-mark)" stroke-width="7"/>
+                  <path d="M21 29.5 27 35 38 23" fill="none" stroke="var(--acc-mark)" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+                <div class="d-money-t">
+                  <b class="num">480 000 ₽</b>
+                  <span class="num">цель 480 000 ₽ · 100%</span>
+                </div>
+              </div>
+
+              <div class="d-linked">
+                <button class="d-linked-h" type="button" aria-expanded="false">
+                  <span>Привязанные активы</span><em>1</em>
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+                </button>
+                <div class="d-assets" hidden>
+                  <div class="d-asset">
+                    <i><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 3v18M17 7.5c0-2-2.2-3-5-3s-5 .9-5 2.8c0 4.4 10 2.2 10 6.4 0 2-2.2 2.9-5 2.9s-5-1-5-3"/></svg></i>
+                    <p>Резервный счёт<span>Счёт</span></p>
+                    <strong class="num">480 000 ₽</strong>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+          </div>
+
+          <nav class="nav">
+            <b><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 10.6 12 3.5l8.5 7.1V20a.9.9 0 0 1-.9.9h-4.4v-5.6H8.8v5.6H4.4a.9.9 0 0 1-.9-.9z"/></svg>Главная</b>
+            <b class="on"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="4"/></svg>Цели</b>
+            <b><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M5.5 20V13.5M12 20V5M18.5 20v-9.5"/></svg>Портфель</b>
+            <b><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M3.8 8.6h16.4v9.9a1.6 1.6 0 0 1-1.6 1.6H5.4a1.6 1.6 0 0 1-1.6-1.6z"/><path d="M6.6 8.6V5.9a1.6 1.6 0 0 1 1.6-1.6h7.6a1.6 1.6 0 0 1 1.6 1.6v2.7"/></svg>Траты</b>
+            <b><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M6 12h.01M12 12h.01M18 12h.01"/></svg>Настройки</b>
+          </nav>
+        </div>
+      </div>
+    </div>
+  </figure>
+</div>
+
+<h1 style="font-size:22px;margin-bottom:6px">Экран «Портфель»</h1>
+<p class="lede">
+  Порядок блоков не выбран заново, а взят из кода: <b>сколько всего, что лежит,
+  и только потом доли</b>. Доли — проверка плана, она нужна реже суммы.
+  Разрезы «Портфель / Журнал» остались переключателем сверху.
+</p>
+
+<div class="rail" style="margin-bottom:56px">
+  <figure>
+    <figcaption>
+      <span class="cap-kicker">Экран 3 из 6</span>
+      <span class="cap-title">Портфель</span>
+      <span class="cap-note">Сумма и доходность против ключевой, бумаги по классам, выплаты, доли с планом довложения.</span>
+    </figcaption>
+    <div class="phone">
+      <div class="island"></div>
+      <div class="screenwrap">
+        <div class="scr dir-d" id="pp">
+          <div class="flow is-list">
+
+            <div class="d-head">
+              <h1>Деньги</h1>
+              <div class="d-add">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+              </div>
+            </div>
+
+            <div class="d-seg">
+              <span class="on">Портфель</span><span>Журнал</span>
+            </div>
+
+            <!-- 1. Сколько всего -->
+            <div class="d-tile d-hero" style="margin-bottom:8px">
+              <div class="d-k"><span>Портфель</span></div>
+              <div class="d-hero-v num">2 776 620 ₽</div>
+              <div class="d-hero-row">
+                <span class="d-badge num">+12,84%</span>
+                <span class="d-note">годовых</span>
+              </div>
+              <div class="d-bench num">
+                Ключевая за период 16,3% · <b class="down">отстаёте на 3,46 п.п.</b>
+              </div>
+            </div>
+
+            <!-- 2. Что лежит -->
+            <div class="d-tile d-holdings" style="margin-bottom:8px">
+
+              <div class="d-grp">
+                <div class="d-grp-h">
+                  <b>Акции</b><u class="num">930 000 ₽</u><em class="up num">+11,7%</em>
+                </div>
+                <div class="d-paper">
+                  <span class="d-logo"><img src="./icons/tickers/SBER.svg" alt=""></span>
+                  <span class="d-paper-t">
+                    <b>Сбербанк ао</b>
+                    <span class="num">700 × 320,00 ₽ · 8,1% портфеля</span>
+                  </span>
+                  <span class="d-paper-v">
+                    <b class="num">224 000 ₽</b>
+                    <em class="up num">+24,6%</em>
+                  </span>
+                  <svg class="d-paper-c" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="m9 6 6 6-6 6"/></svg>
+                </div>
+                <div class="d-paper">
+                  <span class="d-logo"><img src="./icons/tickers/LKOH.svg" alt=""></span>
+                  <span class="d-paper-t">
+                    <b>Лукойл</b>
+                    <span class="num">30 × 6 741,90 ₽ · 7,3% портфеля</span>
+                  </span>
+                  <span class="d-paper-v">
+                    <b class="num">202 257 ₽</b>
+                    <em class="up num">+9,8%</em>
+                  </span>
+                  <svg class="d-paper-c" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="m9 6 6 6-6 6"/></svg>
+                </div>
+                <div class="d-paper">
+                  <span class="d-logo"><img src="./icons/tickers/ROSN.svg" alt=""></span>
+                  <span class="d-paper-t">
+                    <b>Роснефть</b>
+                    <span class="num">200 × 525,00 ₽ · 3,8% портфеля</span>
+                  </span>
+                  <span class="d-paper-v">
+                    <b class="num">105 000 ₽</b>
+                    <em class="up num">+5,1%</em>
+                  </span>
+                  <svg class="d-paper-c" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="m9 6 6 6-6 6"/></svg>
+                </div>
+                <div class="d-paper">
+                  <span class="d-logo"><img src="./icons/tickers/GMKN.svg" alt=""></span>
+                  <span class="d-paper-t">
+                    <b>Норникель</b>
+                    <span class="num">800 × 120,00 ₽ · 3,5% портфеля</span>
+                  </span>
+                  <span class="d-paper-v">
+                    <b class="num">96 000 ₽</b>
+                    <em class="down num">−12,4%</em>
+                  </span>
+                  <svg class="d-paper-c" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="m9 6 6 6-6 6"/></svg>
+                </div>
+                <div class="d-paper">
+                  <span class="d-logo"><img src="./icons/tickers/YDEX.svg" alt=""></span>
+                  <span class="d-paper-t">
+                    <b>Яндекс</b>
+                    <span class="num">24 × 4 000,00 ₽ · 3,5% портфеля</span>
+                  </span>
+                  <span class="d-paper-v">
+                    <b class="num">96 000 ₽</b>
+                    <em class="up num">+41,2%</em>
+                  </span>
+                  <svg class="d-paper-c" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="m9 6 6 6-6 6"/></svg>
+                </div>
+                <div class="d-paper">
+                  <span class="d-logo"><img src="./icons/tickers/GAZP.svg" alt=""></span>
+                  <span class="d-paper-t">
+                    <b>Газпром</b>
+                    <span class="num">640 × 137,91 ₽ · 3,2% портфеля</span>
+                  </span>
+                  <span class="d-paper-v">
+                    <b class="num">88 262 ₽</b>
+                    <em class="down num">−7,3%</em>
+                  </span>
+                  <svg class="d-paper-c" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="m9 6 6 6-6 6"/></svg>
+                </div>
+                <div class="d-paper">
+                  <span class="d-logo"><img src="./icons/tickers/VTBR.svg" alt=""></span>
+                  <span class="d-paper-t">
+                    <b>ВТБ</b>
+                    <span class="num">800 × 85,00 ₽ · 2,4% портфеля</span>
+                  </span>
+                  <span class="d-paper-v">
+                    <b class="num">68 000 ₽</b>
+                    <em class="down num">−3,8%</em>
+                  </span>
+                  <svg class="d-paper-c" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="m9 6 6 6-6 6"/></svg>
+                </div>
+                <div class="d-paper">
+                  <!-- Значка нет — рисуется монограмма. Штатный вид, а не сбой. -->
+                  <span class="d-mono" style="--t:#c9a227">SELG</span>
+                  <span class="d-paper-t">
+                    <b>Селигдар</b>
+                    <span class="num">1 000 × 50,48 ₽ · 1,8% портфеля</span>
+                  </span>
+                  <span class="d-paper-v">
+                    <b class="num">50 480 ₽</b>
+                    <em class="up num">+18,9%</em>
+                  </span>
+                  <svg class="d-paper-c" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="m9 6 6 6-6 6"/></svg>
+                </div>
+              </div>
+
+              <div class="d-grp">
+                <div class="d-grp-h">
+                  <b>Фонды</b><u class="num">305 000 ₽</u><em class="up num">+9,4%</em>
+                </div>
+                <div class="d-paper">
+                  <span class="d-logo"><img src="./icons/tickers/LQDT.svg" alt=""></span>
+                  <span class="d-paper-t">
+                    <b>Ликвидность</b>
+                    <span class="num">210 000 × 1,4524 ₽ · 11,0% портфеля</span>
+                  </span>
+                  <span class="d-paper-v">
+                    <b class="num">305 000 ₽</b>
+                    <em class="up num">+9,4%</em>
+                  </span>
+                  <svg class="d-paper-c" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="m9 6 6 6-6 6"/></svg>
+                </div>
+              </div>
+              <div class="d-grp">
+                <div class="d-grp-h">
+                  <b>Облигации</b><u class="num">1 277 700 ₽</u><em class="up num">+11,6%</em>
+                </div>
+                <div class="d-paper">
+                  <span class="d-mono" style="--t:#ffdd2d">ОФЗ</span>
+                  <span class="d-paper-t">
+                    <b>ОФЗ 26238</b>
+                    <span class="num">1 380 × 92,586% · 46,0% портфеля</span>
+                  </span>
+                  <span class="d-paper-v">
+                    <b class="num">1 277 700 ₽</b>
+                    <em class="up num">+11,6%</em>
+                  </span>
+                  <svg class="d-paper-c" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="m9 6 6 6-6 6"/></svg>
+                </div>
+              </div>
+
+              <div class="d-grp">
+                <div class="d-grp-h">
+                  <b>Вклады</b><u class="num">263 920 ₽</u><em class="up num">+16,5%</em>
+                </div>
+                <div class="d-paper">
+                  <span class="d-mono" style="--t:#34d399">ВКЛ</span>
+                  <span class="d-paper-t">
+                    <b>Вклад 3 месяца</b>
+                    <span class="num">16,5% годовых · 9,5% портфеля</span>
+                  </span>
+                  <span class="d-paper-v">
+                    <b class="num">263 920 ₽</b>
+                    <em class="up num">+16,5%</em>
+                  </span>
+                  <svg class="d-paper-c" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="m9 6 6 6-6 6"/></svg>
+                </div>
+              </div>
+
+            </div>
+
+            <button class="d-ghost" type="button" style="margin-top:0">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 0 1 15.5-6.2L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-15.5 6.2L3 16"/><path d="M3 21v-5h5"/></svg>
+              Обновить котировки
+            </button>
+
+            <!-- 3. Вне расчёта долей -->
+            <div class="d-tile" style="margin-top:8px">
+              <div class="d-linked" style="margin: 0; border-top: 0; padding-top: 0">
+                <button class="d-linked-h" type="button" aria-expanded="false" style="padding-top:0">
+                  <span>Вне расчёта долей</span><em>2</em>
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+                </button>
+                <div class="d-assets" hidden>
+                  <div class="d-asset">
+                    <p>Накопительный счёт<span>Счёт · класс не задан</span></p>
+                    <strong class="num">642 300 ₽</strong>
+                  </div>
+                  <div class="d-asset">
+                    <p>Резервный счёт<span>Счёт · класс не задан</span></p>
+                    <strong class="num">480 000 ₽</strong>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- 4. Ближайшие выплаты -->
+            <div class="d-tile" style="margin-top:8px">
+              <div class="d-k" style="display:flex;align-items:center;margin-bottom:6px">
+                Ближайшие выплаты <span class="d-gap num">133 280 ₽</span>
+              </div>
+              <div class="d-pay">
+                <i><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="2.5"/><path d="M3 10h18M8 3v4M16 3v4"/></svg></i>
+                <p><b>ОФЗ 26238</b><span>послезавтра · купон</span></p>
+                <strong class="num">+4 380 ₽</strong>
+              </div>
+              <div class="d-pay">
+                <i><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="2.5"/><path d="M3 10h18M8 3v4M16 3v4"/></svg></i>
+                <p><b>ОФЗ 26207</b><span>15 сентября · купон и погашение</span></p>
+                <strong class="num">+128 900 ₽</strong>
+              </div>
+            </div>
+
+            <!-- 5. Доли — последними -->
+            <div class="d-tile" style="margin-top:8px">
+              <div class="d-k" style="margin-bottom:10px">Доли · факт против цели</div>
+
+              <div class="d-share">
+                <div class="d-share-h"><b>Акции</b><u class="num">930 000 ₽</u></div>
+                <div class="d-share-track"><i style="width:33.5%"></i><u style="left:30%"></u></div>
+                <div class="d-share-f"><span class="num">33,5% при цели 30%</span><span class="act sell num">ПРОДАТЬ 97 014 ₽</span></div>
+              </div>
+
+              <div class="d-share">
+                <div class="d-share-h"><b>Фонды</b><u class="num">305 000 ₽</u></div>
+                <div class="d-share-track"><i style="width:11%"></i><u style="left:15%"></u></div>
+                <div class="d-share-f"><span class="num">11,0% при цели 15%</span><span class="act buy num">ДОКУПИТЬ 111 493 ₽</span></div>
+              </div>
+
+              <div class="d-share">
+                <div class="d-share-h"><b>Облигации</b><u class="num">1 277 700 ₽</u></div>
+                <div class="d-share-track"><i style="width:46%"></i><u style="left:46%"></u></div>
+                <div class="d-share-f"><span class="num">46,0% при цели 46%</span><span class="act ok">В НОРМЕ</span></div>
+              </div>
+
+              <div class="d-share">
+                <div class="d-share-h"><b>Вклады</b><u class="num">263 920 ₽</u></div>
+                <div class="d-share-track"><i style="width:9.5%"></i><u style="left:9%"></u></div>
+                <div class="d-share-f"><span class="num">9,5% при цели 9%</span><span class="act ok">В НОРМЕ</span></div>
+              </div>
+
+              <div class="d-plan">
+                <div class="d-plan-h"><b>Выправить довложением</b><u class="num">323 380 ₽</u></div>
+                <div class="d-plan-r"><span>Фонды</span><b class="num">160 000 ₽</b></div>
+                <div class="d-plan-r"><span>Облигации</span><b class="num">148 300 ₽</b></div>
+                <div class="d-plan-r"><span>Вклады</span><b class="num">15 080 ₽</b></div>
+              </div>
+            </div>
+
+          </div>
+
+          <nav class="nav">
+            <b><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 10.6 12 3.5l8.5 7.1V20a.9.9 0 0 1-.9.9h-4.4v-5.6H8.8v5.6H4.4a.9.9 0 0 1-.9-.9z"/></svg>Главная</b>
+            <b><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="4"/></svg>Цели</b>
+            <b class="on"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M5.5 20V13.5M12 20V5M18.5 20v-9.5"/></svg>Портфель</b>
+            <b><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M3.8 8.6h16.4v9.9a1.6 1.6 0 0 1-1.6 1.6H5.4a1.6 1.6 0 0 1-1.6-1.6z"/><path d="M6.6 8.6V5.9a1.6 1.6 0 0 1 1.6-1.6h7.6a1.6 1.6 0 0 1 1.6 1.6v2.7"/></svg>Траты</b>
+            <b><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M6 12h.01M12 12h.01M18 12h.01"/></svg>Настройки</b>
+          </nav>
+        </div>
+      </div>
+    </div>
+  </figure>
+</div>
+
+<h1 style="font-size:22px;margin-bottom:6px">Экран «Траты»</h1>
+<p class="lede">
+  Самый плотный экран приложения: восемь блоков и вопрос, которого нет
+  больше нигде — <b>какой ценой даются накопления</b>. Всё считается
+  по выписке, ничего не спрашивается «примерно».
+</p>
+
+<div class="rail" style="margin-bottom:56px">
+  <figure>
+    <figcaption>
+      <span class="cap-kicker">Экран 4 из 6</span>
+      <span class="cap-title">Траты</span>
+      <span class="cap-note">Период, три числа, прогноз до конца месяца, подписки, разбор по категориям.</span>
+    </figcaption>
+    <div class="phone">
+      <div class="island"></div>
+      <div class="screenwrap">
+        <div class="scr dir-d" id="pt">
+          <div class="flow is-list">
+
+            <div class="d-head">
+              <h1>Траты</h1>
+              <div class="d-add">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15.5V4M8 8.5 12 4l4 4.5"/><path d="M4 15.5v3a1.6 1.6 0 0 0 1.6 1.6h12.8a1.6 1.6 0 0 0 1.6-1.6v-3"/></svg>
+              </div>
+            </div>
+
+            <!-- 1. Период и три числа -->
+            <div class="d-tile" style="margin-bottom:8px">
+              <div class="d-win">
+                <span>Месяц</span><span>3 месяца</span><span class="on">Полгода</span><span>Год</span>
+              </div>
+              <div class="d-trio3">
+                <div><span>Получено</span><b class="num">700 200</b><small class="num">116 700 в месяц</small></div>
+                <div><span>Прожито</span><b class="num">486 200</b><small class="num">81 033 в месяц</small></div>
+                <div class="g"><span>Свободно</span><b class="num">+214 000</b><small class="num">31% дохода</small></div>
+              </div>
+            </div>
+
+            <!-- 2. До конца месяца. Вопрос ближайших двух недель, и он
+                 не совпадает с остальным экраном: подушка говорит о годах,
+                 а не дожить до зарплаты можно и при хорошем среднем. -->
+            <div class="d-tile" style="margin-bottom:8px">
+              <div class="d-k">До конца месяца</div>
+              <div class="d-big warn num">18 400 ₽</div>
+              <div class="d-big-h num">останется · 28 дней по 2 614 ₽ в день</div>
+              <div style="margin-top:10px">
+                <div class="d-line">
+                  <p>Сейчас доступно<span>мгновенные деньги</span></p>
+                  <strong class="num">96 600 ₽</strong>
+                </div>
+                <div class="d-line">
+                  <p>Уйдёт по нынешнему темпу<span class="num">28 дней × 2 614 ₽</span></p>
+                  <strong class="num">73 200 ₽</strong>
+                </div>
+                <div class="d-line">
+                  <p>Ждём: Зарплата<span class="num">10 августа · по прошлым месяцам</span></p>
+                  <strong class="plus num">+90 000 ₽</strong>
+                </div>
+              </div>
+              <p class="d-say warn">Останется меньше недели трат. Запас на неожиданное — сломанный телефон, лекарства — в этот месяц тонкий.</p>
+            </div>
+
+            <!-- 3. Вердикт -->
+            <p class="d-say ok" style="margin:0 0 8px">
+              <b>Равновесие держится.</b> Треть дохода уходит в накопления, подушки хватит почти на восемь месяцев.
+            </p>
+
+            <!-- 4. Жизнь и накопления -->
+            <div class="d-tile" style="margin-bottom:8px">
+              <div class="d-k" style="margin-bottom:4px">Жизнь и накопления</div>
+              <div class="d-line">
+                <p>Подушка<span class="num">мгновенные деньги при расходе 81 033 ₽ в месяц</span></p>
+                <strong class="num">7,9 мес.</strong>
+              </div>
+              <div class="d-line">
+                <p>Отложено за период<span>доход минус жизнь</span></p>
+                <strong class="num">+214 000 ₽</strong>
+              </div>
+              <div class="d-line">
+                <p>Дошло до капитала<span class="num">41 000 ₽ осело на карте</span></p>
+                <strong class="num">173 000 ₽</strong>
+              </div>
+              <div class="d-line">
+                <p>Переводы себе<span>из выписки, не считаются тратой</span></p>
+                <strong class="num">128 400 ₽</strong>
+              </div>
+            </div>
+
+            <!-- 5. Списывается само. Другой род трат: продукты покупают
+                 решением, подписку один раз решили и забыли. -->
+            <div class="d-tile" style="margin-bottom:8px">
+              <div class="d-k">Списывается само</div>
+              <div class="d-big num">6 340 ₽</div>
+              <div class="d-big-h num">в месяц · 8% месячных трат</div>
+              <div style="margin-top:10px">
+                <div class="d-line">
+                  <p>Яндекс Плюс<span class="num">Подписки · 6 платежей · следующий 12.08</span></p>
+                  <strong class="num">399 ₽</strong>
+                </div>
+                <div class="d-line">
+                  <p>Интернет<span class="num">Дом · 6 платежей · следующий 05.08</span></p>
+                  <strong class="num">890 ₽</strong>
+                </div>
+                <div class="d-line">
+                  <p>Аренда гаража<span class="num">Транспорт · 5 платежей · следующий 01.09</span></p>
+                  <strong class="num">5 051 ₽</strong>
+                </div>
+              </div>
+              <p class="d-say info">Найдено по повторам в выписке: тот же магазин, та же сумма, шаг около месяца. Это не список ваших подписок из банка — приложение видит только то, что уже списывалось.</p>
+            </div>
+
+            <!-- 6. Доход и жизнь по месяцам -->
+            <div class="d-tile" style="margin-bottom:8px">
+              <div class="d-k" style="margin-bottom:8px">Доход и жизнь по месяцам</div>
+              <svg viewBox="0 0 320 96" width="100%" height="96" preserveAspectRatio="none">
+                <path d="M6 22 L68 30 L130 18 L192 26 L254 20 L314 14" fill="none" stroke="var(--good)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+                <path d="M6 62 L68 58 L130 70 L192 60 L254 66 L314 56" fill="none" stroke="var(--acc-mark)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="5 4"/>
+              </svg>
+              <div style="display:flex;gap:14px;margin-top:6px;font-size:11px;color:var(--ink-3)">
+                <span><i style="display:inline-block;width:9px;height:2px;background:var(--good);vertical-align:middle;margin-right:5px"></i>Получено</span>
+                <span><i style="display:inline-block;width:9px;height:2px;background:var(--acc-mark);vertical-align:middle;margin-right:5px"></i>Прожито</span>
+                <span style="margin-left:auto">фев — авг</span>
+              </div>
+            </div>
+
+            <!-- 7. На что уходит -->
+            <div class="d-tile" style="margin-bottom:8px">
+              <div class="d-k" style="margin-bottom:8px">На что уходит</div>
+              <div class="d-search">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m20 20-4.8-4.8"/></svg>
+                Магазин, категория, сумма
+              </div>
+
+              <button class="d-cat is-open" type="button" aria-expanded="true">
+                <div class="d-cat-h"><b>Продукты</b><u class="num">148 900 ₽</u><em class="num">31%</em></div>
+                <div class="d-cat-t"><i style="width:31%"></i></div>
+              </button>
+              <div class="d-op2">
+                <p>Пятёрочка<span class="num">02.08</span></p>
+                <strong class="num">2 597,40 ₽</strong>
+              </div>
+              <div class="d-op2">
+                <p>Вкусвилл<span class="num">31.07</span></p>
+                <strong class="num">1 214,00 ₽</strong>
+              </div>
+
+              <button class="d-cat" type="button" aria-expanded="false">
+                <div class="d-cat-h"><b>Дом</b><u class="num">96 400 ₽</u><em class="num">20%</em></div>
+                <div class="d-cat-t"><i style="width:20%"></i></div>
+              </button>
+              <button class="d-cat" type="button" aria-expanded="false">
+                <div class="d-cat-h"><b>Транспорт</b><u class="num">67 100 ₽</u><em class="num">14%</em></div>
+                <div class="d-cat-t"><i style="width:14%"></i></div>
+              </button>
+              <button class="d-cat" type="button" aria-expanded="false">
+                <div class="d-cat-h"><b>Кафе</b><u class="num">54 300 ₽</u><em class="num">11%</em></div>
+                <div class="d-cat-t"><i style="width:11%"></i></div>
+              </button>
+              <button class="d-cat" type="button" aria-expanded="false">
+                <div class="d-cat-h"><b>Здоровье</b><u class="num">38 200 ₽</u><em class="num">8%</em></div>
+                <div class="d-cat-t"><i style="width:8%"></i></div>
+              </button>
+              <button class="d-cat" type="button" aria-expanded="false">
+                <div class="d-cat-h"><b>Прочее</b><u class="num">81 300 ₽</u><em class="num">16%</em></div>
+                <div class="d-cat-t"><i style="width:16%"></i></div>
+              </button>
+
+              <button class="d-ghost" type="button">Показать все траты</button>
+            </div>
+
+          </div>
+
+          <nav class="nav">
+            <b><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 10.6 12 3.5l8.5 7.1V20a.9.9 0 0 1-.9.9h-4.4v-5.6H8.8v5.6H4.4a.9.9 0 0 1-.9-.9z"/></svg>Главная</b>
+            <b><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="4"/></svg>Цели</b>
+            <b><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M5.5 20V13.5M12 20V5M18.5 20v-9.5"/></svg>Портфель</b>
+            <b class="on"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M3.8 8.6h16.4v9.9a1.6 1.6 0 0 1-1.6 1.6H5.4a1.6 1.6 0 0 1-1.6-1.6z"/><path d="M6.6 8.6V5.9a1.6 1.6 0 0 1 1.6-1.6h7.6a1.6 1.6 0 0 1 1.6 1.6v2.7"/></svg>Траты</b>
+            <b><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M6 12h.01M12 12h.01M18 12h.01"/></svg>Настройки</b>
+          </nav>
+        </div>
+      </div>
+    </div>
+  </figure>
+</div>
+
+<h1 style="font-size:22px;margin-bottom:6px">Экран «Настройки»</h1>
+<p class="lede">
+  Бывшее «Ещё». Вложенный экран настроек разобран на группы:
+  <b>«Настройки → Настройки» — не путь, а тупик</b>. Всё, что там было,
+  осталось, только поднялось на уровень выше.
+</p>
+
+<div class="rail" style="margin-bottom:56px">
+  <figure>
+    <figcaption>
+      <span class="cap-kicker">Экран 5 из 5</span>
+      <span class="cap-title">Настройки</span>
+      <span class="cap-note">Приложение, данные, копия, о приложении. Служебное — то, куда заходят раз в месяц.</span>
+    </figcaption>
+    <div class="phone">
+      <div class="island"></div>
+      <div class="screenwrap">
+        <div class="scr dir-d" id="ps">
+          <div class="flow is-list">
+
+            <div class="d-head">
+              <h1>Настройки</h1>
+            </div>
+
+            <!-- Приложение: то, что меняют руками и часто. -->
+            <div class="d-k" style="margin:2px 0 7px">Приложение</div>
+            <div class="d-tile" style="padding:2px 13px">
+              <div class="d-line">
+                <p>Тема<span>сейчас тёмная</span></p>
+                <strong style="color:var(--ink-3);font-weight:600">Как в системе</strong>
+                <svg class="d-paper-c" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="m9 6 6 6-6 6"/></svg>
+              </div>
+              <div class="d-line">
+                <p>Быстрый взнос<span>Накопительный счёт</span></p>
+                <strong class="num">5 000 ₽</strong>
+                <svg class="d-paper-c" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="m9 6 6 6-6 6"/></svg>
+              </div>
+              <div class="d-line">
+                <p>Скрывать суммы<span>вместо рублей — точки. Проценты и количества остаются</span></p>
+                <span class="d-sw"><i></i></span>
+              </div>
+              <div class="d-line">
+                <p>Вход по Face ID<span>спрашивается при запуске</span></p>
+                <span class="d-sw on"><i></i></span>
+              </div>
+              <div class="d-line">
+                <p>Кубыш на острове<span>висит на Dynamic Island и радуется взносам</span></p>
+                <span class="d-sw on"><i></i></span>
+              </div>
+            </div>
+
+            <!-- Данные: то, что смотрят, а не крутят. -->
+            <div class="d-k" style="margin:16px 0 7px">Данные</div>
+            <div class="d-tile" style="padding:2px 13px">
+              <div class="d-line">
+                <p>Активы<span class="num">3 418 920 ₽</span></p>
+                <strong>7</strong>
+                <svg class="d-paper-c" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="m9 6 6 6-6 6"/></svg>
+              </div>
+              <div class="d-line">
+                <p>Проверка данных<span>находит то, что молча искажает цифры</span></p>
+                <span class="d-tag err">2 ОШИБКИ</span>
+                <svg class="d-paper-c" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="m9 6 6 6-6 6"/></svg>
+              </div>
+              <div class="d-line">
+                <p>Категории трат<span>свой список для разбора трат</span></p>
+                <strong>24</strong>
+                <svg class="d-paper-c" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="m9 6 6 6-6 6"/></svg>
+              </div>
+              <div class="d-line">
+                <p>История капитала<span>снимков по дням</span></p>
+                <strong>18</strong>
+                <svg class="d-paper-c" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="m9 6 6 6-6 6"/></svg>
+              </div>
+              <div class="d-line">
+                <p>Налог на проценты<span class="num">лимит 210 000 ₽</span></p>
+                <strong class="num">64 300 ₽</strong>
+                <svg class="d-paper-c" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="m9 6 6 6-6 6"/></svg>
+              </div>
+              <div class="d-line">
+                <p>Ключевая ставка ЦБ<span>от неё считается налоговый лимит</span></p>
+                <strong class="num">16,50%</strong>
+                <svg class="d-paper-c" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="m9 6 6 6-6 6"/></svg>
+              </div>
+            </div>
+
+            <!-- Копия отдельной плиткой, а не строкой в списке: данные живут
+                 только в этом телефоне, и это единственное место, где их
+                 можно оттуда достать. Строкой среди прочих она не читается. -->
+            <div class="d-k" style="margin:16px 0 7px">Резервная копия</div>
+            <div class="d-tile">
+              <div class="d-two" style="align-items:center">
+                <div>
+                  <div class="d-v num" style="margin-top:0">19 дней назад</div>
+                  <div class="d-s">последняя копия · напоминать раз в 14 дней</div>
+                </div>
+                <span class="d-tag warn" style="flex:0 0 auto">ПОРА</span>
+              </div>
+              <button class="d-fill" type="button" style="margin-top:12px">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v11M8 11.5l4 3.5 4-3.5"/><path d="M4 16v2.4A1.6 1.6 0 0 0 5.6 20h12.8a1.6 1.6 0 0 0 1.6-1.6V16"/></svg>
+                Выгрузить копию
+              </button>
+              <p class="d-note info">Данные живут только в этом телефоне: сервера у приложения нет. Копия — единственный способ перенести их или вернуть после сброса.</p>
+            </div>
+
+            <!-- О приложении -->
+            <div class="d-k" style="margin:16px 0 7px">О приложении</div>
+            <div class="d-tile" style="padding:2px 13px 13px">
+              <div class="d-line">
+                <p>Сборка<span>время выкладки по UTC</span></p>
+                <strong class="num">03.08.2026 09:14</strong>
+              </div>
+              <button class="d-ghost" type="button" style="margin-top:10px">Обновить приложение</button>
+              <p class="d-note info">Стирает сохранённую копию кода и перезагружает страницу. Данные не затрагиваются — они лежат отдельно.</p>
+            </div>
+
+            <p style="text-align:center;font-size:11.5px;color:var(--ink-3);margin:18px 0 0">Кубыш · локальная версия</p>
+
+          </div>
+
+          <nav class="nav">
+            <b><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 10.6 12 3.5l8.5 7.1V20a.9.9 0 0 1-.9.9h-4.4v-5.6H8.8v5.6H4.4a.9.9 0 0 1-.9-.9z"/></svg>Главная</b>
+            <b><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="4"/></svg>Цели</b>
+            <b><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M5.5 20V13.5M12 20V5M18.5 20v-9.5"/></svg>Портфель</b>
+            <b><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M3.8 8.6h16.4v9.9a1.6 1.6 0 0 1-1.6 1.6H5.4a1.6 1.6 0 0 1-1.6-1.6z"/><path d="M6.6 8.6V5.9a1.6 1.6 0 0 1 1.6-1.6h7.6a1.6 1.6 0 0 1 1.6 1.6v2.7"/></svg>Траты</b>
+            <b class="on"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3.2"/><path d="M19.3 14.7a1.5 1.5 0 0 0 .3 1.7l.1.1a1.8 1.8 0 1 1-2.6 2.6l-.1-.1a1.5 1.5 0 0 0-2.6 1.1v.3a1.8 1.8 0 1 1-3.6 0v-.2a1.5 1.5 0 0 0-2.7-1 1.8 1.8 0 1 1-2.6-2.6l.1-.1a1.5 1.5 0 0 0-1.1-2.6h-.3a1.8 1.8 0 1 1 0-3.6h.2a1.5 1.5 0 0 0 1-2.7l-.1-.1a1.8 1.8 0 1 1 2.6-2.6l.1.1a1.5 1.5 0 0 0 1.7.3h.1a1.5 1.5 0 0 0 .9-1.4v-.3a1.8 1.8 0 1 1 3.6 0v.2a1.5 1.5 0 0 0 2.6 1l.1-.1a1.8 1.8 0 1 1 2.6 2.6l-.1.1a1.5 1.5 0 0 0 1.1 2.6h.3a1.8 1.8 0 1 1 0 3.6h-.2a1.5 1.5 0 0 0-1.4.9z"/></svg>Настройки</b>
+          </nav>
+        </div>
+      </div>
+    </div>
+  </figure>
+</div>
+
+<h1 style="font-size:22px;margin-bottom:6px">Формы</h1>
+<p class="lede">
+  Через них проходит каждое изменение данных. Здесь важнее красоты три вещи:
+  <b>видно, куда нажимать; видно, что получится; и «Сохранить» не уезжает
+  за клавиатуру</b>. Складки обязательны — в форме актива сорок полей,
+  и открыта та половина, которая относится к нему.
+</p>
+
+<div class="rail" style="margin-bottom:56px">
+
+  <!-- ============================================== 1. Операция -->
+  <figure>
+    <figcaption>
+      <span class="cap-kicker">Форма 1</span>
+      <span class="cap-title">Операция</span>
+      <span class="cap-note">Самая частая. Сумма набирается крупно — её вводят, не глядя на экран.</span>
+    </figcaption>
+    <div class="phone">
+      <div class="island"></div>
+      <div class="screenwrap">
+        <div class="scr dir-d" id="pf1">
+          <div class="flow is-list">
+            <div class="d-head"><h1>Главная</h1></div>
+            <div class="d-tile d-hero">
+              <div class="d-k"><span>Мой капитал</span></div>
+              <div class="d-hero-v num">3 418 920 ₽</div>
+            </div>
+          </div>
+          <nav class="nav">
+            <b class="on"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 10.6 12 3.5l8.5 7.1V20a.9.9 0 0 1-.9.9h-4.4v-5.6H8.8v5.6H4.4a.9.9 0 0 1-.9-.9z"/></svg>Главная</b>
+            <b><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="4"/></svg>Цели</b>
+            <b><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M5.5 20V13.5M12 20V5M18.5 20v-9.5"/></svg>Портфель</b>
+            <b><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M3.8 8.6h16.4v9.9a1.6 1.6 0 0 1-1.6 1.6H5.4a1.6 1.6 0 0 1-1.6-1.6z"/><path d="M6.6 8.6V5.9a1.6 1.6 0 0 1 1.6-1.6h7.6a1.6 1.6 0 0 1 1.6 1.6v2.7"/></svg>Траты</b>
+            <b><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M6 12h.01M12 12h.01M18 12h.01"/></svg>Настройки</b>
+          </nav>
+        </div>
+        <div class="d-scrim dir-d"></div>
+        <div class="d-sheet dir-d">
+          <div class="d-grab"></div>
+          <div class="d-sheet-h"><b>Новая операция</b></div>
+          <div class="d-sheet-b">
+
+            <div class="d-fld">
+              <span class="d-fld-l">Сумма, ₽</span>
+              <span class="d-ctrl big is-focus num">15 000</span>
+            </div>
+
+            <div class="d-fld">
+              <span class="d-fld-l">Тип</span>
+              <span class="d-ctrl">Взнос
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+              </span>
+            </div>
+
+            <div class="d-fld">
+              <span class="d-fld-l">Дата</span>
+              <span class="d-ctrl num">03.08.2026
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="2.5"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>
+              </span>
+            </div>
+
+            <div class="d-fld">
+              <span class="d-fld-l">Актив</span>
+              <span class="d-ctrl">Накопительный счёт
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+              </span>
+            </div>
+
+            <div class="d-fld">
+              <span class="d-fld-l">Цель</span>
+              <span class="d-ctrl">Квартира
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+              </span>
+            </div>
+
+            <div class="d-fld">
+              <span class="d-fld-l">Комментарий</span>
+              <span class="d-ctrl ph">не обязательно</span>
+            </div>
+
+          </div>
+          <div class="d-sheet-f">
+            <button class="d-btn" type="button">Отмена</button>
+            <button class="d-btn pri" type="button">Сохранить</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </figure>
+
+  <!-- ============================================== 2. Актив -->
+  <figure>
+    <figcaption>
+      <span class="cap-kicker">Форма 2</span>
+      <span class="cap-title">Актив</span>
+      <span class="cap-note">Поля зависят от типа: у вклада нет котировок, у акции — процентов и сверки с банком.</span>
+      <span class="cap-note" style="margin-top:10px"><b style="color:#14161a">Тип актива</b> — переключите и смотрите, что остаётся:</span>
+    </figcaption>
+    <div class="bar" id="atype" style="margin-bottom:14px">
+      <button type="button" data-t="share" class="is-on">Акция</button>
+      <button type="button" data-t="fund">Фонд</button>
+      <button type="button" data-t="bond">Облигация</button>
+      <button type="button" data-t="deposit">Вклад</button>
+    </div>
+    <div class="phone">
+      <div class="island"></div>
+      <div class="screenwrap">
+        <div class="scr dir-d" id="pf2">
+          <div class="flow is-list">
+            <div class="d-head"><h1>Портфель</h1></div>
+          </div>
+          <nav class="nav">
+            <b><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 10.6 12 3.5l8.5 7.1V20a.9.9 0 0 1-.9.9h-4.4v-5.6H8.8v5.6H4.4a.9.9 0 0 1-.9-.9z"/></svg>Главная</b>
+            <b><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="4"/></svg>Цели</b>
+            <b class="on"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M5.5 20V13.5M12 20V5M18.5 20v-9.5"/></svg>Портфель</b>
+            <b><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M3.8 8.6h16.4v9.9a1.6 1.6 0 0 1-1.6 1.6H5.4a1.6 1.6 0 0 1-1.6-1.6z"/><path d="M6.6 8.6V5.9a1.6 1.6 0 0 1 1.6-1.6h7.6a1.6 1.6 0 0 1 1.6 1.6v2.7"/></svg>Траты</b>
+            <b><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M6 12h.01M12 12h.01M18 12h.01"/></svg>Настройки</b>
+          </nav>
+        </div>
+        <div class="d-scrim dir-d"></div>
+        <div class="d-sheet dir-d" style="max-height:94%">
+          <div class="d-grab"></div>
+          <div class="d-sheet-h"><b id="af-name">Сбербанк ао</b><span id="af-sub">Акция · в портфеле</span></div>
+          <div class="d-sheet-b">
+
+            <div class="d-fld">
+              <span class="d-fld-l">Название</span>
+              <span class="d-ctrl" id="af-title">Сбербанк ао</span>
+            </div>
+
+            <div class="d-two" style="margin-top:14px">
+              <div class="d-fld" style="margin:0">
+                <span class="d-fld-l">Тип</span>
+                <span class="d-ctrl is-focus" id="af-type">Акция
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+                </span>
+              </div>
+              <div class="d-fld" style="margin:0">
+                <span class="d-fld-l">Статус</span>
+                <span class="d-ctrl">Активен
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+                </span>
+              </div>
+            </div>
+
+            <div class="d-fld">
+              <span class="d-fld-l">Класс в портфеле</span>
+              <span class="d-ctrl" id="af-class">Акции
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+              </span>
+            </div>
+
+            <!-- Бумага: тикер и цена. Вкладу это поле не нужно вовсе. -->
+            <div class="d-grp2" data-for="share fund bond">
+              <button class="d-grp2-h" type="button" aria-expanded="true">
+                <b>Котировки</b>
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+              </button>
+              <div class="d-grp2-b">
+                <div class="d-two" style="margin-top:12px">
+                  <div class="d-fld" style="margin:0">
+                    <span class="d-fld-l">Тикер</span>
+                    <span class="d-ctrl" id="af-ticker">SBER</span>
+                  </div>
+                  <div class="d-fld" style="margin:0">
+                    <span class="d-fld-l">Режим</span>
+                    <span class="d-ctrl ph">авто</span>
+                  </div>
+                </div>
+                <div class="d-fld">
+                  <span class="d-fld-l" id="af-price-l">Текущая цена, ₽</span>
+                  <span class="d-ctrl num" id="af-price">320,00</span>
+                  <small class="d-hint num">Обновлена 3 августа 2026</small>
+                </div>
+              </div>
+            </div>
+
+            <!-- Покупка. Лотами, а не штуками: на бирже покупают лот,
+                 и человек вводит то, что видит в заявке. -->
+            <div class="d-grp2" data-for="share fund bond">
+              <button class="d-grp2-h" type="button" aria-expanded="true">
+                <b>Покупка</b>
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+              </button>
+              <div class="d-grp2-b">
+                <div class="d-two" style="margin-top:12px">
+                  <div class="d-fld" style="margin:0">
+                    <span class="d-fld-l" id="af-lotsize-l">Бумаг в лоте</span>
+                    <span class="d-ctrl num">10</span>
+                  </div>
+                  <div class="d-fld" style="margin:0">
+                    <span class="d-fld-l">Количество лотов</span>
+                    <span class="d-ctrl num">160</span>
+                  </div>
+                </div>
+                <div class="d-two" style="margin-top:14px">
+                  <div class="d-fld" style="margin:0">
+                    <span class="d-fld-l" id="af-paid-l">Заплачено за лот, ₽</span>
+                    <span class="d-ctrl num">3 165,00</span>
+                  </div>
+                  <div class="d-fld" style="margin:0">
+                    <span class="d-fld-l">Комиссия, ₽</span>
+                    <span class="d-ctrl num">152,00</span>
+                  </div>
+                </div>
+                <p class="d-note info" id="af-total">Вложено <b>506 552 ₽</b> за 1 600 бумаг. Средняя цена с комиссией — 316,60 ₽.</p>
+              </div>
+            </div>
+
+            <!-- Только облигация. -->
+            <div class="d-grp2" data-for="bond">
+              <button class="d-grp2-h" type="button" aria-expanded="true">
+                <b>Облигация</b>
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+              </button>
+              <div class="d-grp2-b">
+                <div class="d-two" style="margin-top:12px">
+                  <div class="d-fld" style="margin:0">
+                    <span class="d-fld-l">Номинал, ₽</span>
+                    <span class="d-ctrl num">1 000</span>
+                  </div>
+                  <div class="d-fld" style="margin:0">
+                    <span class="d-fld-l">Купон, % годовых</span>
+                    <span class="d-ctrl num">12,50</span>
+                  </div>
+                </div>
+                <div class="d-two" style="margin-top:14px">
+                  <div class="d-fld" style="margin:0">
+                    <span class="d-fld-l">Периодичность</span>
+                    <span class="d-ctrl">2 раза в год
+                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+                    </span>
+                  </div>
+                  <div class="d-fld" style="margin:0">
+                    <span class="d-fld-l">НКД при покупке, ₽</span>
+                    <span class="d-ctrl num">18,40</span>
+                  </div>
+                </div>
+                <div class="d-two" style="margin-top:14px">
+                  <div class="d-fld" style="margin:0">
+                    <span class="d-fld-l">Ближайший купон</span>
+                    <span class="d-ctrl num">05.08.2026</span>
+                  </div>
+                  <div class="d-fld" style="margin:0">
+                    <span class="d-fld-l">Погашение</span>
+                    <span class="d-ctrl num">15.05.2041</span>
+                  </div>
+                </div>
+                <p class="d-note info">Цена облигации котируется в процентах от номинала, а не в рублях. Пока номинал не задан, цена читается как рубли за штуку.</p>
+              </div>
+            </div>
+
+            <!-- Только вклад и счёт. -->
+            <div class="d-grp2" data-for="deposit">
+              <button class="d-grp2-h" type="button" aria-expanded="true">
+                <b>Остаток</b>
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+              </button>
+              <div class="d-grp2-b">
+                <div class="d-fld" style="margin-top:12px">
+                  <span class="d-fld-l">Начальный остаток, ₽</span>
+                  <span class="d-ctrl num">250 000</span>
+                  <small class="d-hint">Баланс на момент заведения актива, а не текущий. Иначе сегодняшний взнос посчитается дважды.</small>
+                </div>
+                <div class="d-fld">
+                  <span class="d-fld-l">Дата начального остатка</span>
+                  <span class="d-ctrl num">01.05.2026</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="d-grp2" data-for="deposit">
+              <button class="d-grp2-h" type="button" aria-expanded="false">
+                <b>Проценты</b><em>ставка, капитализация</em>
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+              </button>
+            </div>
+
+            <div class="d-grp2" data-for="deposit">
+              <button class="d-grp2-h" type="button" aria-expanded="false">
+                <b>Сверка с банком</b><em>остаток и дата</em>
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+              </button>
+            </div>
+
+            <div class="d-grp2">
+              <button class="d-grp2-h" type="button" aria-expanded="false">
+                <b>Цели</b><em>1 выбрана</em>
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+              </button>
+            </div>
+
+          </div>
+          <div class="d-sheet-f">
+            <button class="d-btn dan" type="button">Удалить</button>
+            <button class="d-btn pri" type="button">Сохранить</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </figure>
+
+  <!-- ============================================== 3. Цель + ошибка -->
+  <figure>
+    <figcaption>
+      <span class="cap-kicker">Форма 3</span>
+      <span class="cap-title">Цель · с ошибкой</span>
+      <span class="cap-note">Ошибка стоит у своего поля, а не всплывашкой: иначе непонятно, какое из пяти чинить.</span>
+    </figcaption>
+    <div class="phone">
+      <div class="island"></div>
+      <div class="screenwrap">
+        <div class="scr dir-d" id="pf3">
+          <div class="flow is-list">
+            <div class="d-head"><h1>Цели</h1></div>
+          </div>
+          <nav class="nav">
+            <b><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 10.6 12 3.5l8.5 7.1V20a.9.9 0 0 1-.9.9h-4.4v-5.6H8.8v5.6H4.4a.9.9 0 0 1-.9-.9z"/></svg>Главная</b>
+            <b class="on"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="4"/></svg>Цели</b>
+            <b><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M5.5 20V13.5M12 20V5M18.5 20v-9.5"/></svg>Портфель</b>
+            <b><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M3.8 8.6h16.4v9.9a1.6 1.6 0 0 1-1.6 1.6H5.4a1.6 1.6 0 0 1-1.6-1.6z"/><path d="M6.6 8.6V5.9a1.6 1.6 0 0 1 1.6-1.6h7.6a1.6 1.6 0 0 1 1.6 1.6v2.7"/></svg>Траты</b>
+            <b><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M6 12h.01M12 12h.01M18 12h.01"/></svg>Настройки</b>
+          </nav>
+        </div>
+        <div class="d-scrim dir-d"></div>
+        <div class="d-sheet dir-d">
+          <div class="d-grab"></div>
+          <div class="d-sheet-h"><b>Новая цель</b></div>
+          <div class="d-sheet-b">
+
+            <div class="d-fld">
+              <span class="d-fld-l">Название</span>
+              <span class="d-ctrl">Ремонт кухни</span>
+            </div>
+
+            <div class="d-fld">
+              <span class="d-fld-l">Сумма цели, ₽</span>
+              <span class="d-ctrl is-bad ph">0</span>
+              <small class="d-hint bad">Сумма должна быть больше нуля</small>
+            </div>
+
+            <div class="d-fld">
+              <span class="d-fld-l">Срок</span>
+              <span class="d-ctrl num">01.06.2027
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="2.5"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>
+              </span>
+            </div>
+
+            <div class="d-fld">
+              <span class="d-fld-l">План в день, ₽</span>
+              <span class="d-ctrl num">1 500</span>
+              <small class="d-hint">Сколько собираетесь откладывать. От этого считается «Выполнение плана».</small>
+            </div>
+
+            <div class="d-fld">
+              <span class="d-fld-l">Статус</span>
+              <span class="d-ctrl">Активна
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+              </span>
+            </div>
+
+          </div>
+          <div class="d-sheet-f">
+            <button class="d-btn" type="button">Отмена</button>
+            <button class="d-btn pri" type="button">Сохранить</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </figure>
+
+  <!-- ============================================== 4. Подтверждение -->
+  <figure>
+    <figcaption>
+      <span class="cap-kicker">Форма 4</span>
+      <span class="cap-title">Подтверждение</span>
+      <span class="cap-note">Названы последствия, а не действие. «Удалить?» — вопрос ни о чём.</span>
+    </figcaption>
+    <div class="phone">
+      <div class="island"></div>
+      <div class="screenwrap">
+        <div class="scr dir-d" id="pf4">
+          <div class="flow is-list">
+            <div class="d-head"><h1>Траты</h1></div>
+          </div>
+          <nav class="nav">
+            <b><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 10.6 12 3.5l8.5 7.1V20a.9.9 0 0 1-.9.9h-4.4v-5.6H8.8v5.6H4.4a.9.9 0 0 1-.9-.9z"/></svg>Главная</b>
+            <b><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="4"/></svg>Цели</b>
+            <b><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M5.5 20V13.5M12 20V5M18.5 20v-9.5"/></svg>Портфель</b>
+            <b class="on"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M3.8 8.6h16.4v9.9a1.6 1.6 0 0 1-1.6 1.6H5.4a1.6 1.6 0 0 1-1.6-1.6z"/><path d="M6.6 8.6V5.9a1.6 1.6 0 0 1 1.6-1.6h7.6a1.6 1.6 0 0 1 1.6 1.6v2.7"/></svg>Траты</b>
+            <b><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M6 12h.01M12 12h.01M18 12h.01"/></svg>Настройки</b>
+          </nav>
+        </div>
+        <div class="d-scrim dir-d"></div>
+        <div class="d-sheet dir-d">
+          <div class="d-grab"></div>
+          <div class="d-sheet-h"><b>Удалить запись?</b></div>
+          <div class="d-sheet-b">
+            <p style="margin:2px 0 0;font-size:14px;line-height:1.5;color:var(--ink-2)">
+              Она пропадёт из расчёта трат: месячный расход, подушка и «Отложено»
+              пересчитаются без неё.
+            </p>
+            <div class="d-tile" style="margin-top:14px;padding:12px">
+              <div class="d-line" style="padding:0">
+                <p>Пятёрочка<span class="num">2 августа · Продукты</span></p>
+                <strong class="num">2 597,40 ₽</strong>
+              </div>
+            </div>
+          </div>
+          <div class="d-sheet-f">
+            <button class="d-btn" type="button">Отмена</button>
+            <button class="d-btn pri" type="button" style="background:var(--crit);border-color:var(--crit);color:#fff">Удалить</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </figure>
+
+  <!-- ============================================== 5. Добавить траты -->
+  <figure>
+    <figcaption>
+      <span class="cap-kicker">Форма 5</span>
+      <span class="cap-title">Добавить траты</span>
+      <span class="cap-note">Два пути неравны, и вид это показывает: выписка точна и полна, снимок приблизителен.</span>
+    </figcaption>
+    <div class="phone">
+      <div class="island"></div>
+      <div class="screenwrap">
+        <div class="scr dir-d" id="pf5">
+          <div class="flow is-list">
+            <div class="d-head"><h1>Траты</h1></div>
+          </div>
+          <nav class="nav">
+            <b><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 10.6 12 3.5l8.5 7.1V20a.9.9 0 0 1-.9.9h-4.4v-5.6H8.8v5.6H4.4a.9.9 0 0 1-.9-.9z"/></svg>Главная</b>
+            <b><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="4"/></svg>Цели</b>
+            <b><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M5.5 20V13.5M12 20V5M18.5 20v-9.5"/></svg>Портфель</b>
+            <b class="on"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M3.8 8.6h16.4v9.9a1.6 1.6 0 0 1-1.6 1.6H5.4a1.6 1.6 0 0 1-1.6-1.6z"/><path d="M6.6 8.6V5.9a1.6 1.6 0 0 1 1.6-1.6h7.6a1.6 1.6 0 0 1 1.6 1.6v2.7"/></svg>Траты</b>
+            <b><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M6 12h.01M12 12h.01M18 12h.01"/></svg>Настройки</b>
+          </nav>
+        </div>
+        <div class="d-scrim dir-d"></div>
+        <div class="d-sheet dir-d">
+          <div class="d-grab"></div>
+          <div class="d-sheet-h"><b>Добавить траты</b></div>
+          <div class="d-sheet-b">
+
+            <button class="d-pick key" type="button">
+              <i><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h8l4 4v14H6z"/><path d="M14 3v4h4M9 12h6M9 16h4"/></svg></i>
+              <div>
+                <b>Выписка из банка</b>
+                <span>CSV или xlsx за период — точно и целиком</span>
+              </div>
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="m9 6 6 6-6 6"/></svg>
+            </button>
+
+            <button class="d-pick" type="button">
+              <i><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="15" rx="2.5"/><circle cx="9" cy="10.5" r="1.8"/><path d="m4 18 5-4.5 4 3.5 3-2.5 4 3.5"/></svg></i>
+              <div>
+                <b>Со скриншота</b>
+                <span>текст со снимка экрана — быстро, для нескольких операций</span>
+              </div>
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="m9 6 6 6-6 6"/></svg>
+            </button>
+
+            <p class="d-note info" style="margin-top:14px">
+              Файл читается в телефоне и никуда не отправляется: сервера у приложения нет.
+              Снимок распознаётся тут же — движок весит пять с половиной мегабайт
+              и грузится один раз, при первом выборе картинки.
+            </p>
+
+          </div>
+          <div class="d-sheet-f">
+            <button class="d-btn" type="button">Закрыть</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </figure>
+
+  <!-- ============================================== 6. Запись траты -->
+  <figure>
+    <figcaption>
+      <span class="cap-kicker">Форма 6</span>
+      <span class="cap-title">Запись траты</span>
+      <span class="cap-note">Своё название поверх банковского. Строка из выписки остаётся: по ней работают правила, подписки и поиск.</span>
+    </figcaption>
+    <div class="phone">
+      <div class="island"></div>
+      <div class="screenwrap">
+        <div class="scr dir-d" id="pf6">
+          <div class="flow is-list">
+            <div class="d-head"><h1>Траты</h1></div>
+          </div>
+          <nav class="nav">
+            <b><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 10.6 12 3.5l8.5 7.1V20a.9.9 0 0 1-.9.9h-4.4v-5.6H8.8v5.6H4.4a.9.9 0 0 1-.9-.9z"/></svg>Главная</b>
+            <b><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="4"/></svg>Цели</b>
+            <b><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M5.5 20V13.5M12 20V5M18.5 20v-9.5"/></svg>Портфель</b>
+            <b class="on"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M3.8 8.6h16.4v9.9a1.6 1.6 0 0 1-1.6 1.6H5.4a1.6 1.6 0 0 1-1.6-1.6z"/><path d="M6.6 8.6V5.9a1.6 1.6 0 0 1 1.6-1.6h7.6a1.6 1.6 0 0 1 1.6 1.6v2.7"/></svg>Траты</b>
+            <b><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M6 12h.01M12 12h.01M18 12h.01"/></svg>Настройки</b>
+          </nav>
+        </div>
+        <div class="d-scrim dir-d"></div>
+        <div class="d-sheet dir-d">
+          <div class="d-grab"></div>
+          <div class="d-sheet-h"><b>Запись</b><span class="num">2 августа 2026</span></div>
+          <div class="d-sheet-b">
+
+            <!-- Своё название поверх банковского.
+                 Оно только показывается: правила категорий, поиск подписок
+                 и поиск по экрану продолжают работать по строке из выписки.
+                 Иначе переименование «SUPERMARKET PYATEROCHKA 4512 MOSCOW»
+                 в «Пятёрочку» разом ломает все три. -->
+            <div class="d-fld">
+              <span class="d-fld-l">Название</span>
+              <span class="d-ctrl">Пятёрочка</span>
+              <small class="d-hint">В выписке: SUPERMARKET PYATEROCHKA 4512 MOSCOW. По ней работают правила, подписки и поиск — она остаётся как есть.</small>
+            </div>
+
+            <div class="d-fld">
+              <span class="d-fld-l">Сумма, ₽</span>
+              <span class="d-ctrl big num">2 597,40</span>
+            </div>
+
+            <div class="d-fld">
+              <span class="d-fld-l">Вид</span>
+              <span class="d-ctrl">Расход
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+              </span>
+              <small class="d-hint">Перевод себе не считается ни тратой, ни доходом.</small>
+            </div>
+
+            <div class="d-fld">
+              <span class="d-fld-l">Категория</span>
+              <span class="d-ctrl">Продукты
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+              </span>
+            </div>
+
+            <div class="d-check2" style="margin-top:16px">
+              <span class="d-box on"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 5 5L19 7"/></svg></span>
+              <span>Запомнить для похожих</span>
+            </div>
+            <small class="d-hint">Все записи со словом «PYATEROCHKA» получат эту категорию.</small>
+
+            <p class="d-note info">Слово берётся самое длинное в описании: в «SUPERMARKET PYATEROCHKA 4512 MOSCOW» узнаётся «PYATEROCHKA», а не «MOSCOW» и не номер точки. Правило по номеру точки сработало бы ровно один раз.</p>
+
+          </div>
+          <div class="d-sheet-f">
+            <button class="d-btn dan" type="button">Удалить</button>
+            <button class="d-btn pri" type="button">Сохранить</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </figure>
+
+</div>
+
+<h1 style="font-size:22px;margin-bottom:6px">Откуда что взято</h1>
+<p class="lede">Три исходных направления. A и C — родители комбо, B оставлен для сравнения плотности.</p>
+
+<div class="rail">
+
+  <!-- ================================================================== A -->
+  <figure>
+    <figcaption>
+      <span class="cap-kicker">Направление A</span>
+      <span class="cap-title">Витрина</span>
+      <span class="cap-note">Т-Банк, Альфа, Сбер. Капитал — предмет: жёлтая карта, под ней круглые действия.</span>
+    </figcaption>
+    <div class="phone">
+      <div class="island"></div>
+      <div class="screenwrap">
+        <div class="scr dir-a" id="pa">
+          <div class="flow">
+
+            <div class="a-top">
+              <div class="a-ava">М</div>
+              <div class="a-hello">Доброе утро</div>
+              <div class="a-bell">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M18 8.5a6 6 0 1 0-12 0c0 6-2 7.5-2 7.5h16s-2-1.5-2-7.5"/><path d="M13.7 19.5a2 2 0 0 1-3.4 0"/></svg>
+              </div>
+            </div>
+
+            <div class="a-plate">
+              <div class="a-plate-lbl">Мой капитал</div>
+              <div class="a-plate-val num">3 418 920 ₽</div>
+              <div class="a-plate-chip">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M5 12l7-7 7 7"/></svg>
+                <span class="num">15 000 ₽ сегодня</span>
+              </div>
+              <div class="a-plate-split">
+                <div><span>Доступно</span><strong class="num">642 300 ₽</strong></div>
+                <div><span>Инвестиции</span><strong class="num">2 776 620 ₽</strong></div>
+              </div>
+            </div>
+
+            <div class="a-acts">
+              <div class="a-act is-key">
+                <i><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></i>
+                <span>Внести</span>
+              </div>
+              <div class="a-act">
+                <i><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3v12M17 15l-4-4M17 15l4-4M7 21V9M7 9 3 13M7 9l4 4"/></svg></i>
+                <span>Операция</span>
+              </div>
+              <div class="a-act">
+                <i><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="4"/><circle cx="12" cy="12" r=".9" fill="currentColor" stroke="none"/></svg></i>
+                <span>Цель</span>
+              </div>
+              <div class="a-act">
+                <i><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2.5"/><path d="M3 9h18M8 14h4"/></svg></i>
+                <span>Снимок</span>
+              </div>
+            </div>
+
+            <div class="a-advice">
+              <div class="beast">
+                <svg viewBox="0 0 40 48" width="22" height="26">
+                  <ellipse cx="20" cy="24" rx="12" ry="12.5" fill="#101114"/>
+                  <circle cx="16" cy="22.5" r="3.6" fill="#fff"/><circle cx="24" cy="22.5" r="3.6" fill="#fff"/>
+                  <circle cx="16.7" cy="23" r="1.8" fill="#101114"/><circle cx="24.7" cy="23" r="1.8" fill="#101114"/>
+                  <path d="M16.5 29 C18.2 30.8 21.8 30.8 23.5 29" stroke="#fff" stroke-width="1.6" fill="none" stroke-linecap="round"/>
+                </svg>
+              </div>
+              <p>ОФЗ 26238: выплата <span class="num">4 380 ₽</span> послезавтра</p>
+              <span class="chev">›</span>
+            </div>
+
+            <div class="a-card">
+              <div class="a-goal-top">
+                <b>Квартира</b>
+                <span class="num">64%</span>
+              </div>
+              <div class="a-track"><i style="width:64%"></i></div>
+              <div class="a-goal-foot">
+                <span class="num">1 920 000 из 3 000 000 ₽</span>
+                <span>март 2027</span>
+              </div>
+              <p class="a-goal-hint num">нужно 4 100 ₽/день · темп 3 640 ₽</p>
+            </div>
+
+            <div class="a-card">
+              <div class="a-head"><h2>Требует внимания</h2><em>скрыто 1</em></div>
+              <div class="a-sig">
+                <div class="a-dot w">!</div>
+                <div class="a-sig-t"><b>Вклад 3 месяца</b><span>закрывается через 9 дней</span></div>
+                <span style="color:var(--ink-3);font-size:19px">›</span>
+              </div>
+              <div class="a-sig">
+                <div class="a-dot e">!</div>
+                <div class="a-sig-t"><b>Накопительный счёт</b><span class="num">банк показывает на 3,96 ₽ больше</span></div>
+                <span style="color:var(--ink-3);font-size:19px">›</span>
+              </div>
+              <button class="a-fix num" type="button">Записать разницу 3,96 ₽</button>
+            </div>
+
+            <div class="a-card">
+              <div class="a-head"><h2>Капитал</h2><em>6 месяцев</em></div>
+              <svg class="a-chart" viewBox="0 0 320 110" width="100%" height="110" preserveAspectRatio="none">
+                <defs><linearGradient id="ga" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stop-color="var(--acc)" stop-opacity=".28"/>
+                  <stop offset="100%" stop-color="var(--acc)" stop-opacity="0"/>
+                </linearGradient></defs>
+                <path d="M4 92 L57 84 L110 78 L163 60 L216 48 L269 30 L316 14 L316 106 L4 106 Z" fill="url(#ga)"/>
+                <path d="M4 92 L57 84 L110 78 L163 60 L216 48 L269 30 L316 14" fill="none" stroke="var(--acc)" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
+                <circle cx="316" cy="14" r="4" fill="var(--acc)"/>
+              </svg>
+              <div class="a-readout"><span>фев</span><span class="num">+18,4% за полгода</span><span>авг</span></div>
+            </div>
+
+            <div class="a-card">
+              <div class="a-head"><h2>Жизнь и накопления</h2><em>подробно ›</em></div>
+              <div class="a-stats">
+                <div class="a-stat"><span>Прожито</span><b class="num">486 200</b></div>
+                <div class="a-stat g"><span>Отложено</span><b class="num">+214 000</b></div>
+                <div class="a-stat"><span>Подушка</span><b class="num">7,9 мес.</b></div>
+              </div>
+            </div>
+
+            <div class="a-card">
+              <div class="a-head"><h2>Дисциплина</h2><em>6 дней подряд</em></div>
+              <div class="a-grid">
+                <i class="a-cell on"></i><i class="a-cell on"></i><i class="a-cell"></i><i class="a-cell on"></i><i class="a-cell on"></i>
+                <i class="a-cell on"></i><i class="a-cell"></i><i class="a-cell on"></i><i class="a-cell on"></i><i class="a-cell on"></i>
+                <i class="a-cell"></i><i class="a-cell on"></i><i class="a-cell on"></i><i class="a-cell on"></i><i class="a-cell on"></i>
+                <i class="a-cell"></i><i class="a-cell on"></i><i class="a-cell on"></i><i class="a-cell on"></i><i class="a-cell"></i>
+                <i class="a-cell on"></i><i class="a-cell on"></i><i class="a-cell on"></i><i class="a-cell on"></i><i class="a-cell on"></i>
+                <i class="a-cell on"></i><i class="a-cell on"></i><i class="a-cell on"></i><i class="a-cell"></i><i class="a-cell"></i>
+              </div>
+            </div>
+
+          </div>
+
+          <nav class="nav">
+            <b class="on"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 10.6 12 3.5l8.5 7.1V20a.9.9 0 0 1-.9.9h-4.4v-5.6H8.8v5.6H4.4a.9.9 0 0 1-.9-.9z"/></svg>Главная</b>
+            <b><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="4"/></svg>Цели</b>
+            <b><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M5.5 20V13.5M12 20V5M18.5 20v-9.5"/></svg>Портфель</b>
+            <b><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M3.8 8.6h16.4v9.9a1.6 1.6 0 0 1-1.6 1.6H5.4a1.6 1.6 0 0 1-1.6-1.6z"/><path d="M6.6 8.6V5.9a1.6 1.6 0 0 1 1.6-1.6h7.6a1.6 1.6 0 0 1 1.6 1.6v2.7"/></svg>Траты</b>
+            <b><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M6 12h.01M12 12h.01M18 12h.01"/></svg>Настройки</b>
+          </nav>
+        </div>
+      </div>
+    </div>
+  </figure>
+
+  <!-- ================================================================== B -->
+  <figure>
+    <figcaption>
+      <span class="cap-kicker">Направление B</span>
+      <span class="cap-title">Система</span>
+      <span class="cap-note">Apple Wallet и Настройки iOS. Экран — документ: крупный заголовок, вложенные списки, воздух.</span>
+    </figcaption>
+    <div class="phone">
+      <div class="island"></div>
+      <div class="screenwrap">
+        <div class="scr dir-b is-dark" id="pb">
+          <div class="flow">
+
+            <div class="b-title">
+              <h1>Кубыш</h1>
+              <p>3 августа, воскресенье</p>
+            </div>
+
+            <div class="b-hero">
+              <div class="b-hero-lbl">Мой капитал</div>
+              <div class="b-hero-val num">3 418 920 ₽</div>
+              <div class="b-hero-sub num">+15 000 ₽ сегодня</div>
+            </div>
+
+            <div class="b-seg">
+              <span class="on">Всё</span><span>Доступно</span><span>Инвестиции</span>
+            </div>
+
+            <button class="b-cta" type="button" style="margin-top:0">
+              Внести 5 000 ₽
+              <small>Накопительный счёт · Квартира</small>
+            </button>
+
+            <div class="b-lbl" style="margin-top:28px">Сегодня</div>
+            <div class="b-grp">
+              <div class="b-row pad">
+                <span class="b-ico" style="background:#ffcc00;color:#000">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 8v5M12 16.5h.01"/><circle cx="12" cy="12" r="9"/></svg>
+                </span>
+                <div class="b-txt"><b>ОФЗ 26238</b><small class="num">выплата 4 380 ₽ послезавтра</small></div>
+                <span class="b-chev">›</span>
+              </div>
+              <div class="b-row pad">
+                <span class="b-ico" style="background:#ff9f0a">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 7v6M12 16.5h.01"/></svg>
+                </span>
+                <div class="b-txt"><b>Вклад 3 месяца</b><small>закрывается через 9 дней</small></div>
+                <span class="b-chev">›</span>
+              </div>
+              <div class="b-row pad">
+                <span class="b-ico" style="background:#ff453a">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 7v6M12 16.5h.01"/></svg>
+                </span>
+                <div class="b-txt"><b>Накопительный счёт</b><small class="num">расхождение 3,96 ₽</small></div>
+                <span class="b-chev">›</span>
+              </div>
+            </div>
+
+            <div class="b-lbl">Цели</div>
+            <div class="b-grp">
+              <div class="b-block">
+                <div class="b-goal-top"><b>Квартира</b><span class="num">64%</span></div>
+                <div class="b-bar"><i style="width:64%"></i></div>
+                <div class="b-goal-foot"><span class="num">1 920 000 из 3 000 000 ₽</span><span>март 2027</span></div>
+              </div>
+              <div class="b-row">
+                <div class="b-txt"><b>Отпуск</b></div>
+                <span class="b-val num">38%</span>
+                <span class="b-chev">›</span>
+              </div>
+              <div class="b-row">
+                <div class="b-txt"><b>Все цели</b></div>
+                <span class="b-val">4</span>
+                <span class="b-chev">›</span>
+              </div>
+            </div>
+
+            <div class="b-lbl">Капитал</div>
+            <div class="b-grp">
+              <div class="b-block" style="padding-bottom:8px">
+                <svg viewBox="0 0 320 100" width="100%" height="100" preserveAspectRatio="none">
+                  <line x1="0" x2="320" y1="30" y2="30" stroke="var(--sep)" stroke-width="1"/>
+                  <line x1="0" x2="320" y1="66" y2="66" stroke="var(--sep)" stroke-width="1"/>
+                  <path d="M4 86 L57 79 L110 73 L163 56 L216 45 L269 28 L316 12" fill="none" stroke="var(--ink)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                  <circle cx="316" cy="12" r="3.4" fill="var(--ink)"/>
+                </svg>
+                <div class="b-goal-foot" style="margin-top:4px"><span>февраль</span><span>август</span></div>
+              </div>
+              <div class="b-row">
+                <div class="b-txt"><b>Рост за полгода</b></div>
+                <span class="b-val s num">+18,4%</span>
+              </div>
+            </div>
+
+            <div class="b-lbl">Жизнь и накопления</div>
+            <div class="b-grp">
+              <div class="b-block">
+                <div class="b-stats">
+                  <div><span>Прожито</span><b class="num">486 200</b><small>за 6 мес.</small></div>
+                  <div><span>Отложено</span><b class="num">+214 000</b><small>31% дохода</small></div>
+                  <div><span>Подушка</span><b class="num">7,9</b><small>месяцев</small></div>
+                </div>
+              </div>
+              <div class="b-row">
+                <div class="b-txt"><b>Разбор трат</b></div>
+                <span class="b-chev">›</span>
+              </div>
+            </div>
+            <p class="b-foot">Равновесие держится: треть дохода уходит в накопления, подушки хватит почти на восемь месяцев.</p>
+
+            <div class="b-lbl">Дисциплина</div>
+            <div class="b-grp">
+              <div class="b-row">
+                <div class="b-txt"><b>Дней подряд</b></div>
+                <span class="b-val s">6</span>
+              </div>
+              <div class="b-row">
+                <div class="b-txt"><b>Взносов за месяц</b></div>
+                <span class="b-val s">21 из 30</span>
+              </div>
+            </div>
+
+          </div>
+
+          <nav class="nav">
+            <b class="on"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 10.6 12 3.5l8.5 7.1V20a.9.9 0 0 1-.9.9h-4.4v-5.6H8.8v5.6H4.4a.9.9 0 0 1-.9-.9z"/></svg>Главная</b>
+            <b><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="4"/></svg>Цели</b>
+            <b><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M5.5 20V13.5M12 20V5M18.5 20v-9.5"/></svg>Портфель</b>
+            <b><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M3.8 8.6h16.4v9.9a1.6 1.6 0 0 1-1.6 1.6H5.4a1.6 1.6 0 0 1-1.6-1.6z"/><path d="M6.6 8.6V5.9a1.6 1.6 0 0 1 1.6-1.6h7.6a1.6 1.6 0 0 1 1.6 1.6v2.7"/></svg>Траты</b>
+            <b><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M6 12h.01M12 12h.01M18 12h.01"/></svg>Настройки</b>
+          </nav>
+        </div>
+      </div>
+    </div>
+  </figure>
+
+  <!-- ================================================================== C -->
+  <figure>
+    <figcaption>
+      <span class="cap-kicker">Направление C</span>
+      <span class="cap-title">Панель</span>
+      <span class="cap-note">Revolut, Monzo, терминалы. Бенто-сетка: каждое число — плитка, всё главное без прокрутки.</span>
+    </figcaption>
+    <div class="phone">
+      <div class="island"></div>
+      <div class="screenwrap">
+        <div class="scr dir-c" id="pc">
+          <div class="flow">
+
+            <div class="c-top">
+              <b>Кубыш</b>
+              <div class="c-pills"><span>Мес</span><span class="on">6 мес</span><span>Год</span></div>
+            </div>
+
+            <div class="c-bento">
+
+              <div class="c-tile c-hero">
+                <div class="c-k">Мой капитал</div>
+                <div class="c-hero-v num">3 418 920 ₽</div>
+                <div class="c-hero-row">
+                  <span class="c-badge num">+18,4%</span>
+                  <span class="c-hero-note num">+15 000 ₽ сегодня</span>
+                </div>
+                <svg class="c-spark" viewBox="0 0 320 56" width="100%" height="56" preserveAspectRatio="none">
+                  <defs><linearGradient id="gc" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stop-color="var(--acc)" stop-opacity=".26"/>
+                    <stop offset="100%" stop-color="var(--acc)" stop-opacity="0"/>
+                  </linearGradient></defs>
+                  <path d="M4 46 L57 42 L110 39 L163 30 L216 24 L269 15 L316 6 L316 54 L4 54 Z" fill="url(#gc)"/>
+                  <path d="M4 46 L57 42 L110 39 L163 30 L216 24 L269 15 L316 6" fill="none" stroke="var(--acc)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+                <div class="c-split">
+                  <div><span>ДОСТУПНО</span><b class="num">642 300 ₽</b></div>
+                  <div><span>ИНВЕСТИЦИИ</span><b class="num">2 776 620 ₽</b></div>
+                </div>
+              </div>
+
+              <div class="c-tile">
+                <div class="c-ring">
+                  <svg width="52" height="52" viewBox="0 0 58 58">
+                    <circle cx="29" cy="29" r="24" fill="none" stroke="var(--tile-2)" stroke-width="7"/>
+                    <circle cx="29" cy="29" r="24" fill="none" stroke="var(--acc)" stroke-width="7"
+                            stroke-linecap="round" stroke-dasharray="150.8 150.8" stroke-dashoffset="54.3"
+                            transform="rotate(-90 29 29)"/>
+                    <text x="29" y="34" text-anchor="middle" font-size="16" font-weight="700" fill="var(--ink)" font-family="Inter">64%</text>
+                  </svg>
+                  <div class="c-ring-t">
+                    <b>Квартира</b>
+                    <span class="num">1,92 из 3 млн ₽<br>март 2027</span>
+                  </div>
+                </div>
+              </div>
+
+              <div class="c-tile">
+                <div class="c-k">Подушка</div>
+                <div class="c-v num">7,9 мес.</div>
+                <div class="c-s">мгновенные деньги</div>
+                <div class="c-strip">
+                  <i class="on" style="height:40%"></i><i class="on" style="height:55%"></i><i class="on" style="height:48%"></i>
+                  <i class="on" style="height:70%"></i><i class="on" style="height:64%"></i><i class="on" style="height:88%"></i>
+                  <i style="height:100%"></i>
+                </div>
+              </div>
+
+              <div class="c-tile">
+                <div class="c-k">Отложено</div>
+                <div class="c-v num">+214 000</div>
+                <div class="c-s up num">31% дохода</div>
+              </div>
+
+              <div class="c-tile">
+                <div class="c-k">Прожито</div>
+                <div class="c-v num">486 200</div>
+                <div class="c-s">за 6 месяцев</div>
+              </div>
+
+              <div class="c-tile wide">
+                <div class="c-k" style="margin-bottom:8px">Требует внимания · 2</div>
+                <div class="c-alert">
+                  <i class="e"></i>
+                  <p><b>Накопительный счёт</b> <span class="num">— банк показывает на 3,96 ₽ больше</span></p>
+                  <em>ЗАПИСАТЬ</em>
+                </div>
+                <div class="c-alert">
+                  <i class="w"></i>
+                  <p><b>Вклад 3 месяца</b> <span>— закрывается через 9 дней</span></p>
+                  <em>ОТКРЫТЬ</em>
+                </div>
+              </div>
+
+              <div class="c-tile wide">
+                <div class="c-k" style="margin-bottom:10px">Дисциплина · 6 дней подряд · 21 из 30</div>
+                <div class="c-days">
+                  <i class="on"></i><i class="on"></i><i></i><i class="on"></i><i class="on"></i>
+                  <i class="on"></i><i></i><i class="on"></i><i class="on"></i><i class="on"></i>
+                  <i></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i>
+                  <i></i><i class="on"></i><i class="on"></i><i class="on"></i><i></i>
+                  <i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i>
+                  <i class="on"></i><i class="on"></i><i class="on"></i><i></i><i></i>
+                </div>
+              </div>
+
+            </div>
+
+            <button class="c-cta" type="button">
+              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+              <span class="num">Внести 5 000 ₽</span>
+            </button>
+
+          </div>
+
+          <nav class="nav">
+            <b class="on"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 10.6 12 3.5l8.5 7.1V20a.9.9 0 0 1-.9.9h-4.4v-5.6H8.8v5.6H4.4a.9.9 0 0 1-.9-.9z"/></svg>Главная</b>
+            <b><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="4"/></svg>Цели</b>
+            <b><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M5.5 20V13.5M12 20V5M18.5 20v-9.5"/></svg>Портфель</b>
+            <b><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M3.8 8.6h16.4v9.9a1.6 1.6 0 0 1-1.6 1.6H5.4a1.6 1.6 0 0 1-1.6-1.6z"/><path d="M6.6 8.6V5.9a1.6 1.6 0 0 1 1.6-1.6h7.6a1.6 1.6 0 0 1 1.6 1.6v2.7"/></svg>Траты</b>
+            <b><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M6 12h.01M12 12h.01M18 12h.01"/></svg>Настройки</b>
+          </nav>
+        </div>
+      </div>
+    </div>
+  </figure>
+
+</div>
+
+<div class="legend">
+  <h2>Что решено в комбо</h2>
+  <ul>
+    <li><b>Экран не прокручивается — это его главное свойство.</b> Не «почти помещается», а ровно ноль пикселей за нижним краем: полезная высота 782, из них 44 статусная строка и 64 навигация, остальное поделено между плитками сеткой с явными строками. Проверка встроена в макет: если содержимое перерастёт рамку, в консоли появится предупреждение.</li>
+    <li><b>Действия круглые, не полосой.</b> Полоса во всю ширину — это одно действие; здесь их четыре, и главное выделено краской, а не размером. Подпись «Внести взнос» вместо суммы: сумма живёт в настройках быстрого взноса и меняется, а подпись кнопки — нет.</li>
+    <li><b>Цели листаются внутри плитки.</b> Активных целей бывает одна, а бывает пять, и вертикали под них нет. Лента с прилипанием показывает одну цель целиком; точки под ней — единственный признак, что за краем есть ещё. Без прилипания лента встаёт между целями, и на экране оказывается пол-кольца одной и пол-кольца другой.</li>
+    <li><b>Переключатель периода уступил место колокольчику.</b> Период переехал в шапку главной плитки — без него линия графика теряет масштаб. Колокольчик ведёт в «Требует внимания», и число на нём обязательно: колокольчик без числа сообщает, что уведомления бывают, а с числом — что их сейчас два.</li>
+    <li><b>Плитка «Требует внимания» осталась на экране.</b> Расхождение со сверкой — это деньги, и прятать его за колокольчик значит узнавать о нём по своей воле, а не сразу. Если плитку всё же убрать, освободится около 90 пикселей: их хватит на график капитала или на вторую видимую цель.</li>
+    <li><b>Жёлтый на белом не рисует линий.</b> В светлой теме дуга кольца, линия графика и полосы прогресса — графит, жёлтый остаётся только заливкой круглой кнопки. Это не вкус: <code>#FFDD2D</code> на белом даёт 1,34:1. То же правило записано в <code>tokens.css</code> самого приложения.</li>
+  </ul>
+
+  <h2>Чем исходные направления отличаются по существу</h2>
+  <ul>
+    <li><b>A. Витрина.</b> Капитал вынесен на жёлтую карту — он перестаёт быть строкой текста и становится предметом. Под картой ряд круглых действий: главный жест доступен сразу, без прокрутки и без плавающей кнопки. Дальше — стопка одинаковых блоков. Это язык, на котором говорят Т-Банк, Альфа и Сбер: узнаётся мгновенно, но и слабее всего отличает приложение от них.</li>
+    <li><b>B. Система.</b> Ничего похожего на банк: крупный заголовок, вложенные сгруппированные списки, волосяные линии, цвет почти не участвует. Сигналы, цели и статистика перестают быть карточками и становятся строками одного документа. Плотность выше, шума меньше, читается как Настройки iOS. Жёлтый остаётся ровно на одной кнопке — и потому работает.</li>
+    <li><b>C. Панель.</b> Бенто-сетка: капитал, цель, подушка и отложено умещаются в первый экран, сигналы и дисциплина — на пол-экрана ниже. Кнопка «Внести» закреплена и не уезжает с прокруткой. Ставка на то, что приложение открывают посмотреть, а не полистать. Самое непохожее на остальные два — и самое требовательное: сетка ломается, когда чисел становится больше, чем плиток, а у целей и активов число заранее не известно.</li>
+  </ul>
+
+  <h2>Что переделка затронет в коде</h2>
+  <ul>
+    <li><b>Расчётов не касается вовсе.</b> <code>calc.js</code>, <code>store.js</code>, <code>import.js</code>, <code>ocr.js</code>, <code>statement.js</code> — 200 КБ логики — остаются как есть.</li>
+    <li><b>Токены.</b> <code>css/tokens.css</code> переписывается: шкалы отступов, кеглей, радиусов задаются заново под выбранный язык.</li>
+    <li><b>Компоненты.</b> <code>css/app.css</code> (86 КБ) переписывается почти целиком. Классы сохраняются по именам, чтобы разметка видов не переезжала.</li>
+    <li><b>Виды.</b> В <code>js/views/*</code> и <code>js/ui.js</code> правки точечные — там, где направление требует другой структуры: круглые действия в A, группы вместо карточек в B, сетка плиток в C.</li>
+    <li><b>Тесты.</b> 60 файлов в <code>tests/</code> ходят по селекторам. Ломается всё, что опирается на классы, — это чинится вместе с разметкой, а не после.</li>
+    <li><b>Мусор.</b> <code>css/theme-t.css</code> и <code>preview-tbank*.html</code> удаляются: их содержимое уже влито в <code>tokens.css</code>.</li>
+  </ul>
+</div>
+
+<script>
+  const A = document.getElementById('pa');
+  const B = document.getElementById('pb');
+  const C = document.getElementById('pc');
+  const D = document.getElementById('pd');
+  for (const btn of document.querySelectorAll('.bar button')) {
+    btn.addEventListener('click', () => {
+      for (const b of document.querySelectorAll('.bar button')) b.classList.toggle('is-on', b === btn);
+      const light = btn.dataset.t === 'light';
+      A.classList.toggle('is-light', light);
+      B.classList.toggle('is-dark', !light);
+      C.classList.toggle('is-light', light);
+      D.classList.toggle('is-light', light);
+      document.getElementById('pg').classList.toggle('is-light', light);
+      document.getElementById('pp').classList.toggle('is-light', light);
+      document.getElementById('pt').classList.toggle('is-light', light);
+      document.getElementById('ps').classList.toggle('is-light', light);
+      for (const id of ['pf1', 'pf2', 'pf3', 'pf4', 'pf5', 'pf6']) {
+        document.getElementById(id).classList.toggle('is-light', light);
+      }
+      // Шторка и затемнение лежат рядом с экраном, а не внутри него: свои
+      // переменные темы им нужны отдельно, иначе форма остаётся тёмной
+      // на светлом экране.
+      for (const el of document.querySelectorAll('.d-sheet, .d-scrim')) {
+        el.classList.toggle('is-light', light);
+      }
+    });
+  }
+
+  // Выбор содержимого освободившейся плитки. Заодно пересчитываем высоту:
+  // варианты разной длины, и «не прокручивается» должно оставаться правдой
+  // для каждого из них, а не только для того, что открыт по умолчанию.
+  const slots = [...document.querySelectorAll('.d-slot')];
+  for (const btn of document.querySelectorAll('#slots button')) {
+    btn.addEventListener('click', () => {
+      for (const b of document.querySelectorAll('#slots button')) b.classList.toggle('is-on', b === btn);
+      slots.forEach((s) => s.classList.toggle('on', s.dataset.slot === btn.dataset.slot));
+      checkFit();
+    });
+  }
+
+  // Форма актива: поля по типу.
+  //
+  // Не украшение и не экономия места. Пустое поле «День капитализации»
+  // у акции — это не «просто лишнее»: человек его читает, пытается понять,
+  // что от него хотят, и заполняет наугад. Форма, в которой видны только
+  // применимые поля, короче и честнее одновременно.
+  const ASSET = {
+    share:   { name: 'Сбербанк ао', sub: 'Акция · в портфеле',    cls: 'Акции',      type: 'Акция',     ticker: 'SBER', price: '320,00',  priceLabel: 'Текущая цена, ₽',      lot: 'Бумаг в лоте', paid: 'Заплачено за лот, ₽', total: 'Вложено <b>506 552 ₽</b> за 1 600 бумаг. Средняя цена с комиссией — 316,60 ₽.' },
+    fund:    { name: 'Ликвидность', sub: 'Фонд · в портфеле',     cls: 'Фонды',      type: 'Фонд',      ticker: 'LQDT', price: '1,4524',  priceLabel: 'Текущая цена, ₽',      lot: 'Паёв в лоте',  paid: 'Заплачено за лот, ₽', total: 'Вложено <b>305 004 ₽</b> за 210 000 паёв. Средняя цена с комиссией — 1,4524 ₽.' },
+    bond:    { name: 'ОФЗ 26238',   sub: 'Облигация · в портфеле', cls: 'Облигации', type: 'Облигация', ticker: 'SU26238RMFS4', price: '92,586', priceLabel: 'Текущая цена, % от номинала', lot: 'Бумаг в лоте', paid: 'Заплачено за лот, % от номинала', total: 'Вложено <b>1 277 700 ₽</b> за 1 380 бумаг. Средняя цена с комиссией и НКД — 92,84%.' },
+    deposit: { name: 'Вклад 3 месяца', sub: 'Вклад · 16,5% годовых', cls: '— не входит в доли', type: 'Вклад' },
+  };
+
+  const atype = document.getElementById('atype');
+  if (atype) {
+    const setType = (key) => {
+      const a = ASSET[key];
+      for (const b of atype.querySelectorAll('button')) b.classList.toggle('is-on', b.dataset.t === key);
+      document.getElementById('af-name').textContent = a.name;
+      document.getElementById('af-sub').textContent = a.sub;
+      document.getElementById('af-title').textContent = a.name;
+      document.getElementById('af-type').firstChild.textContent = a.type + '\n                  ';
+      document.getElementById('af-class').firstChild.textContent = a.cls + '\n                ';
+      if (a.ticker) {
+        document.getElementById('af-ticker').textContent = a.ticker;
+        document.getElementById('af-price').textContent = a.price;
+        document.getElementById('af-price-l').textContent = a.priceLabel;
+        document.getElementById('af-lotsize-l').textContent = a.lot;
+        document.getElementById('af-paid-l').textContent = a.paid;
+        document.getElementById('af-total').innerHTML = a.total;
+      }
+      for (const g of document.querySelectorAll('[data-for]')) {
+        g.hidden = !g.dataset.for.split(' ').includes(key);
+      }
+    };
+    for (const b of atype.querySelectorAll('button')) {
+      b.addEventListener('click', () => setType(b.dataset.t));
+    }
+    setType('share');
+  }
+
+  // Раскрытие привязанных активов. Через делегирование: карточек целей
+  // сколько угодно, и вешать обработчик на каждую значит помнить о нём
+  // при каждом добавлении цели.
+  document.addEventListener('click', (e) => {
+    const head = e.target.closest('.d-linked-h');
+    if (!head) return;
+    const open = head.getAttribute('aria-expanded') === 'true';
+    head.setAttribute('aria-expanded', String(!open));
+    head.nextElementSibling.hidden = open;
+  });
+
+  // Точка следует за лентой целей. Считаем по положению прокрутки, а не по
+  // событию прилипания: onscrollsnapchange есть не везде, а деление ширины
+  // на слайд работает всюду и не требует наблюдателя на каждую цель.
+  const goals = document.getElementById('goals');
+  const dots = [...document.getElementById('dots').children];
+  goals.addEventListener('scroll', () => {
+    const i = Math.round(goals.scrollLeft / goals.clientWidth);
+    dots.forEach((d, n) => d.classList.toggle('on', n === i));
+  }, { passive: true });
+
+  // Проверка обещания: экран не должен прокручиваться. Если содержимое
+  // переросло рамку, об этом надо знать сразу, а не заметить на устройстве.
+  function checkFit() {
+    const over = D.scrollHeight - D.clientHeight;
+    const slot = document.querySelector('.d-slot.on').dataset.slot;
+    if (over > 1) console.warn(`Комбо прокручивается на ${over} px — вариант «${slot}»`);
+    else console.info(`Комбо помещается в экран — вариант «${slot}»`);
+  }
+  requestAnimationFrame(checkFit);
+</script>
+</body>
+</html>

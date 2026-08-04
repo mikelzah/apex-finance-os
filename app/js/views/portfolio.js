@@ -22,6 +22,7 @@ import * as forms from '../forms.js';
 import * as journal from './journal.js';
 import * as moex from '../moex.js';
 import * as store from '../store.js';
+import * as icons from '../icons.js';
 
 const { h } = U;
 
@@ -36,16 +37,34 @@ const { h } = U;
  */
 let mode = 'assets';
 
+/**
+ * Заголовок раздела — «Деньги», а не «Портфель».
+ *
+ * Портфель и журнал — два разреза одного и того же, и слово «Портфель» стоит
+ * прямо под заголовком в переключателе. Повторённое дважды подряд, крупным
+ * и мелким, оно читается не как заголовок раздела, а как сбой отрисовки.
+ *
+ * Действие меняется вместе с разрезом: на портфеле заводят бумагу, в журнале
+ * записывают операцию. Один плюс, который делает разное в зависимости от того,
+ * что открыто, — это не двусмысленность, а ровно то, чего ждут: добавить сюда.
+ */
+export function head(ctx) {
+  const add = mode === 'journal'
+    ? { label: 'Записать операцию', open: () => forms.operationSheet(null, { onDone: ctx.refresh }) }
+    : {
+        label: 'Добавить бумагу',
+        open: () => forms.assetSheet(null, {
+          onDone: ctx.refresh,
+          preset: { type: C.TYPE_INVESTMENT, liquidity: 'T+1', assetClass: 'Акции', lotSize: 1 },
+        }),
+      };
+
+  return U.screenHead('Деньги', U.roundAction(add.label, icons.icon('plus'), add.open));
+}
+
 export function render(ctx) {
   if (ctx.sub) return instrument(ctx);
-
-  // Строка над содержимым нужна только журналу — ради кнопки записи сделки.
-  return [
-    mode === 'journal'
-      ? h('div', { class: 'screen-head is-end' }, [journal.addButton(ctx)])
-      : null,
-    ...(mode === 'journal' ? journal.body(ctx) : overview(ctx)),
-  ];
+  return mode === 'journal' ? journal.body(ctx) : overview(ctx);
 }
 
 /** Открывает журнал снаружи — с переключателя разрезов и по старому адресу. */
@@ -306,27 +325,23 @@ function holdings(ctx, total) {
 }
 
 /**
- * Два действия портфеля стоят в строку, а не одно под другим.
+ * Служебное действие портфеля — обновить котировки.
  *
- * Стопкой они читались как один сплошной блок: две одинаковые капсулы во всю
- * ширину, вплотную, без всякого признака, что это разные вещи. В строке
- * разница видна сразу — и по месту, и по весу: завести бумагу это основное
- * действие, обновить котировки — служебное.
+ * Завести бумагу отсюда ушло в круглое действие шапки. Прежде здесь стояли
+ * обе кнопки в ряд, и главная из них — «Добавить бумагу» — оказывалась в самом
+ * низу экрана, под всеми бумагами: чтобы завести первую, приходилось сперва
+ * пролистать те, которых ещё нет. Действие раздела принадлежит шапке раздела.
+ *
+ * Обновление котировок осталось внизу и осталось обводкой: его делают после
+ * того, как посмотрели на список, а не до.
  */
 function actions(ctx, withTickers) {
-  const { refresh } = ctx;
+  if (!withTickers.length) return null;
   const status = h('p', { class: 'quotes-status' });
 
-  // Обновление котировок — служебное действие и потому обводкой, а не
-  // заливкой: две одинаково крупные кнопки в ряд читались как выбор
-  // из равного, хотя завести бумагу и подтянуть цены — вещи разного веса.
   return h('div', { class: 'act' }, [
-    U.button('Добавить бумагу', () => forms.assetSheet(null, {
-      onDone: refresh,
-      preset: { type: C.TYPE_INVESTMENT, liquidity: 'T+1', assetClass: 'Акции', lotSize: 1 },
-    }), { kind: 'primary', class: 'btn-wide' }),
-    withTickers.length ? U.button('Обновить котировки', () => updateQuotes(ctx, withTickers, status), { class: 'btn-wide btn-ghost' }) : null,
-    withTickers.length ? status : null,
+    U.button('Обновить котировки', () => updateQuotes(ctx, withTickers, status), { class: 'btn-wide btn-ghost' }),
+    status,
   ]);
 }
 
@@ -369,20 +384,33 @@ function paperRow(r, ctx, total, ops) {
   ]);
 }
 
+/**
+ * Тикеры, у которых значка нет. Заполняется по ходу дела: список «у кого
+ * значок есть» пришлось бы держать в двух местах сразу — в папке и в коде —
+ * и однажды забыть про одно из них.
+ *
+ * Живёт до перезагрузки страницы, и этого достаточно. Без него экран портфеля
+ * при каждой перерисовке заново просит файлы, которых нет: облигаций и фондов
+ * тысячи, логотипов у них не бывает вовсе, и каждая перерисовка стоила бы
+ * десятка запросов с заранее известным ответом.
+ */
+const noLogo = new Set();
+
 /** Значок бумаги: файл по тикеру или монограмма из первых букв. */
 function paperMark(asset) {
   const ticker = String(asset.ticker || '').trim().toUpperCase();
-  if (ticker && /^[A-Z0-9]+$/.test(ticker)) {
+  if (ticker && /^[A-Z0-9]+$/.test(ticker) && !noLogo.has(ticker)) {
     const img = h('img', {
       src: `./icons/tickers/${ticker}.svg`,
       alt: '',
       loading: 'lazy',
     });
     const box = h('span', { class: 'paper-logo' }, [img]);
-    // Файла может не быть — тогда чип превращается в монограмму прямо здесь,
-    // без списка «у кого значок есть»: список пришлось бы держать в двух
-    // местах сразу и однажды забыть про одно из них.
+    // Файла может не быть — тогда чип превращается в монограмму прямо здесь.
+    // Монограмма это штатный вид, а не сбой: у большинства бумаг значка нет
+    // по существу.
     img.addEventListener('error', () => {
+      noLogo.add(ticker);
       box.className = 'paper-mono';
       box.textContent = monogram(asset.name, ticker);
     });

@@ -43,7 +43,13 @@ const TABS = [
   { id: 'goals', label: 'Цели', icon: 'target' },
   { id: 'portfolio', label: 'Портфель', icon: 'bars' },
   { id: 'spending', label: 'Траты', icon: 'wallet' },
-  { id: 'more', label: 'Настройки', icon: 'more' },
+  // Шестерёнка только у выбранной вкладки. Многоточие означает «здесь есть
+  // ещё что-то» и осталось от прежнего имени раздела — «Ещё»; про настройки
+  // оно не говорит ничего. Заменить его шестерёнкой во всех состояниях нельзя:
+  // шестерёнка плотнее остальных четырёх значков и в невыбранном ряду
+  // перевешивает его вправо. Выбранной вкладке перевешивать нечего — она
+  // и должна быть тяжелее прочих.
+  { id: 'more', label: 'Настройки', icon: 'more', iconOn: 'gear' },
 ];
 
 /**
@@ -184,6 +190,10 @@ function render() {
 
   const notices = [offlineNotice(), backupBanner(ctx)].filter(Boolean);
   U.append(screen, notices);
+  // Шапка раздела — крупный заголовок и действие — стоит выше переключателя
+  // разрезов: разрезы принадлежат экрану, а не наоборот. Собирает её сам вид:
+  // заголовок один на раздел, а действие у каждого своё.
+  if (view.head && !route.sub) U.append(screen, view.head(ctx));
   // Переключатель стоит только на самом портфеле. На подстранице — бумага,
   // снимок капитала — его нет: там наверху шапка с «назад», и второй ряд
   // переключателей под ней означал бы, что уйти можно и вбок тоже.
@@ -336,15 +346,27 @@ function renderTabs() {
         h('span', { class: 'tab-label', text: tab.label }),
       ]),
     );
+    tabNodes.forEach((node, i) => { node.dataset.glyph = TABS[i].icon; });
 
     U.append(U.clear(tabbar), tabNodes);
   }
 
   TABS.forEach((tab, i) => {
     const active = tab.id === route.tab;
-    tabNodes[i].classList.toggle('is-on', active);
-    if (active) tabNodes[i].setAttribute('aria-current', 'page');
-    else tabNodes[i].removeAttribute('aria-current');
+    const node = tabNodes[i];
+    node.classList.toggle('is-on', active);
+
+    // Значок выбранной вкладки может отличаться от невыбранной. Меняется
+    // подменой узла, а не переключением видимости двух: второй значок в разметке
+    // виден скринридеру и попадает в поиск по странице, а его там быть не должно.
+    const want = active && tab.iconOn ? tab.iconOn : tab.icon;
+    if (node.dataset.glyph !== want) {
+      node.replaceChild(icon(want), node.firstChild);
+      node.dataset.glyph = want;
+    }
+
+    if (active) node.setAttribute('aria-current', 'page');
+    else node.removeAttribute('aria-current');
   });
 }
 

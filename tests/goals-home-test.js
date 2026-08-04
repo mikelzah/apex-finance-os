@@ -74,7 +74,7 @@ const URL = 'http://127.0.0.1:8899/app/index.html';
   console.log('\n4. Новая цель появляется после добавления через форму');
   await p.evaluate(() => { location.hash = '#/goals'; });
   await p.waitForTimeout(700);
-  await p.locator('.screen-head .btn-primary:has-text("Добавить")').click();
+  await p.locator('.screen-head .head-round[aria-label="Добавить цель"]').click();
   await p.waitForTimeout(500);
   // Числовые поля тоже type=text — название берём по data-autofocus.
   await p.locator('.sheet-body input[data-autofocus=yes]').fill('💻 Ноутбук');
