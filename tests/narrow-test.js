@@ -63,11 +63,33 @@ const SCREENS = [
           * Math.max(0, Math.min(r.h1.b, r.act.b) - Math.max(r.h1.t, r.act.t));
         check(`${screen}: действие не налезает на заголовок`, ov === 0, `${ov} px²`);
         check(`${screen}: действие внутри экрана`, r.act.r <= r.screenW + 1, `${r.act.r} из ${r.screenW}`);
-        // Сорок четыре пикселя на палец — минимум, ниже которого круг
-        // перестаёт быть кнопкой, как бы аккуратно он ни выглядел.
-        check(`${screen}: в действие можно попасть пальцем`,
-          (r.act.r - r.act.l) >= 40 && (r.act.b - r.act.t) >= 40,
-          `${r.act.r - r.act.l}×${r.act.b - r.act.t}`);
+
+        // Сорок четыре пикселя на палец — минимум, ниже которого кнопка
+        // перестаёт быть кнопкой, как бы аккуратно она ни выглядела.
+        //
+        // Меряется не размер круга, а то, куда попадает палец: круг нарисован
+        // в тридцать четыре — рядом заголовок экрана, и круг в сорок четыре
+        // начинает с ним спорить, — а ловит на сорока четырёх невидимой
+        // накладкой вокруг себя. Размер узла об этом ничего не знает,
+        // и проверять надо тычком, а не рулеткой.
+        const reach = await p.evaluate(() => {
+          const act = document.querySelector('.screen-head .head-round');
+          const q = act.getBoundingClientRect();
+          const cx = q.left + q.width / 2;
+          const cy = q.top + q.height / 2;
+          const R = 21; // половина сорока четырёх минус пиксель на округление
+          const hits = (x, y) => {
+            const el = document.elementFromPoint(x, y);
+            return Boolean(el && (el === act || act.contains(el)));
+          };
+          return {
+            left: hits(cx - R, cy), right: hits(cx + R, cy),
+            top: hits(cx, cy - R), bottom: hits(cx, cy + R),
+          };
+        });
+        const missed = Object.entries(reach).filter(([, ok]) => !ok).map(([k]) => k);
+        check(`${screen}: в действие можно попасть пальцем`, missed.length === 0,
+          missed.length ? `мимо с краёв: ${missed.join(', ')}` : '44×44');
       }
     }
     await c.close();
